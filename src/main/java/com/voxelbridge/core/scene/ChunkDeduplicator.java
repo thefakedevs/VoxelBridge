@@ -1,4 +1,4 @@
-package com.voxelbridge.export.scene;
+package com.voxelbridge.core.scene;
 
 import gnu.trove.map.hash.TObjectIntHashMap;
 import java.util.*;
@@ -133,8 +133,8 @@ final class ChunkDeduplicator {
     void flushTo(SceneSink target) {
         if (quads.isEmpty()) return;
 
-        // OPTIMIZATION: Batch transfer for GltfSceneBuilder to reduce lock contention
-        if (target instanceof com.voxelbridge.export.scene.gltf.GltfSceneBuilder gltfSink) {
+        // OPTIMIZATION: Batch transfer for bulk-capable sinks to reduce lock contention
+        if (target instanceof BulkQuadSink bulkSink) {
             int count = quads.size();
             List<String> spriteKeys = new ArrayList<>(count);
             List<String> overlaySpriteKeys = new ArrayList<>(count);
@@ -193,7 +193,7 @@ final class ChunkDeduplicator {
                 allDoubleSided.add(quad.doubleSided());
             }
 
-            gltfSink.addBatch(
+            bulkSink.addBatch(
                 materialKey,
                 spriteKeys,
                 overlaySpriteKeys,

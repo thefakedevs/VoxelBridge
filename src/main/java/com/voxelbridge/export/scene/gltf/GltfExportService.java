@@ -4,8 +4,8 @@ import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.StreamingRegionSampler;
 import com.voxelbridge.export.ExportProgressTracker;
-import com.voxelbridge.export.scene.SceneSink;
-import com.voxelbridge.export.scene.SceneWriteRequest; // Fixed: missing import
+import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.scene.SceneWriteRequest; // Fixed: missing import
 import com.voxelbridge.export.texture.TextureAtlasManager;
 import com.voxelbridge.util.client.ProgressNotifier;
 import com.voxelbridge.util.debug.LogModule;

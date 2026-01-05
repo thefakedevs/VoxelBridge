@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.scene.SceneSink;
+import com.voxelbridge.core.scene.SceneSink;
 import com.voxelbridge.export.texture.BlockEntityTextureManager;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;

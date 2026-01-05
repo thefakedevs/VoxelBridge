@@ -6,7 +6,7 @@ import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExportResult;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
-import com.voxelbridge.export.scene.SceneSink;
+import com.voxelbridge.core.scene.SceneSink;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.modhandler.ModHandledQuads;
 import com.voxelbridge.modhandler.ModHandlerRegistry;

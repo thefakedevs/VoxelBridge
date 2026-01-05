@@ -2,8 +2,7 @@ package com.voxelbridge.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.voxelbridge.VoxelBridge;
-import com.voxelbridge.command.VoxelBridgeCommands;
+import com.voxelbridge.export.ExportControl;
 import com.voxelbridge.export.ExportProgressTracker;
 import com.voxelbridge.export.ExportProgressTracker.ChunkState;
 import net.minecraft.client.Minecraft;
@@ -14,24 +13,19 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import java.util.Map;
 
-@EventBusSubscriber(modid = VoxelBridge.MODID, value = Dist.CLIENT)
 public class SelectionRenderer {
 
-    @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
 
-        BlockPos pos1 = VoxelBridgeCommands.getPos1();
-        BlockPos pos2 = VoxelBridgeCommands.getPos2();
+        BlockPos pos1 = ExportControl.getPos1();
+        BlockPos pos2 = ExportControl.getPos2();
 
         if (pos1 == null && pos2 == null) return;
 

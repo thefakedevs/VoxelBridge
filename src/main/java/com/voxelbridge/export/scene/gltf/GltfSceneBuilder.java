@@ -3,8 +3,9 @@ package com.voxelbridge.export.scene.gltf;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportProgressTracker;
-import com.voxelbridge.export.scene.SceneSink;
-import com.voxelbridge.export.scene.SceneWriteRequest;
+import com.voxelbridge.core.scene.BulkQuadSink;
+import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.scene.SceneWriteRequest;
 import com.voxelbridge.export.texture.TextureExportPipeline;
 import com.voxelbridge.export.texture.TextureLoader;
 import com.voxelbridge.export.texture.AnimatedTextureHelper;
@@ -40,7 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 3. UV remapping -> uvraw.bin -> finaluv.bin
  * 4. Assemble glTF -> Build directly from geometry.bin + finaluv.bin
  */
-public final class GltfSceneBuilder implements SceneSink {
+public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
     private final ExportContext ctx;
     private final Path outputDir;
     private final TextureRegistry textureRegistry;
@@ -111,6 +112,7 @@ public final class GltfSceneBuilder implements SceneSink {
      * Optimized batch addition.
      * Called by ChunkDeduplicator to reduce queue lock contention.
      */
+    @Override
     public void addBatch(String materialGroupKey,
                          List<String> spriteKeys,
                          List<String> overlaySpriteKeys,

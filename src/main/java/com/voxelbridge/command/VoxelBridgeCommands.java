@@ -1,13 +1,9 @@
 package com.voxelbridge.command;
 
-import java.nio.file.Path;
-
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.CoordinateMode;
-import com.voxelbridge.export.ExportProgressTracker;
-import com.voxelbridge.util.io.IOUtil;
+import com.voxelbridge.export.ExportControl;
 import com.voxelbridge.util.client.RayCastUtil;
-import com.voxelbridge.thread.ExportThread;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.tree.CommandNode;
 import net.minecraft.client.Minecraft;
@@ -15,7 +11,6 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 
 /**
@@ -24,33 +19,26 @@ import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
  */
 public final class VoxelBridgeCommands {
 
-    private static BlockPos pos1;
-    private static BlockPos pos2;
-
     private VoxelBridgeCommands() {}
 
     public static BlockPos getPos1() {
-        return pos1;
+        return ExportControl.getPos1();
     }
 
     public static BlockPos getPos2() {
-        return pos2;
+        return ExportControl.getPos2();
     }
 
     public static void setPos1(BlockPos pos) {
-        pos1 = pos;
-        ExportProgressTracker.previewSelection(pos1, pos2);
+        ExportControl.setPos1(pos);
     }
 
     public static void setPos2(BlockPos pos) {
-        pos2 = pos;
-        ExportProgressTracker.previewSelection(pos1, pos2);
+        ExportControl.setPos2(pos);
     }
 
     public static void clearSelection() {
-        pos1 = null;
-        pos2 = null;
-        ExportProgressTracker.clear();
+        ExportControl.clearSelection();
     }
 
     public static void register(RegisterClientCommandsEvent event) {
@@ -63,9 +51,8 @@ public final class VoxelBridgeCommands {
                 ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No block targeted."));
                 return 0;
             }
-            pos1 = hit;
-            ExportProgressTracker.previewSelection(pos1, pos2);
-            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + pos1));
+            setPos1(hit);
+            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + getPos1()));
             return 1;
         }));
 
@@ -76,16 +63,15 @@ public final class VoxelBridgeCommands {
                 ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No block targeted."));
                 return 0;
             }
-            pos2 = hit;
-            ExportProgressTracker.previewSelection(pos1, pos2);
-            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + pos2));
+            setPos2(hit);
+            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + getPos2()));
             return 1;
         }));
 
         root.then(Commands.literal("info").executes(ctx -> {
             ctx.getSource().sendSystemMessage(Component.literal("6[VoxelBridge] Selection info:"));
-            ctx.getSource().sendSystemMessage(Component.literal("e  pos1: f" + (pos1 != null ? pos1 : "unset")));
-            ctx.getSource().sendSystemMessage(Component.literal("e  pos2: f" + (pos2 != null ? pos2 : "unset")));
+            ctx.getSource().sendSystemMessage(Component.literal("e  pos1: f" + (getPos1() != null ? getPos1() : "unset")));
+            ctx.getSource().sendSystemMessage(Component.literal("e  pos2: f" + (getPos2() != null ? getPos2() : "unset")));
             ctx.getSource().sendSystemMessage(Component.literal("e  Atlas mode: f" + ExportRuntimeConfig.getAtlasMode().getDescription()));
             ctx.getSource().sendSystemMessage(Component.literal("e  Atlas size: f" + ExportRuntimeConfig.getAtlasSize().getDescription()));
             ctx.getSource().sendSystemMessage(Component.literal("e  Atlas padding: f" + ExportRuntimeConfig.getAtlasPadding() + "px"));
@@ -334,29 +320,10 @@ public final class VoxelBridgeCommands {
         );
 
         root.then(Commands.literal("export").executes(ctx -> {
-            if (pos1 == null || pos2 == null) {
-                ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] Please set pos1 and pos2 first."));
-                return 0;
-            }
-
             Minecraft mc = Minecraft.getInstance();
-            Level level = mc.level;
-            if (level == null) {
-                ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No world loaded."));
-                return 0;
-            }
-
-            try {
-                Path outDir = IOUtil.ensureExportDir();
-                Thread exportThread = new ExportThread(level, pos1, pos2, outDir);
-                ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] Starting export (glTF) ..."));
-                exportThread.start();
-                return 1;
-            } catch (Exception e) {
-                e.printStackTrace();
-                ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] Export failed: " + e.getMessage()));
-                return 0;
-            }
+            ExportControl.ExportResult result = ExportControl.startExport(mc.level);
+            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] " + result.message()));
+            return result.started() ? 1 : 0;
         }));
 
         // Register the literal once and reuse the returned node for the "vb" shortcut.

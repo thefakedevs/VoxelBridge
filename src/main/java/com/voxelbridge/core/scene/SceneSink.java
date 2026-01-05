@@ -1,4 +1,4 @@
-package com.voxelbridge.export.scene;
+package com.voxelbridge.core.scene;
 
 import java.io.IOException;
 

@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.scene.SceneSink;
+import com.voxelbridge.core.scene.SceneSink;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;

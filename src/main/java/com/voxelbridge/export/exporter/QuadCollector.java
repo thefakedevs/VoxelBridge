@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter;
 
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.scene.SceneSink;
+import com.voxelbridge.core.scene.SceneSink;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.export.util.geometry.GeometryUtil;
 import com.voxelbridge.export.util.color.ColorModeHandler;
