@@ -1,5 +1,8 @@
 package com.voxelbridge.export.exporter.blockentity;
 
+import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
+import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
+import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -32,22 +35,29 @@ import net.neoforged.api.distmarker.OnlyIn;
  * load it from the resource manager.
  */
 @OnlyIn(Dist.CLIENT)
-public final class BlockEntityTextureResolver {
+public final class BlockEntityTextureResolver implements TextureResolver<BlockEntity> {
 
     private BlockEntityTextureResolver() {
     }
 
+    public static final BlockEntityTextureResolver INSTANCE = new BlockEntityTextureResolver();
+    private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
+
     private static final boolean IS_CHRISTMAS = isChristmasWindow();
 
-    public record ResolvedTexture(ResourceLocation texture, float u0, float u1, float v0, float v1, boolean isAtlasTexture, TextureAtlasSprite sprite, ResourceLocation atlasLocation) {
+    public static void setRenderTypeResolver(RenderTypeResolver resolver) {
+        if (resolver != null) {
+            RENDER_TYPE_RESOLVER = resolver;
+        }
     }
 
     /**
      * Resolve the texture for a block entity render, falling back to the render
      * type's texture when no better match is available.
      */
-    public static ResolvedTexture resolve(BlockEntity blockEntity, RenderType renderType) {
-        ResourceLocation base = RenderTypeTextureResolver.resolve(renderType);
+    @Override
+    public ResolvedTexture resolve(BlockEntity blockEntity, RenderType renderType) {
+        ResourceLocation base = RENDER_TYPE_RESOLVER.resolve(renderType);
 
         // First try entity-specific resolution (for known BlockEntity types)
         ResolvedTexture mapped = resolveFromBlockEntity(blockEntity, base);

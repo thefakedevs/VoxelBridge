@@ -1,7 +1,7 @@
 package com.voxelbridge.export.texture;
 
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.exporter.blockentity.BlockEntityTextureResolver;
+import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -58,7 +58,7 @@ public final class BlockEntityTextureManager {
      * Uses the same approach as the old EntityTextureManager for compatibility.
      * Returns the sprite key that should be used.
      */
-    public static String registerTexture(ExportContext ctx, BlockEntityTextureResolver.ResolvedTexture textureRes) {
+    public static String registerTexture(ExportContext ctx, ResolvedTexture textureRes) {
         ResourceLocation textureLoc = com.voxelbridge.util.ResourceLocationUtil.sanitize(textureRes.texture().toString());
         String spriteKey = "blockentity:" + textureLoc.getNamespace() + "/" + textureLoc.getPath();
 
@@ -173,7 +173,7 @@ public final class BlockEntityTextureManager {
         }
     }
 
-    private static BufferedImage loadTextureFromResolved(BlockEntityTextureResolver.ResolvedTexture textureRes, ResourceLocation location) {
+    private static BufferedImage loadTextureFromResolved(ResolvedTexture textureRes, ResourceLocation location) {
         if (textureRes.isAtlasTexture()) {
             TextureAtlasSprite sprite = textureRes.sprite();
             if (sprite != null) {
@@ -227,7 +227,7 @@ public final class BlockEntityTextureManager {
      * Some block entity textures come from atlases (e.g., chest/sign). Their PBR companions are often atlases like chest_n.png.
      * This attempts to load atlas-level _n/_s and crop the relevant UV rectangle into sprite-specific images.
      */
-    private static void tryCropPbrFromAtlas(ExportContext ctx, BlockEntityTextureResolver.ResolvedTexture textureRes, String spriteKey) {
+    private static void tryCropPbrFromAtlas(ExportContext ctx, ResolvedTexture textureRes, String spriteKey) {
         ResourceLocation atlas = textureRes.atlasLocation() != null ? textureRes.atlasLocation() : textureRes.texture();
         if (atlas == null) return;
 
@@ -343,6 +343,5 @@ public final class BlockEntityTextureManager {
         return s.replace(':', '_').replace('/', '_');
     }
 }
-
 
 

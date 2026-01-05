@@ -1,11 +1,12 @@
 package com.voxelbridge.export.exporter.blockentity;
 
+import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
+import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import com.voxelbridge.util.debug.LogModule;
-import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,7 +17,9 @@ import java.util.Optional;
  * Resolves texture resource locations from RenderType instances using reflection.
  */
 @OnlyIn(Dist.CLIENT)
-public final class RenderTypeTextureResolver {
+public final class RenderTypeTextureResolver implements RenderTypeResolver {
+
+    public static final RenderTypeTextureResolver INSTANCE = new RenderTypeTextureResolver();
 
     private RenderTypeTextureResolver() {
     }
@@ -27,7 +30,8 @@ public final class RenderTypeTextureResolver {
      * @param renderType the render type
      * @return the texture location, or null if it cannot be determined
      */
-    public static ResourceLocation resolve(RenderType renderType) {
+    @Override
+    public ResourceLocation resolve(RenderType renderType) {
         if (renderType == null) {
             return null;
         }
@@ -56,7 +60,8 @@ public final class RenderTypeTextureResolver {
     /**
      * Determines if the RenderType disables back-face culling.
      */
-    public static boolean isDoubleSided(RenderType renderType) {
+    @Override
+    public boolean isDoubleSided(RenderType renderType) {
         try {
             RenderType.CompositeState state = compositeState(renderType);
             if (state == null) {

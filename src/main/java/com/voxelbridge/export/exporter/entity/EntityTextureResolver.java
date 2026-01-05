@@ -1,5 +1,8 @@
 package com.voxelbridge.export.exporter.entity;
 
+import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
+import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
+import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.export.exporter.blockentity.RenderTypeTextureResolver;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.RenderType;
@@ -19,15 +22,24 @@ import com.voxelbridge.util.debug.VoxelBridgeLogger;
  * Resolves textures for entity renderers with entity-specific overrides.
  */
 @OnlyIn(Dist.CLIENT)
-public final class EntityTextureResolver {
-
-    public record ResolvedTexture(ResourceLocation texture, float u0, float u1, float v0, float v1,
-                                  boolean isAtlasTexture, net.minecraft.client.renderer.texture.TextureAtlasSprite sprite,
-                                  ResourceLocation atlasLocation) {}
+public final class EntityTextureResolver implements TextureResolver<Entity> {
+    public static final EntityTextureResolver INSTANCE = new EntityTextureResolver();
+    private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
 
     private EntityTextureResolver() {}
 
-    public static ResolvedTexture resolve(Entity entity, RenderType renderType) {
+    public static void setRenderTypeResolver(RenderTypeResolver resolver) {
+        if (resolver != null) {
+            RENDER_TYPE_RESOLVER = resolver;
+        }
+    }
+
+    @Override
+    public ResolvedTexture resolve(Entity entity, RenderType renderType) {
+        return resolveInternal(entity, renderType);
+    }
+
+    private static ResolvedTexture resolveInternal(Entity entity, RenderType renderType) {
         // Try entity-specific resolvers first
         ResolvedTexture specific = resolveEntitySpecific(entity, renderType);
         if (specific != null) {
@@ -35,7 +47,7 @@ public final class EntityTextureResolver {
         }
 
         // Fall back to generic RenderType-based resolution
-        ResourceLocation base = RenderTypeTextureResolver.resolve(renderType);
+        ResourceLocation base = RENDER_TYPE_RESOLVER.resolve(renderType);
         if (base == null) {
             return null;
         }
@@ -126,7 +138,7 @@ public final class EntityTextureResolver {
                 itemFrame.getType(), "direction", itemFrame.getDirection()));
 
             // Item frames use the block atlas; resolve to an atlas sprite via RenderType first.
-            ResourceLocation base = RenderTypeTextureResolver.resolve(renderType);
+            ResourceLocation base = RENDER_TYPE_RESOLVER.resolve(renderType);
             if (base != null) {
                 VoxelBridgeLogger.debug(LogModule.ENTITY, "[ItemFrame] Resolved texture from RenderType: " + base);
                 return resolveTextureWithAtlasDetection(base);
