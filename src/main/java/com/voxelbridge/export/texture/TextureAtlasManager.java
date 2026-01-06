@@ -1,11 +1,11 @@
 package com.voxelbridge.export.texture;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.config.ExportRuntimeConfig.AtlasMode;
+import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.core.texture.TextureRepository;
 import com.voxelbridge.core.texture.UvRemap;
-import com.voxelbridge.config.ExportRuntimeConfig.AtlasMode;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -15,23 +15,16 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
+import java.awt.image.SinglePixelPackedSampleModel;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.LinkedHashMap;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.Comparator;
-import java.util.stream.Collectors;
-import java.awt.image.DataBufferInt;
-import java.awt.image.SinglePixelPackedSampleModel;
-import java.util.concurrent.Executors;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 /**
  * TextureAtlasManager handles atlas bookkeeping and generation.

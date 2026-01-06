@@ -1,23 +1,19 @@
 package com.voxelbridge.export.scene.gltf;
 
-import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.config.ExportRuntimeConfig;
-import com.voxelbridge.export.ExportProgressTracker;
-import com.voxelbridge.core.ir.IrBulkQuadSink;
-import com.voxelbridge.core.ir.IrFlags;
-import com.voxelbridge.core.ir.IrSink;
-import com.voxelbridge.core.ir.RenderLayer;
-import com.voxelbridge.core.ir.TintMode;
+import com.voxelbridge.core.export.ExportState;
+import com.voxelbridge.core.ir.*;
 import com.voxelbridge.core.scene.SceneWriteRequest;
+import com.voxelbridge.export.ExportProgressTracker;
 import com.voxelbridge.export.texture.ColorMapManager;
-import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import de.javagl.jgltf.impl.v2.*;
 import de.javagl.jgltf.model.io.GltfAsset;
 import de.javagl.jgltf.model.io.GltfAssetWriter;
 import de.javagl.jgltf.model.io.v2.GltfAssetV2;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;

@@ -1,12 +1,12 @@
 package com.voxelbridge.export.texture;
 
+import com.mojang.blaze3d.platform.NativeImage;
+import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import com.voxelbridge.config.ExportRuntimeConfig;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 

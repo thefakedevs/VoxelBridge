@@ -5,7 +5,6 @@ import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.util.debug.LogModule;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.*;

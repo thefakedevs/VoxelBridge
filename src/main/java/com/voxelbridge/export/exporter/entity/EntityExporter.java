@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter.entity;
 
-import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.world.entity.Entity;

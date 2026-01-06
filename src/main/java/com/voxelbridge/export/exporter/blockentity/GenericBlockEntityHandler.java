@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter.blockentity;
 
-import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.util.debug.LogModule;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;

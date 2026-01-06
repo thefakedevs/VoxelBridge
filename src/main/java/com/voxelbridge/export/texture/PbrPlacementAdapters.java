@@ -1,7 +1,5 @@
 package com.voxelbridge.export.texture;
 
-import com.voxelbridge.core.texture.PbrAtlasWriter;
-
 /**
  * Platform-side adapters for core PBR atlas placement interfaces.
  */

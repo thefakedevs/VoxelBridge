@@ -1,12 +1,12 @@
 package com.voxelbridge.export.exporter;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.export.CoordinateMode;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExportResult;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
-import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.modhandler.ModHandledQuads;

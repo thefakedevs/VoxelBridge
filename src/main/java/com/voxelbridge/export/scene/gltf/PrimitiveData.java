@@ -1,12 +1,8 @@
 package com.voxelbridge.export.scene.gltf;
 
 import gnu.trove.map.hash.TObjectIntHashMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.Objects;
+
+import java.util.*;
 
 /**
  * Accumulates vertices/indices for a single material group (e.g. "minecraft:glass").

@@ -1,9 +1,9 @@
 package com.voxelbridge.export.texture;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.VoxelBridge;
 import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.export.ExportContext;
-import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.Minecraft;

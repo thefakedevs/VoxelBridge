@@ -1,11 +1,15 @@
 package com.voxelbridge.export.exporter;
 
-import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
+import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -13,10 +17,6 @@ import net.minecraft.world.level.material.FluidState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.textures.FluidSpriteCache;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
-import net.minecraft.resources.ResourceLocation;
 
 /**
  * Format-agnostic sampler for fluid geometry.
