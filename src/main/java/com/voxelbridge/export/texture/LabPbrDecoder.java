@@ -76,9 +76,9 @@ public final class LabPbrDecoder {
                     try {
                         BufferedImage normal = readImage(normalPages.get(udim));
                         if (normal != null) {
-                            PngjWriter.write(decodeNormal(normal), atlasDir.resolve("atlas_normal_" + udim + ".png"));
-                            PngjWriter.write(extractChannel(normal, Channel.BLUE), atlasDir.resolve("atlas_ao_" + udim + ".png"));
-                            PngjWriter.write(extractChannel(normal, Channel.ALPHA), atlasDir.resolve("atlas_height_" + udim + ".png"));
+                            com.voxelbridge.core.texture.PngjWriter.write(decodeNormal(normal), atlasDir.resolve("atlas_normal_" + udim + ".png"));
+                            com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.BLUE), atlasDir.resolve("atlas_ao_" + udim + ".png"));
+                            com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.ALPHA), atlasDir.resolve("atlas_height_" + udim + ".png"));
                         }
 
                         BufferedImage spec = readImage(specPages.get(udim));
@@ -87,10 +87,10 @@ public final class LabPbrDecoder {
                             if (albedo != null && (albedo.getWidth() != spec.getWidth() || albedo.getHeight() != spec.getHeight())) {
                                 albedo = resizeTo(albedo, spec.getWidth(), spec.getHeight());
                             }
-                            PngjWriter.write(decodeRoughness(spec), atlasDir.resolve("atlas_roughness_" + udim + ".png"));
-                            PngjWriter.write(decodeMetallic(spec), atlasDir.resolve("atlas_metallic_" + udim + ".png"));
-                            PngjWriter.write(decodeSss(spec), atlasDir.resolve("atlas_sss_" + udim + ".png"));
-                            PngjWriter.write(decodeEmissive(albedo, spec), atlasDir.resolve("atlas_emissive_" + udim + ".png"));
+                            com.voxelbridge.core.texture.PngjWriter.write(decodeRoughness(spec), atlasDir.resolve("atlas_roughness_" + udim + ".png"));
+                            com.voxelbridge.core.texture.PngjWriter.write(decodeMetallic(spec), atlasDir.resolve("atlas_metallic_" + udim + ".png"));
+                            com.voxelbridge.core.texture.PngjWriter.write(decodeSss(spec), atlasDir.resolve("atlas_sss_" + udim + ".png"));
+                            com.voxelbridge.core.texture.PngjWriter.write(decodeEmissive(albedo, spec), atlasDir.resolve("atlas_emissive_" + udim + ".png"));
                         }
                     } catch (IOException e) {
                         throw new RuntimeException(e);

@@ -136,7 +136,7 @@ public final class TextureAtlasPacker {
             int udim = 1001 + (i % 10) + (i / 10) * 10;
             String filename = prefix + udim + ".png";
             Path outputPath = outputDir.resolve(filename);
-            PngjWriter.write(pages.get(i).image, outputPath);
+            com.voxelbridge.core.texture.PngjWriter.write(pages.get(i).image, outputPath);
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, "[TextureAtlasPacker] Wrote atlas page: " + filename);
             }

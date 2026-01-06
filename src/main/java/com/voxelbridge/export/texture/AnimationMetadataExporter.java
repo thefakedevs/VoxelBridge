@@ -24,7 +24,7 @@ public final class AnimationMetadataExporter {
      * @param metadata Animation metadata to export
      * @param frameCount Total number of frames (for validation)
      */
-    public static void exportMetadata(Path outputDir, AnimationMetadata metadata, int frameCount) {
+    public static void exportMetadata(Path outputDir, com.voxelbridge.core.texture.AnimationMetadata metadata, int frameCount) {
         if (metadata == null || outputDir == null) {
             VoxelBridgeLogger.warn(LogModule.ANIMATION, "[AnimationExport][WARN] Cannot export metadata: null input");
             return;
@@ -58,7 +58,7 @@ public final class AnimationMetadataExporter {
      *   }
      * }
      */
-    private static String generateMcmetaJson(AnimationMetadata metadata, int frameCount) {
+    private static String generateMcmetaJson(com.voxelbridge.core.texture.AnimationMetadata metadata, int frameCount) {
         StringBuilder json = new StringBuilder();
         json.append("{\n");
         json.append("  \"animation\": {\n");
@@ -80,10 +80,10 @@ public final class AnimationMetadataExporter {
         // Custom frame order and timing
         if (metadata.hasCustomFrameOrder()) {
             json.append(",\n    \"frames\": [\n");
-            List<AnimationMetadata.FrameTiming> timings = metadata.frameTimings();
+            List<com.voxelbridge.core.texture.AnimationMetadata.FrameTiming> timings = metadata.frameTimings();
 
             for (int i = 0; i < timings.size(); i++) {
-                AnimationMetadata.FrameTiming timing = timings.get(i);
+                com.voxelbridge.core.texture.AnimationMetadata.FrameTiming timing = timings.get(i);
                 json.append("      ");
 
                 // If frame uses default timing, just output the index
@@ -119,7 +119,7 @@ public final class AnimationMetadataExporter {
      * @param frameIndex Index of this frame in the animation
      * @param metadata Animation metadata
      */
-    public static void exportFrameMetadata(Path frameFile, int frameIndex, AnimationMetadata metadata) {
+    public static void exportFrameMetadata(Path frameFile, int frameIndex, com.voxelbridge.core.texture.AnimationMetadata metadata) {
         if (frameFile == null || metadata == null) {
             return;
         }
@@ -149,14 +149,14 @@ public final class AnimationMetadataExporter {
      * @param frameCount Number of frames exported
      * @return true if metadata is valid for the given frame count
      */
-    public static boolean validateMetadata(AnimationMetadata metadata, int frameCount) {
+    public static boolean validateMetadata(com.voxelbridge.core.texture.AnimationMetadata metadata, int frameCount) {
         if (metadata == null || frameCount <= 0) {
             return false;
         }
 
         // Check if custom frame order references valid indices
         if (metadata.hasCustomFrameOrder()) {
-            for (AnimationMetadata.FrameTiming timing : metadata.frameTimings()) {
+            for (com.voxelbridge.core.texture.AnimationMetadata.FrameTiming timing : metadata.frameTimings()) {
                 if (timing.index() < 0 || timing.index() >= frameCount) {
                     VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(
                         "[AnimationExport][WARN] Frame timing references invalid index %d (max: %d)",

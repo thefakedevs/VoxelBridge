@@ -1,6 +1,7 @@
 package com.voxelbridge.export.texture;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.core.texture.UvRemap;
 import com.voxelbridge.config.ExportRuntimeConfig.AtlasMode;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.ExportContext.BlockEntityAtlasPlacement;
@@ -238,7 +239,7 @@ public final class TextureAtlasManager {
             String relativePath = subDir + safe(spriteKey) + ".png";
             Path target = outDir.resolve(relativePath);
             Files.createDirectories(target.getParent());
-            PngjWriter.write(outputImage, target);
+            com.voxelbridge.core.texture.PngjWriter.write(outputImage, target);
             atlas.atlasFile = target;
             atlas.texW = outputImage.getWidth();
             atlas.texH = outputImage.getHeight();
@@ -257,7 +258,7 @@ public final class TextureAtlasManager {
                 String normalRel = subDir + safe(spriteKey) + "_n.png";
                 Path normalTarget = outDir.resolve(normalRel);
                 Files.createDirectories(normalTarget.getParent());
-                PngjWriter.write(normal, normalTarget);
+                com.voxelbridge.core.texture.PngjWriter.write(normal, normalTarget);
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen] sprite=%s normal exported: %s", spriteKey, normalRel));
                 ctx.getMaterialPaths().put(spriteKey + "_n", normalRel);
             }
@@ -266,7 +267,7 @@ public final class TextureAtlasManager {
                 String specRel = subDir + safe(spriteKey) + "_s.png";
                 Path specTarget = outDir.resolve(specRel);
                 Files.createDirectories(specTarget.getParent());
-                PngjWriter.write(spec, specTarget);
+                com.voxelbridge.core.texture.PngjWriter.write(spec, specTarget);
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen] sprite=%s specular exported: %s", spriteKey, specRel));
                 ctx.getMaterialPaths().put(spriteKey + "_s", specRel);
             }
@@ -470,9 +471,7 @@ public final class TextureAtlasManager {
             return new float[]{u, v};
         }
 
-        double uu = placement.u0() + (double) u * (placement.u1() - placement.u0());
-        double vv = placement.v0() + (double) v * (placement.v1() - placement.v0());
-        return new float[]{(float) uu, (float) vv};
+        return UvRemap.remap(placement, u, v);
     }
 
     private static int sanitizeTintValue(int tint) {
@@ -736,7 +735,7 @@ public final class TextureAtlasManager {
      * Generate PBR atlases (normal/specular) using the same layout as the albedo atlas.
      * Missing channels are filled with default tiles.
      *
-     * Uses PbrAtlasWriter to generate PBR channel atlases aligned to the base texture placements.
+     * Uses com.voxelbridge.core.texture.PbrAtlasWriter to generate PBR channel atlases aligned to the base texture placements.
      * Each tint variant placement gets its own PBR texture lookup.
      */
     private static void generatePbrAtlases(ExportContext ctx,
@@ -754,8 +753,8 @@ public final class TextureAtlasManager {
         Path atlasDir = outDir.resolve(atlasDirName);
 
         // Build a flat map of all placements (spriteKey#tintIndex -> placement)
-        // This allows PbrAtlasWriter to handle each tint variant independently
-        Map<String, PbrAtlasWriter.Placement> flatPlacements = new java.util.LinkedHashMap<>();
+        // This allows com.voxelbridge.core.texture.PbrAtlasWriter to handle each tint variant independently
+        Map<String, com.voxelbridge.core.texture.PbrAtlasWriter.Placement> flatPlacements = new java.util.LinkedHashMap<>();
         for (Map.Entry<String, ExportContext.TintAtlas> entry : entries.entrySet()) {
             String spriteKey = entry.getKey();
             ExportContext.TintAtlas atlas = entry.getValue();
@@ -763,7 +762,7 @@ public final class TextureAtlasManager {
                 int tintIndex = placementEntry.getKey();
                 ExportContext.TexturePlacement placement = placementEntry.getValue();
                 String key = tintIndex == 0 ? spriteKey : spriteKey + "#t" + tintIndex;
-                flatPlacements.put(key, new PbrAtlasWriter.TexturePlacementAdapter(placement));
+                flatPlacements.put(key, new PbrPlacementAdapters.TexturePlacementAdapter(placement));
             }
         }
 
@@ -791,11 +790,11 @@ public final class TextureAtlasManager {
             Future<?> futureNormal = executor.submit(() -> {
                 try {
                     Map<String, BufferedImage> paddedNormalCache = new java.util.concurrent.ConcurrentHashMap<>();
-                    PbrAtlasWriter.PbrAtlasConfig normalConfig = new PbrAtlasWriter.PbrAtlasConfig(
+                    com.voxelbridge.core.texture.PbrAtlasWriter.PbrAtlasConfig normalConfig = new com.voxelbridge.core.texture.PbrAtlasWriter.PbrAtlasConfig(
                         atlasDir, atlasSize, basePrefix + "n_",
                         PbrTextureHelper.DEFAULT_NORMAL_COLOR, usedPages, pageToUdim
                     );
-                    PbrAtlasWriter.generatePbrAtlas(normalConfig, flatPlacements, key -> {
+                    com.voxelbridge.core.texture.PbrAtlasWriter.generatePbrAtlas(normalConfig, flatPlacements, key -> {
                         String spriteKey = key.contains("#") ? key.substring(0, key.indexOf("#")) : key;
                         BufferedImage normalImage = paddedNormalCache.computeIfAbsent(spriteKey, k -> {
                             BufferedImage img = ctx.getCachedSpriteImage(k + "_n");
@@ -808,7 +807,7 @@ public final class TextureAtlasManager {
                             return img;
                         });
                         if (normalImage != null && !key.contains("#")) {
-                            PbrAtlasWriter.Placement p = flatPlacements.get(key);
+                            com.voxelbridge.core.texture.PbrAtlasWriter.Placement p = flatPlacements.get(key);
                             int udim = pageToUdim.getOrDefault(p.page(), p.page() + 1001);
                             String normalPath = atlasDirName + "/" + basePrefix + "n_" + udim + ".png";
                             ctx.getMaterialPaths().put(spriteKey + "_n", normalPath);
@@ -823,11 +822,11 @@ public final class TextureAtlasManager {
             Future<?> futureSpec = executor.submit(() -> {
                 try {
                     Map<String, BufferedImage> paddedSpecCache = new java.util.concurrent.ConcurrentHashMap<>();
-                    PbrAtlasWriter.PbrAtlasConfig specConfig = new PbrAtlasWriter.PbrAtlasConfig(
+                    com.voxelbridge.core.texture.PbrAtlasWriter.PbrAtlasConfig specConfig = new com.voxelbridge.core.texture.PbrAtlasWriter.PbrAtlasConfig(
                         atlasDir, atlasSize, basePrefix + "s_",
                         PbrTextureHelper.DEFAULT_SPECULAR_COLOR, usedPages, pageToUdim
                     );
-                    PbrAtlasWriter.generatePbrAtlas(specConfig, flatPlacements, key -> {
+                    com.voxelbridge.core.texture.PbrAtlasWriter.generatePbrAtlas(specConfig, flatPlacements, key -> {
                         String spriteKey = key.contains("#") ? key.substring(0, key.indexOf("#")) : key;
                         BufferedImage specImage = paddedSpecCache.computeIfAbsent(spriteKey, k -> {
                             BufferedImage img = ctx.getCachedSpriteImage(k + "_s");
@@ -840,7 +839,7 @@ public final class TextureAtlasManager {
                             return img;
                         });
                         if (specImage != null && !key.contains("#")) {
-                            PbrAtlasWriter.Placement p = flatPlacements.get(key);
+                            com.voxelbridge.core.texture.PbrAtlasWriter.Placement p = flatPlacements.get(key);
                             int udim = pageToUdim.getOrDefault(p.page(), p.page() + 1001);
                             String specPath = atlasDirName + "/" + basePrefix + "s_" + udim + ".png";
                             ctx.getMaterialPaths().put(spriteKey + "_s", specPath);
@@ -913,7 +912,7 @@ public final class TextureAtlasManager {
             if (whitelist != null && !whitelist.isEmpty() && !whitelist.contains(spriteKey)) {
                 continue; // Skip animations outside the export set
             }
-            AnimatedFrameSet frames = repo.getAnimation(spriteKey);
+            com.voxelbridge.core.texture.AnimatedFrameSet frames = repo.getAnimation(spriteKey);
             if (frames == null || frames.isEmpty()) {
                 continue; // Skip empty markers
             }
@@ -935,7 +934,7 @@ public final class TextureAtlasManager {
             }
 
             // Export PBR frames if available
-            AnimatedFrameSet normalFrames = repo.getAnimation(spriteKey + "_n");
+            com.voxelbridge.core.texture.AnimatedFrameSet normalFrames = repo.getAnimation(spriteKey + "_n");
             if (normalFrames != null && !normalFrames.isEmpty()) {
                 for (int i = 0; i < frameCount; i++) {
                     String idx = String.format("%03d", i);
@@ -949,7 +948,7 @@ public final class TextureAtlasManager {
                 }
             }
 
-            AnimatedFrameSet specFrames = repo.getAnimation(spriteKey + "_s");
+            com.voxelbridge.core.texture.AnimatedFrameSet specFrames = repo.getAnimation(spriteKey + "_s");
             if (specFrames != null && !specFrames.isEmpty()) {
                 for (int i = 0; i < frameCount; i++) {
                     String idx = String.format("%03d", i);

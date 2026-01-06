@@ -80,7 +80,7 @@ public final class BlockEntityTextureManager {
         // Register the texture with the export context (same as old EntityTextureManager)
         if (texture != null) {
             if (com.voxelbridge.config.ExportRuntimeConfig.isAnimationEnabled()) {
-                AnimatedFrameSet frames = AnimatedTextureHelper.extractAndStore(spriteKey, texture, repo);
+                com.voxelbridge.core.texture.AnimatedFrameSet frames = AnimatedTextureHelper.extractAndStore(spriteKey, texture, repo);
                 if (frames != null && !frames.isEmpty()) {
                     texture = frames.frames().get(0);
                 }

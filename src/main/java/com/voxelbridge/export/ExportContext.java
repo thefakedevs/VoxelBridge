@@ -7,6 +7,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
+import com.voxelbridge.core.texture.UvPlacement;
+
 import com.voxelbridge.export.texture.TextureRepository;
 
 import java.awt.image.BufferedImage;
@@ -236,14 +238,16 @@ public final class ExportContext {
     }
 
     public record TexturePlacement(int page, int tileU, int tileV, int x, int y, int w, int h,
-                                   float u0, float v0, float u1, float v1, String path) {}
+                                   float u0, float v0, float u1, float v1, String path)
+        implements UvPlacement {}
 
     public record EntityTexture(ResourceLocation location, int width, int height) {}
 
     /**
      * Stores atlas placement information for block entity textures.
      */
-    public record BlockEntityAtlasPlacement(int page, int udim, int x, int y, int width, int height, int atlasSize) {
+    public record BlockEntityAtlasPlacement(int page, int udim, int x, int y, int width, int height, int atlasSize)
+        implements UvPlacement {
         public float u0() {
             double tileU = page % 10;
             return (float) (tileU + (double) x / atlasSize);

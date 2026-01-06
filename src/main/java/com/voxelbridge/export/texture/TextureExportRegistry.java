@@ -94,7 +94,7 @@ public final class TextureExportRegistry {
                 throw new IllegalStateException("Failed to resolve texture for spriteKey=" + spriteKey);
             }
             if (ExportRuntimeConfig.isAnimationEnabled()) {
-                AnimatedFrameSet framesForWrite = repo.getAnimation(spriteKey);
+                com.voxelbridge.core.texture.AnimatedFrameSet framesForWrite = repo.getAnimation(spriteKey);
                 if (framesForWrite == null) {
                     framesForWrite = AnimatedTextureHelper.extractAndStore(spriteKey, image, repo);
                 }

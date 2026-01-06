@@ -1,4 +1,4 @@
-package com.voxelbridge.export.texture;
+package com.voxelbridge.core.texture;
 
 import java.util.Collections;
 import java.util.List;

@@ -16,7 +16,7 @@ public final class TextureRepository {
     private final Map<ResourceLocation, BufferedImage> locationCache = new ConcurrentHashMap<>();
     private final Map<String, ResourceLocation> keyToLocation = new ConcurrentHashMap<>();
     private final Map<String, BufferedImage> spriteCache = new ConcurrentHashMap<>();
-    private final Map<String, AnimatedFrameSet> animatedCache = new ConcurrentHashMap<>();
+    private final Map<String, com.voxelbridge.core.texture.AnimatedFrameSet> animatedCache = new ConcurrentHashMap<>();
 
     public BufferedImage get(ResourceLocation loc) {
         return locationCache.get(loc);
@@ -79,14 +79,14 @@ public final class TextureRepository {
         }
     }
 
-    public void putAnimation(String spriteKey, AnimatedFrameSet frames) {
+    public void putAnimation(String spriteKey, com.voxelbridge.core.texture.AnimatedFrameSet frames) {
         // Accept empty frames as markers (indicates animation exists but frames couldn't be extracted)
         if (spriteKey != null && frames != null) {
             animatedCache.put(spriteKey, frames);
         }
     }
 
-    public AnimatedFrameSet getAnimation(String spriteKey) {
+    public com.voxelbridge.core.texture.AnimatedFrameSet getAnimation(String spriteKey) {
         return spriteKey == null ? null : animatedCache.get(spriteKey);
     }
 
@@ -94,7 +94,7 @@ public final class TextureRepository {
         return spriteKey != null && animatedCache.containsKey(spriteKey);
     }
 
-    public Map<String, AnimatedFrameSet> getAnimatedCache() {
+    public Map<String, com.voxelbridge.core.texture.AnimatedFrameSet> getAnimatedCache() {
         return animatedCache;
     }
 

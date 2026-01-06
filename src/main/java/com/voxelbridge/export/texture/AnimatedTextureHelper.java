@@ -44,7 +44,7 @@ public final class AnimatedTextureHelper {
      * Detect animation from .mcmeta file.
      * STRICT MODE: Only accepts textures with valid .mcmeta animation section.
      */
-    public static AnimatedFrameSet detectFromMetadata(String spriteKey, ResourceLocation png, TextureRepository repo) {
+    public static com.voxelbridge.core.texture.AnimatedFrameSet detectFromMetadata(String spriteKey, ResourceLocation png, TextureRepository repo) {
         if (!ExportRuntimeConfig.isAnimationEnabled() || spriteKey == null || png == null || repo == null) {
             return null;
         }
@@ -81,7 +81,7 @@ public final class AnimatedTextureHelper {
      * Now acts as a fallback that tries to load from metadata if not already cached.
      */
     @Deprecated
-    public static AnimatedFrameSet extractAndStore(String spriteKey, BufferedImage img, TextureRepository repo) {
+    public static com.voxelbridge.core.texture.AnimatedFrameSet extractAndStore(String spriteKey, BufferedImage img, TextureRepository repo) {
         if (!ExportRuntimeConfig.isAnimationEnabled() || spriteKey == null || repo == null) {
             return null;
         }
@@ -104,7 +104,7 @@ public final class AnimatedTextureHelper {
      * Split animation frames according to .mcmeta specification.
      * Follows frame order and timing from metadata.
      */
-    private static AnimatedFrameSet splitWithMetadata(String spriteKey, BufferedImage img, AnimationMetadataSection meta, TextureRepository repo) {
+    private static com.voxelbridge.core.texture.AnimatedFrameSet splitWithMetadata(String spriteKey, BufferedImage img, AnimationMetadataSection meta, TextureRepository repo) {
         if (meta == null || img == null) {
             return null;
         }
@@ -142,13 +142,13 @@ public final class AnimatedTextureHelper {
         final int frameCount = totalFrames;
 
         List<Integer> frameOrder = new ArrayList<>();
-        List<AnimationMetadata.FrameTiming> frameTimings = new ArrayList<>();
+        List<com.voxelbridge.core.texture.AnimationMetadata.FrameTiming> frameTimings = new ArrayList<>();
 
         // Capture both frame order AND timing information
         meta.forEachFrame((idx, time) -> {
             if (idx >= 0 && idx < frameCount) {
                 frameOrder.add(idx);
-                frameTimings.add(new AnimationMetadata.FrameTiming(idx, time));
+                frameTimings.add(new com.voxelbridge.core.texture.AnimationMetadata.FrameTiming(idx, time));
             }
         });
 
@@ -182,7 +182,7 @@ public final class AnimatedTextureHelper {
             return null;
         }
 
-        // Create complete AnimationMetadata with captured timing information
+        // Create complete com.voxelbridge.core.texture.AnimationMetadata with captured timing information
         boolean interpolate = false;
         try {
             interpolate = meta.isInterpolatedFrames();
@@ -190,7 +190,7 @@ public final class AnimatedTextureHelper {
             VoxelBridgeLogger.info(LogModule.ANIMATION, "[Animation][DEBUG] AnimationMetadataSection.isInterpolatedFrames() not available, using false");
         }
 
-        AnimationMetadata animMetadata = new AnimationMetadata(
+        com.voxelbridge.core.texture.AnimationMetadata animMetadata = new com.voxelbridge.core.texture.AnimationMetadata(
             meta.getDefaultFrameTime(),
             frameTimings,
             interpolate,
@@ -198,7 +198,7 @@ public final class AnimatedTextureHelper {
             frameH
         );
 
-        AnimatedFrameSet set = new AnimatedFrameSet(frames, animMetadata);
+        com.voxelbridge.core.texture.AnimatedFrameSet set = new com.voxelbridge.core.texture.AnimatedFrameSet(frames, animMetadata);
         repo.putAnimation(spriteKey, set);
         VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(
             "[Animation][INFO] Detected animation: %s (%d frames, %dx%d)",
@@ -212,7 +212,7 @@ public final class AnimatedTextureHelper {
     /**
      * Extract animation frames directly from a loaded atlas sprite (uses SpriteContents metadata).
      */
-    public static AnimatedFrameSet extractFromSprite(String spriteKey, TextureAtlasSprite sprite, TextureRepository repo) {
+    public static com.voxelbridge.core.texture.AnimatedFrameSet extractFromSprite(String spriteKey, TextureAtlasSprite sprite, TextureRepository repo) {
         if (!ExportRuntimeConfig.isAnimationEnabled() || sprite == null || spriteKey == null || repo == null) {
             return null;
         }
@@ -231,7 +231,7 @@ public final class AnimatedTextureHelper {
             // Read full texture from sprite
             BufferedImage full = TextureLoader.readTexture(contents.name(), true);
             if (full != null) {
-                AnimatedFrameSet frames = splitWithMetadata(spriteKey, full, meta, repo);
+                com.voxelbridge.core.texture.AnimatedFrameSet frames = splitWithMetadata(spriteKey, full, meta, repo);
                 return frames;
             }
             return null;
@@ -267,7 +267,7 @@ public final class AnimatedTextureHelper {
                 if (key.endsWith("_n") || key.endsWith("_s")) continue; // skip PBR companions
                 ResourceLocation pngLoc = TextureLoader.spriteKeyToTexturePNG(key);
                 if (pngLoc == null) continue;
-                AnimatedFrameSet frames = detectFromMetadata(key, pngLoc, repo);
+                com.voxelbridge.core.texture.AnimatedFrameSet frames = detectFromMetadata(key, pngLoc, repo);
                 if (frames != null) {
                     whitelistFound++;
                     com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(
@@ -388,7 +388,7 @@ public final class AnimatedTextureHelper {
 
                         if (!repo.hasAnimation(spriteKey)) {
                             // Only treat as animated when .mcmeta is present AND valid
-                            AnimatedFrameSet frames = detectFromMetadata(spriteKey, pngLoc, repo);
+                            com.voxelbridge.core.texture.AnimatedFrameSet frames = detectFromMetadata(spriteKey, pngLoc, repo);
                             if (frames != null) {
                                 foundCount++;
                                 com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(

@@ -1,4 +1,4 @@
-package com.voxelbridge.export.texture;
+package com.voxelbridge.core.texture;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;

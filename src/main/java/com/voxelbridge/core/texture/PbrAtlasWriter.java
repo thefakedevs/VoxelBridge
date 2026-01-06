@@ -1,7 +1,4 @@
-package com.voxelbridge.export.texture;
-
-import com.voxelbridge.util.debug.LogModule;
-import com.voxelbridge.util.debug.VoxelBridgeLogger;
+package com.voxelbridge.core.texture;
 
 import java.awt.AlphaComposite;
 import java.awt.Graphics2D;
@@ -9,10 +6,11 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
 /**
  * Utility for generating PBR (Physically Based Rendering) atlas pages.
@@ -26,8 +24,7 @@ import java.util.function.Function;
  *   <li>Writing atlas pages as UDIM-tiled PNG files</li>
  * </ul>
  *
- * <p>This utility is used by both {@link TextureAtlasManager} (for regular block textures)
- * and {@link BlockEntityTextureManager} (for block entity textures) to avoid code duplication.
+ * <p>This utility is used by texture atlas generators to avoid code duplication.
  *
  * <p><b>Thread Safety:</b> This class is stateless and thread-safe.
  */
@@ -219,46 +216,5 @@ public final class PbrAtlasWriter {
         return scaled;
     }
 
-    /**
-     * Adapter to convert {@link com.voxelbridge.export.ExportContext.TexturePlacement}
-     * to the generic {@link Placement} interface.
-     * Used by {@link TextureAtlasManager}.
-     */
-    public static class TexturePlacementAdapter implements Placement {
-        private final com.voxelbridge.export.ExportContext.TexturePlacement placement;
-
-        public TexturePlacementAdapter(com.voxelbridge.export.ExportContext.TexturePlacement placement) {
-            this.placement = placement;
-        }
-
-        @Override public int page() { return placement.page(); }
-        @Override public int udim() {
-            // Calculate UDIM from page index: UDIM = 1001 + (page % 10) + (page / 10) * 10
-            return 1001 + (placement.page() % 10) + (placement.page() / 10) * 10;
-        }
-        @Override public int x() { return placement.x(); }
-        @Override public int y() { return placement.y(); }
-        @Override public int width() { return placement.w(); }
-        @Override public int height() { return placement.h(); }
-    }
-
-    /**
-     * Adapter to convert {@link TextureAtlasPacker.Placement}
-     * to the generic {@link Placement} interface.
-     * Used by {@link BlockEntityTextureManager}.
-     */
-    public static class PackerPlacementAdapter implements Placement {
-        private final TextureAtlasPacker.Placement placement;
-
-        public PackerPlacementAdapter(TextureAtlasPacker.Placement placement) {
-            this.placement = placement;
-        }
-
-        @Override public int page() { return placement.page(); }
-        @Override public int udim() { return placement.udim(); }
-        @Override public int x() { return placement.x(); }
-        @Override public int y() { return placement.y(); }
-        @Override public int width() { return placement.width(); }
-        @Override public int height() { return placement.height(); }
-    }
+    // Placement adapters live in platform-specific code.
 }
