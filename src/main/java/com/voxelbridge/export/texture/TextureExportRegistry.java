@@ -58,11 +58,11 @@ public final class TextureExportRegistry {
         }
 
         boolean isAnimated = ExportRuntimeConfig.isAnimationEnabled() && repo.hasAnimation(spriteKey);
-        if (ExportRuntimeConfig.getAtlasMode() == ExportRuntimeConfig.AtlasMode.ATLAS && !isAnimated) {
+        if (!isAnimated) {
             String path = ctx.getMaterialPaths().get(spriteKey);
             if (path != null) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE, String.format(
-                    "[TextureExport] spriteKey=%s using materialPath=%s (atlas reuse)",
+                    "[TextureExport] spriteKey=%s using materialPath=%s (reuse)",
                     spriteKey, path));
                 spriteRelativePaths.put(spriteKey, path);
                 return path;

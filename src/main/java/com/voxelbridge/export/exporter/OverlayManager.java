@@ -324,6 +324,7 @@ public final class OverlayManager {
                 String overlayMaterialKey = overlay.materialSuffix != null
                     ? overlay.materialKey + overlay.materialSuffix
                     : overlay.materialKey;
+                overlayMaterialKey = ctx.resolveMaterialKey(overlay.spriteKey, overlayMaterialKey);
                 Direction dir = overlay.direction;
 
                 // Apply occlusion culling

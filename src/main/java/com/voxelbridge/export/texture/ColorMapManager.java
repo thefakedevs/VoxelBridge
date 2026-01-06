@@ -2,6 +2,7 @@ package com.voxelbridge.export.texture;
 
 import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
@@ -103,7 +104,7 @@ public final class ColorMapManager {
 
     public static void generateColorMaps(ExportState state, Path outDir) throws IOException {
         // Skip colormap generation in VertexColor mode
-        if (com.voxelbridge.config.ExportRuntimeConfig.getColorMode() == com.voxelbridge.config.ExportRuntimeConfig.ColorMode.VERTEX_COLOR) {
+        if (com.voxelbridge.config.ExportRuntimeConfig.getColorMode() == ColorMode.VERTEX_COLOR) {
             VoxelBridgeLogger.info(LogModule.TEXTURE, "[ColorMap] Skipping colormap generation (VertexColor mode)");
             return;
         }

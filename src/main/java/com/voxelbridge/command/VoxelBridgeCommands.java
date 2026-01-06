@@ -3,6 +3,7 @@ package com.voxelbridge.command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.tree.CommandNode;
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.export.CoordinateMode;
 import com.voxelbridge.export.ExportControl;
 import com.voxelbridge.util.client.RayCastUtil;
@@ -266,19 +267,19 @@ public final class VoxelBridgeCommands {
 
         root.then(Commands.literal("colormode")
                 .executes(ctx -> {
-                    ExportRuntimeConfig.ColorMode current = ExportRuntimeConfig.getColorMode();
+                    ColorMode current = ExportRuntimeConfig.getColorMode();
                     ctx.getSource().sendSystemMessage(Component.literal("6[VoxelBridge] Current color mode: f" + current.getDescription()));
                     ctx.getSource().sendSystemMessage(Component.literal("7   colormap: TEXCOORD_1 + colormap texture (default)"));
                     ctx.getSource().sendSystemMessage(Component.literal("7   vertexcolor: COLOR_0 vertex attribute"));
                     return 1;
                 })
                 .then(Commands.literal("colormap").executes(ctx -> {
-                    ExportRuntimeConfig.setColorMode(ExportRuntimeConfig.ColorMode.COLORMAP);
+                    ExportRuntimeConfig.setColorMode(ColorMode.COLORMAP);
                     ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] Color mode -> ColorMap"));
                     return 1;
                 }))
                 .then(Commands.literal("vertexcolor").executes(ctx -> {
-                    ExportRuntimeConfig.setColorMode(ExportRuntimeConfig.ColorMode.VERTEX_COLOR);
+                    ExportRuntimeConfig.setColorMode(ColorMode.VERTEX_COLOR);
                     ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] Color mode -> Vertex Color"));
                     return 1;
                 }))

@@ -129,14 +129,15 @@ public final class QuadProcessor {
             }
         }
 
+        String materialKey = ctx.resolveMaterialKey(spriteKey, blockKey);
         // Register sprite material (Intern strings)
-        ctx.registerSpriteMaterial(spriteKey, blockKey);
+        ctx.registerSpriteMaterial(spriteKey, materialKey);
 
         // Output quad (Intern keys)
         TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
             ? TintMode.COLORMAP
             : TintMode.VERTEX_COLOR;
-        sceneSink.addQuad(ctx.intern(blockKey), ctx.intern(spriteKey), null,
+        sceneSink.addQuad(ctx.intern(materialKey), ctx.intern(spriteKey), null,
             RenderLayer.UNKNOWN, tintMode, doubleSided, false,
             vertexData.positions(), vertexData.uvs(), colorData.uv1(), vertexData.normal(), colorData.colors());
     }

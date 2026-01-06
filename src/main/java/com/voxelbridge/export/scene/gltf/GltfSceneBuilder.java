@@ -3,6 +3,7 @@ package com.voxelbridge.export.scene.gltf;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.core.ir.*;
+import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.core.scene.SceneWriteRequest;
 import com.voxelbridge.export.ExportProgressTracker;
 import com.voxelbridge.export.texture.ColorMapManager;
@@ -150,7 +151,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         String bucketKey = animName != null ? animName : materialKey;
 
         // Colormap mode: all quads must have TEXCOORD_1; non-tinted points to reserved white slot
-        if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP) {
+        if (ExportRuntimeConfig.getColorMode() == ColorMode.COLORMAP) {
             if (uv1 == null || uv1.length < 8) {
                 float[] lut = ColorMapManager.remapColorUV(state, 0xFFFFFFFF);
                 float u0 = lut[0], v0 = lut[1], u1v = lut[2], v1v = lut[3];
@@ -274,7 +275,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
                         
                         // Pre-calculate default UV1 for ColorMap mode if needed
                         float[] defaultUv1 = null;
-                        if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP) {
+                        if (ExportRuntimeConfig.getColorMode() == ColorMode.COLORMAP) {
                             if (bulk.flatUv1s() == null || bulk.flatUv1s().length == 0) {
                                 float[] lut = ColorMapManager.remapColorUV(state, 0xFFFFFFFF);
                                 float u0 = lut[0], v0 = lut[1], u1v = lut[2], v1v = lut[3];
@@ -912,6 +913,10 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
             return null;
         }
         List<String> list = new ArrayList<>(usedSprites);
+        list.remove("voxelbridge:transparent");
+        if (list.isEmpty()) {
+            list = new ArrayList<>(usedSprites);
+        }
         Collections.sort(list);
         //  item_frame/glow_item_frame ?sprite
         for (String s : list) {

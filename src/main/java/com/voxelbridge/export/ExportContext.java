@@ -64,9 +64,7 @@ public final class ExportContext {
     }
 
     public ColorMode getColorMode() {
-        return ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
-            ? ColorMode.COLORMAP
-            : ColorMode.VERTEX_COLOR;
+        return ExportRuntimeConfig.getColorMode();
     }
 
     public BlockColors getBlockColors() {
@@ -91,6 +89,13 @@ public final class ExportContext {
 
     public void registerSpriteMaterial(String spriteKey, String materialKey) {
         state.registerSpriteMaterial(spriteKey, materialKey);
+    }
+
+    public String resolveMaterialKey(String spriteKey, String fallbackMaterialKey) {
+        if (ExportRuntimeConfig.getAtlasMode() == ExportRuntimeConfig.AtlasMode.INDIVIDUAL && spriteKey != null) {
+            return spriteKey;
+        }
+        return fallbackMaterialKey;
     }
 
     public it.unimi.dsi.fastutil.ints.Int2ObjectMap<ExportState.TexturePlacement> getColorMap() {

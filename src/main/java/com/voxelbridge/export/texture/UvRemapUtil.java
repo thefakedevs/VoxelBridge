@@ -2,6 +2,7 @@ package com.voxelbridge.export.texture;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.export.ExportState;
+import com.voxelbridge.core.util.color.ColorMode;
 
 public final class UvRemapUtil {
 
@@ -12,7 +13,7 @@ public final class UvRemapUtil {
     }
 
     public static boolean isColormapMode() {
-        return ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP;
+        return ExportRuntimeConfig.getColorMode() == ColorMode.COLORMAP;
     }
 
     public static boolean shouldRemap(ExportState state, String spriteKey) {

@@ -4,21 +4,20 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.platform.render.capture.CaptureBufferBase;
-import com.voxelbridge.platform.render.capture.RenderCapture;
-import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
+import com.voxelbridge.platform.render.capture.CaptureBufferBase;
+import com.voxelbridge.platform.render.capture.RenderCapture;
+import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -353,9 +352,11 @@ public final class BlockEntityRenderer {
 
                     fillUvs(verts, uv0, isAtlasTexture, u0, u1, v0, v1);
 
+                    String resolvedMaterialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
                     RenderCaptureUtil.ColorModeResult colorResult =
                         RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
-                    sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
+                    ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
+                    sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
                         RenderLayer.UNKNOWN, colorResult.tintMode(),
                         RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
                         false,
@@ -400,8 +401,9 @@ public final class BlockEntityRenderer {
                 RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
 
             // Send quad to scene sink using the BlockEntity type as group key (block entities typically don't have overlays)
-            ctx.registerSpriteMaterial(spriteKey, materialGroupKey);
-            sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
+            String resolvedMaterialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
+            ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
+            sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
                 RenderLayer.UNKNOWN, colorResult.tintMode(),
                 RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
                 false,

@@ -155,7 +155,8 @@ final class QuadCollector implements VertexConsumer {
         TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
             ? TintMode.COLORMAP
             : TintMode.VERTEX_COLOR;
-        sink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
+        String materialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
+        sink.addQuad(materialKey, spriteKey, "voxelbridge:transparent",
             RenderLayer.UNKNOWN, tintMode, true, false,
             positions.clone(), normalizedUVs, colorData.uv1(), normal, colorData.colors());
 

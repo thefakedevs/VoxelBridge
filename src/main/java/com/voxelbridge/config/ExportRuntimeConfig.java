@@ -1,5 +1,6 @@
 package com.voxelbridge.config;
 
+import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.export.CoordinateMode;
 
 /**
@@ -54,21 +55,6 @@ public final class ExportRuntimeConfig {
                 if (s.size == size) return s;
             }
             return SIZE_8192; // default
-        }
-    }
-
-    public enum ColorMode {
-        COLORMAP("ColorMap (TEXCOORD_1 + texture)"),
-        VERTEX_COLOR("Vertex Color (COLOR_0 attribute)");
-
-        private final String description;
-
-        ColorMode(String description) {
-            this.description = description;
-        }
-
-        public String getDescription() {
-            return description;
         }
     }
 
