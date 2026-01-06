@@ -1,11 +1,9 @@
 package com.voxelbridge.platform;
 
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.IEventBus;
-
 /**
  * Platform-specific bootstrap for event registration.
+ * Pure interface, decoupled from specific mod loader types.
  */
 public interface PlatformBootstrap {
-    void register(Dist dist, IEventBus modBus);
+    void init();
 }

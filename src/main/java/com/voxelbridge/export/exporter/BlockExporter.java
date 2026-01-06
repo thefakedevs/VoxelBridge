@@ -14,7 +14,6 @@ import com.voxelbridge.modhandler.frapi.FabricApiHelper;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
-import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -48,7 +47,6 @@ public final class BlockExporter {
     private final IrSink blockEntitySceneSink;
     private final Level level;
     private final ClientChunkCache chunkCache;
-    private final SpriteFinder spriteFinder;
     private final boolean vanillaRandomTransformEnabled;
     private final BlockEntityRenderBatch blockEntityBatch;
 
@@ -79,7 +77,6 @@ public final class BlockExporter {
         this.blockEntitySceneSink = blockEntitySceneSink != null ? blockEntitySceneSink : sceneSink;
         this.level = level;
         this.chunkCache = (level instanceof ClientLevel cl) ? cl.getChunkSource() : null;
-        this.spriteFinder = SpriteFinder.get(ctx.getMc().getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS));
         this.vanillaRandomTransformEnabled = ctx.isVanillaRandomTransformEnabled();
         this.blockEntityBatch = blockEntityBatch;
     }
@@ -146,22 +143,23 @@ public final class BlockExporter {
         // Skip invisible blocks
         if (state.getRenderShape() == RenderShape.INVISIBLE) return;
 
-        // Get block model
-        BakedModel model = ctx.getMc().getModelManager().getBlockModelShaper().getBlockModel(state);
+        // Get block model via Adapter
+        BakedModel model = com.voxelbridge.adapter.Adapters.getRender().getBlockModel(state);
         if (model == null) return;
 
         // Occlusion culling for opaque blocks
         boolean isTransparent = !state.isSolidRender(level, pos);
         if (!isTransparent && isFullyOccluded(pos)) return;
 
-        // Get model data (for CTM/connected textures)
-        ModelData modelData = getModelData(model, state, pos);
-
-        // Get quads (via mod handlers or vanilla)
+        // Get quads via Adapter (handles ModelData and Fabric API internally)
         ModHandledQuads handledQuads = ModHandlerRegistry.handle(ctx, level, state, be, pos, model);
-        List<BakedQuad> quads = (handledQuads != null)
-            ? handledQuads.quads()
-            : getQuads(model, state, modelData, pos);
+        List<BakedQuad> quads;
+        if (handledQuads != null) {
+            quads = handledQuads.quads();
+        } else {
+            long seed = state.is(Blocks.LILY_PAD) ? computeBushSeed(pos) : Mth.getSeed(pos.getX(), pos.getY(), pos.getZ());
+            quads = com.voxelbridge.adapter.Adapters.getRender().getQuads(model, state, pos, level, seed);
+        }
 
         if (quads.isEmpty()) return;
 
@@ -181,7 +179,7 @@ public final class BlockExporter {
         for (BakedQuad quad : quads) {
             if (quad == null || quad.getSprite() == null) continue;
 
-            String spriteKey = ctx.getTextureAccess().resolveSpriteKey(quad.getSprite());
+            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(quad.getSprite());
 
             // Check vanilla overlay
             if (OverlayManager.isVanillaOverlay(spriteKey)) {
@@ -206,7 +204,7 @@ public final class BlockExporter {
             Direction dir = quad.getDirection();
 
             // Skip if processed as overlay
-            String spriteKey = ctx.getTextureAccess().resolveSpriteKey(quad.getSprite());
+            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(quad.getSprite());
             if (overlayManager.isProcessedOverlay(spriteKey)) {
                 continue;
             }
@@ -246,7 +244,7 @@ public final class BlockExporter {
             if (quad == null || quad.getSprite() == null) continue;
 
             var sprite = quad.getSprite();
-            String spriteKey = ctx.getTextureAccess().resolveSpriteKey(sprite);
+            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(sprite);
             var vertexData = VertexExtractor.extractFromQuad(quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset);
             long posHash = computePositionHash(vertexData.positions());
             boolean approxSquare = isApprox1x1Square(vertexData.positions());
@@ -351,54 +349,6 @@ public final class BlockExporter {
             hash = 31 * hash + Math.round(positions[pi + 2] * 100f);
         }
         return hash;
-    }
-
-    /**
-     * Gets model data for CTM/connected textures support.
-     */
-    private ModelData getModelData(BakedModel model, BlockState state, BlockPos pos) {
-        ModelData modelData = ModelData.EMPTY;
-        try {
-            modelData = level.getModelData(pos);
-        } catch (Throwable ignored) {}
-
-        try {
-            if (model instanceof IBakedModelExtension extension) {
-                modelData = extension.getModelData(level, pos, state, modelData);
-            }
-        } catch (Throwable ignored) {}
-
-        return modelData;
-    }
-
-    /**
-     * Gets quads from model, using Fabric API for CTM models.
-     */
-    private List<BakedQuad> getQuads(BakedModel model, BlockState state, ModelData data, BlockPos pos) {
-        List<BakedQuad> quads = new ArrayList<>();
-
-        long seed = state.is(Blocks.LILY_PAD) ? computeBushSeed(pos) : Mth.getSeed(pos.getX(), pos.getY(), pos.getZ());
-        RandomSource rand = RandomSource.create(seed);
-
-        // Try Fabric API for CTM models
-        if (model instanceof FabricBakedModel fabricModel && !fabricModel.isVanillaAdapter()) {
-            List<BakedQuad> fabricQuads = FabricApiHelper.extractQuads(fabricModel, level, state, pos, rand, spriteFinder);
-            if (!fabricQuads.isEmpty()) {
-                return fabricQuads;
-            }
-        }
-
-        // Fallback to vanilla API
-        try {
-            for (Direction dir : Direction.values()) {
-                List<BakedQuad> q = model.getQuads(state, dir, rand, data, null);
-                if (q != null) quads.addAll(q);
-            }
-            List<BakedQuad> q2 = model.getQuads(state, null, rand, data, null);
-            if (q2 != null) quads.addAll(q2);
-        } catch (Throwable ignored) {}
-
-        return quads;
     }
 
     // ===== Occlusion culling helpers =====

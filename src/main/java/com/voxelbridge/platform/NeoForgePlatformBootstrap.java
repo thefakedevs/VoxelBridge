@@ -13,8 +13,17 @@ import net.neoforged.neoforge.common.NeoForge;
  * NeoForge event registration for client-only hooks.
  */
 public final class NeoForgePlatformBootstrap implements PlatformBootstrap {
+    
+    private final Dist dist;
+    private final IEventBus modBus;
+
+    public NeoForgePlatformBootstrap(Dist dist, IEventBus modBus) {
+        this.dist = dist;
+        this.modBus = modBus;
+    }
+
     @Override
-    public void register(Dist dist, IEventBus modBus) {
+    public void init() {
         if (dist != Dist.CLIENT) {
             return;
         }

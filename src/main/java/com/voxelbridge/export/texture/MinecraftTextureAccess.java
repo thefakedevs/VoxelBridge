@@ -51,7 +51,7 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
 
     @Override
     public String resolveSpriteKey(TextureAtlasSprite sprite) {
-        return sprite == null ? null : SpriteKeyResolver.resolve(sprite);
+        return sprite == null ? null : com.voxelbridge.adapter.Adapters.getRender().getSpriteName(sprite);
     }
 
     @Override

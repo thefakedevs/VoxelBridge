@@ -312,14 +312,15 @@ public final class StreamingRegionSampler {
 
             // OPTIMIZATION: Use ChunkSection API for faster block state access (1.3-1.8x speedup)
             // Reduces 98,304 method calls per chunk by accessing palette directly
-            int minSectionY = level.getMinSection();
-            int maxSectionY = level.getMaxSection();
-            int worldMinY = level.getMinBuildHeight();
+            var worldAdapter = com.voxelbridge.adapter.Adapters.getWorld();
+            int minSectionY = worldAdapter.getMinSection(level);
+            int maxSectionY = worldAdapter.getMaxSection(level);
+            int worldMinY = worldAdapter.getMinBuildHeight(level);
 
             // getMaxSection() is exclusive; iterate while < maxSectionY to avoid AIOOB on the last index
             for (int sectionIndex = minSectionY; sectionIndex < maxSectionY; sectionIndex++) {
                 // Get section (16x16x16 block region)
-                LevelChunkSection section = chunk.getSection(chunk.getSectionIndexFromSectionY(sectionIndex));
+                LevelChunkSection section = worldAdapter.getSection(chunk, worldAdapter.getSectionIndexFromSectionY(chunk, sectionIndex));
                 if (section == null || section.hasOnlyAir()) {
                     continue; // Skip empty sections entirely
                 }
@@ -346,7 +347,7 @@ public final class StreamingRegionSampler {
 
                             try {
                                 // Direct palette access - much faster than getBlockState()
-                                BlockState state = section.getBlockState(localX, localY, localZ);
+                                BlockState state = worldAdapter.getBlockState(section, localX, localY, localZ);
                                 if (state.isAir()) continue;
 
                                 mutablePos.set(worldX, worldY, worldZ);
@@ -460,12 +461,13 @@ public final class StreamingRegionSampler {
 
             // OPTIMIZATION: Use ChunkSection API for faster block state access
             // This mirrors the fast path in exportChunk
-            int minSectionY = level.getMinSection();
-            int maxSectionY = level.getMaxSection();
-            int worldMinY = level.getMinBuildHeight();
+            var worldAdapter = com.voxelbridge.adapter.Adapters.getWorld();
+            int minSectionY = worldAdapter.getMinSection(level);
+            int maxSectionY = worldAdapter.getMaxSection(level);
+            int worldMinY = worldAdapter.getMinBuildHeight(level);
 
             for (int sectionIndex = minSectionY; sectionIndex < maxSectionY; sectionIndex++) {
-                LevelChunkSection section = chunk.getSection(chunk.getSectionIndexFromSectionY(sectionIndex));
+                LevelChunkSection section = worldAdapter.getSection(chunk, worldAdapter.getSectionIndexFromSectionY(chunk, sectionIndex));
                 if (section == null || section.hasOnlyAir()) {
                     continue; // Skip empty sections
                 }
@@ -486,7 +488,7 @@ public final class StreamingRegionSampler {
                             if (worldX < minX || worldX > maxX) continue;
 
                             try {
-                                BlockState state = section.getBlockState(localX, localY, localZ);
+                                BlockState state = worldAdapter.getBlockState(section, localX, localY, localZ);
                                 if (state.isAir()) continue;
 
                                 mutablePos.set(worldX, worldY, worldZ);

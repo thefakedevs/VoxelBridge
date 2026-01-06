@@ -14,9 +14,13 @@ import net.neoforged.fml.common.Mod;
 @Mod(VoxelBridge.MODID)
 public class VoxelBridge {
     public static final String MODID = "voxelbridge";
-    private static final PlatformBootstrap PLATFORM = new NeoForgePlatformBootstrap();
 
     public VoxelBridge(IEventBus modBus, ModContainer container, Dist dist) {
-        PLATFORM.register(dist, modBus);
+        com.voxelbridge.adapter.Adapters.init(
+            new com.voxelbridge.adapter.NeoForgeWorldAdapter(),
+            new com.voxelbridge.adapter.NeoForgeRenderAdapter()
+        );
+        PlatformBootstrap platform = new NeoForgePlatformBootstrap(dist, modBus);
+        platform.init();
     }
 }
