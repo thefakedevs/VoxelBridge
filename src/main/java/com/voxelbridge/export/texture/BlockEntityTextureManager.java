@@ -109,14 +109,14 @@ public final class BlockEntityTextureManager {
             if (pbr.normalImage() != null && pbr.normalLocation() != null) {
                 repo.put(pbr.normalLocation().toString(), normalKey(spriteKey), pbr.normalImage());
                 ctx.getMaterialPaths().putIfAbsent(normalKey(spriteKey),
-                    "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_n.png");
+                    TexturePathResolver.entityPbrPath(ctx, spriteKey, "_n"));
                 ctx.getEntityTextures().putIfAbsent(normalKey(spriteKey),
                     new ExportState.EntityTexture(pbr.normalLocation().toString(), pbr.normalImage().getWidth(), pbr.normalImage().getHeight()));
             }
             if (pbr.specularImage() != null && pbr.specularLocation() != null) {
                 repo.put(pbr.specularLocation().toString(), specKey(spriteKey), pbr.specularImage());
                 ctx.getMaterialPaths().putIfAbsent(specKey(spriteKey),
-                    "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_s.png");
+                    TexturePathResolver.entityPbrPath(ctx, spriteKey, "_s"));
                 ctx.getEntityTextures().putIfAbsent(specKey(spriteKey),
                     new ExportState.EntityTexture(pbr.specularLocation().toString(), pbr.specularImage().getWidth(), pbr.specularImage().getHeight()));
             }
@@ -238,7 +238,7 @@ public final class BlockEntityTextureManager {
                 String genKey = ctx.getTextureAccess().generatedKey("voxelbridge", "generated/" + safe(normalKey(spriteKey)) + ".png");
                 repo(ctx).put(genKey, normalKey(spriteKey), cropped);
                 ctx.getMaterialPaths().putIfAbsent(normalKey(spriteKey),
-                    "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_n.png");
+                    TexturePathResolver.entityPbrPath(ctx, spriteKey, "_n"));
                 ctx.getEntityTextures().putIfAbsent(normalKey(spriteKey),
                     new ExportState.EntityTexture(genKey, cropped.getWidth(), cropped.getHeight()));
                 VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex][PBR] Cropped normal from atlas " + atlasNormalKey + " for " + spriteKey);
@@ -252,7 +252,7 @@ public final class BlockEntityTextureManager {
                 String genKey = ctx.getTextureAccess().generatedKey("voxelbridge", "generated/" + safe(specKey(spriteKey)) + ".png");
                 repo(ctx).put(genKey, specKey(spriteKey), cropped);
                 ctx.getMaterialPaths().putIfAbsent(specKey(spriteKey),
-                    "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_s.png");
+                    TexturePathResolver.entityPbrPath(ctx, spriteKey, "_s"));
                 ctx.getEntityTextures().putIfAbsent(specKey(spriteKey),
                     new ExportState.EntityTexture(genKey, cropped.getWidth(), cropped.getHeight()));
                 VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex][PBR] Cropped specular from atlas " + atlasSpecKey + " for " + spriteKey);
@@ -278,7 +278,7 @@ public final class BlockEntityTextureManager {
             if (img != null) {
                 repo(ctx).put(sibNormalKey, normalKey(spriteKey), img);
                 ctx.getMaterialPaths().putIfAbsent(normalKey(spriteKey),
-                    "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_n.png");
+                    TexturePathResolver.entityPbrPath(ctx, spriteKey, "_n"));
                 ctx.getEntityTextures().putIfAbsent(normalKey(spriteKey),
                     new ExportState.EntityTexture(sibNormalKey, img.getWidth(), img.getHeight()));
             }
@@ -290,7 +290,7 @@ public final class BlockEntityTextureManager {
             if (img != null) {
                 repo(ctx).put(sibSpecKey, specKey(spriteKey), img);
                 ctx.getMaterialPaths().putIfAbsent(specKey(spriteKey),
-                    "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_s.png");
+                    TexturePathResolver.entityPbrPath(ctx, spriteKey, "_s"));
                 ctx.getEntityTextures().putIfAbsent(specKey(spriteKey),
                     new ExportState.EntityTexture(sibSpecKey, img.getWidth(), img.getHeight()));
             }
@@ -317,7 +317,7 @@ public final class BlockEntityTextureManager {
     }
 
     private static String safe(String s) {
-        return s.replace(':', '_').replace('/', '_');
+        return TexturePathResolver.safe(s);
     }
 
     private static String[] splitKey(String resourceKey) {

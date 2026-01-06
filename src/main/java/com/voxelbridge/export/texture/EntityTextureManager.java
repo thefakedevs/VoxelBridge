@@ -23,7 +23,9 @@ public final class EntityTextureManager {
         String sanitized = com.voxelbridge.util.ResourceLocationUtil.sanitizeKey(resourceKey);
         String[] parts = splitKey(sanitized);
         if (parts == null) {
-            return new TextureHandle("entity:unknown", "mat_unknown", "entity_textures/unknown.png", sanitized);
+            String fallbackKey = "entity:unknown";
+            String relativePath = TexturePathResolver.ensureEntityLikePath(ctx, fallbackKey);
+            return new TextureHandle(fallbackKey, "mat_unknown", relativePath, sanitized);
         }
         String namespace = parts[0];
         String path = parts[1];
@@ -134,4 +136,3 @@ public final class EntityTextureManager {
 
     public record TextureHandle(String spriteKey, String materialName, String relativePath, String textureLocation) {}
 }
-

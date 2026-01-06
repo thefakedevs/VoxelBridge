@@ -78,6 +78,7 @@ public final class TextureExportRegistry {
         Path png = texturesDir.resolve(safe + ".png");
         String rel = "textures/" + png.getFileName().toString();
         spriteRelativePaths.put(spriteKey, rel);
+        ctx.getMaterialPaths().put(spriteKey, rel);
         if (!Files.exists(png)) {
             String pngKey = ctx.getTextureAccess().spriteKeyToResourceKey(spriteKey);
             BufferedImage image = repo.get(pngKey);
@@ -123,20 +124,21 @@ public final class TextureExportRegistry {
             rel = TexturePathResolver.ensureEntityLikePath(ctx, spriteKey);
         }
         spriteRelativePaths.put(spriteKey, rel);
+        ctx.getMaterialPaths().put(spriteKey, rel);
 
-        boolean isAtlasPath = rel.startsWith("textures/atlas/");
-        Path target = isAtlasPath ? outputDir.resolve(rel) : texturesDir.resolve(rel);
+        boolean isAbsoluteRel = rel.startsWith("textures/");
+        Path target = isAbsoluteRel ? outputDir.resolve(rel) : texturesDir.resolve(rel);
         if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE)) {
             VoxelBridgeLogger.info(LogModule.TEXTURE, String.format(
-                "[TextureExport][EntityLike] spriteKey=%s -> rel=%s target=%s (isAtlas=%s)",
-                spriteKey, rel, target, isAtlasPath));
+                "[TextureExport][EntityLike] spriteKey=%s -> rel=%s target=%s (isAbsolute=%s)",
+                spriteKey, rel, target, isAbsoluteRel));
         }
         try {
             Files.createDirectories(target.getParent());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        if (Files.exists(target) || isAtlasPath) {
+        if (Files.exists(target)) {
             return rel;
         }
 

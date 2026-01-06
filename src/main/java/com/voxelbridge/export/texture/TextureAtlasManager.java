@@ -866,7 +866,7 @@ public final class TextureAtlasManager {
     }
 
     private static String safe(String spriteKey) {
-        return spriteKey.replace(':', '_').replace('/', '_');
+        return TexturePathResolver.safe(spriteKey);
     }
 
     private static boolean isBlockEntitySprite(String spriteKey) {

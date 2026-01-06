@@ -1042,7 +1042,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
 
     private String safe(String spriteKey) {
         if (spriteKey == null) return "unknown";
-        return spriteKey.replace(':', '_').replace('/', '_');
+        return com.voxelbridge.export.texture.TexturePathResolver.safe(spriteKey);
     }
 
     private static final class PhaseProgress {

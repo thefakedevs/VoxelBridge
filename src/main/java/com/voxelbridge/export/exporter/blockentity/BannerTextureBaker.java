@@ -25,7 +25,6 @@ import java.util.Set;
 
 @OnlyIn(Dist.CLIENT)
 final class BannerTextureBaker {
-    private static final String OUTPUT_DIR = "entity_textures/banner";
     private static final ResourceLocation FLAG_ONLY_TEXTURE = ResourceLocation.withDefaultNamespace("entity/banner/base");
     private static final ResourceLocation BASE_WITH_POLE_TEXTURE = ResourceLocation.withDefaultNamespace("entity/banner_base");
     private static final float[] NO_TINT = new float[]{1.0f, 1.0f, 1.0f};
@@ -35,7 +34,7 @@ final class BannerTextureBaker {
 
     static BannerTextures bake(ExportContext ctx, BannerBlockEntity banner) {
         String key = BannerTextureBaker.buildKey(banner);
-        String bakedPath = OUTPUT_DIR + "/" + BannerTextureBaker.safe(key) + ".png";
+        String bakedPath = resolveOutputDir(ctx) + "/" + BannerTextureBaker.safe(key) + ".png";
         BufferedImage bakedImage = ctx.getGeneratedEntityTextures().computeIfAbsent(key, k -> BannerTextureBaker.composeTexture(ctx, banner));
         EntityTextureManager.TextureHandle bakedHandle = EntityTextureManager.registerGenerated(ctx, key, bakedPath, bakedImage);
 
@@ -167,6 +166,13 @@ final class BannerTextureBaker {
             sb.append("__").append(index++).append(":").append(id).append("@").append(colorName);
         }
         return sb.toString();
+    }
+
+    private static String resolveOutputDir(ExportContext ctx) {
+        return com.voxelbridge.config.ExportRuntimeConfig.getAtlasMode()
+            == com.voxelbridge.config.ExportRuntimeConfig.AtlasMode.INDIVIDUAL
+            ? "textures/individual"
+            : "entity_textures/banner";
     }
 
     private static String safe(String s) {
