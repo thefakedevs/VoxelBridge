@@ -1,18 +1,16 @@
 package com.voxelbridge.export.texture;
 
-import java.awt.Graphics2D;
+import com.voxelbridge.core.texture.PngjWriter;
+import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
+
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.IntStream;
-
-import com.voxelbridge.util.debug.LogModule;
-import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
 /**
  * Generic texture atlas packer using the MaxRects (Maximum Rectangles) algorithm.
@@ -136,7 +134,7 @@ public final class TextureAtlasPacker {
             int udim = 1001 + (i % 10) + (i / 10) * 10;
             String filename = prefix + udim + ".png";
             Path outputPath = outputDir.resolve(filename);
-            com.voxelbridge.core.texture.PngjWriter.write(pages.get(i).image, outputPath);
+            PngjWriter.write(pages.get(i).image, outputPath);
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, "[TextureAtlasPacker] Wrote atlas page: " + filename);
             }

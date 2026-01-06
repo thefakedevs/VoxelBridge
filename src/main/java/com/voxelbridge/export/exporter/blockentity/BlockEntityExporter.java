@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.ir.IrSink;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -46,7 +46,7 @@ public final class BlockEntityExporter {
         BlockState state,
         BlockEntity blockEntity,
         BlockPos pos,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         double offsetX,
         double offsetY,
         double offsetZ,

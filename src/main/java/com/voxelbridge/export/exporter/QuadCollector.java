@@ -1,11 +1,14 @@
 package com.voxelbridge.export.exporter;
 
-import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.core.scene.SceneSink;
-import com.voxelbridge.export.texture.SpriteKeyResolver;
-import com.voxelbridge.export.util.geometry.GeometryUtil;
-import com.voxelbridge.export.util.color.ColorModeHandler;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.core.ir.TintMode;
+import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.texture.SpriteKeyResolver;
+import com.voxelbridge.export.util.color.ColorModeHandler;
+import com.voxelbridge.export.util.geometry.GeometryUtil;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 
@@ -13,7 +16,7 @@ import net.minecraft.core.BlockPos;
  * Collects quads emitted by the vanilla render pipeline (e.g., fluids) and forwards them to the SceneSink.
  */
 final class QuadCollector implements VertexConsumer {
-    private final SceneSink sink;
+    private final IrSink sink;
     private final ExportContext ctx;
     private final BlockPos pos;
     private final TextureAtlasSprite[] sprites;
@@ -40,7 +43,7 @@ final class QuadCollector implements VertexConsumer {
     private int quadArgb = 0xFFFFFFFF;
     private boolean quadColorCaptured = false;
 
-    QuadCollector(SceneSink sink, ExportContext ctx, BlockPos pos, TextureAtlasSprite[] sprites,
+    QuadCollector(IrSink sink, ExportContext ctx, BlockPos pos, TextureAtlasSprite[] sprites,
                   double offsetX, double offsetY, double offsetZ,
                   BlockPos regionMin, BlockPos regionMax, String materialGroupKey) {
         this.sink = sink;
@@ -148,8 +151,12 @@ final class QuadCollector implements VertexConsumer {
         ColorModeHandler.ColorData colorData = ColorModeHandler.prepareColorsWithUV(ctx, quadArgb, normalizedUVs);
 
         // Send to sink (fluids typically do not have overlays)
+        TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
+            ? TintMode.COLORMAP
+            : TintMode.VERTEX_COLOR;
         sink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
-                     positions.clone(), normalizedUVs, colorData.uv1(), normal, colorData.colors(), true);
+            RenderLayer.UNKNOWN, tintMode, true, false,
+            positions.clone(), normalizedUVs, colorData.uv1(), normal, colorData.colors());
 
         resetQuadState();
     }

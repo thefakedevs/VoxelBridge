@@ -3,17 +3,17 @@ package com.voxelbridge.export.exporter;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.CoordinateMode;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.exporter.blockentity.BlockEntityExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExportResult;
+import com.voxelbridge.export.exporter.blockentity.BlockEntityExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
-import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
+import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.modhandler.ModHandledQuads;
 import com.voxelbridge.modhandler.ModHandlerRegistry;
 import com.voxelbridge.modhandler.frapi.FabricApiHelper;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import com.voxelbridge.export.util.geometry.VertexExtractor;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
 import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
 import net.minecraft.client.multiplayer.ClientChunkCache;
@@ -37,12 +37,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.extensions.IBakedModelExtension;
 import net.neoforged.neoforge.client.model.data.ModelData;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Simplified block geometry exporter.
@@ -50,8 +45,8 @@ import java.util.Map;
  */
 public final class BlockExporter {
     private final ExportContext ctx;
-    private final SceneSink sceneSink;
-    private final SceneSink blockEntitySceneSink;
+    private final IrSink sceneSink;
+    private final IrSink blockEntitySceneSink;
     private final Level level;
     private final ClientChunkCache chunkCache;
     private final SpriteFinder spriteFinder;
@@ -71,15 +66,15 @@ public final class BlockExporter {
     private final BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
     private volatile boolean missingNeighborDetected = false;
 
-    public BlockExporter(ExportContext ctx, SceneSink sceneSink, Level level) {
+    public BlockExporter(ExportContext ctx, IrSink sceneSink, Level level) {
         this(ctx, sceneSink, level, null, sceneSink);
     }
 
-    public BlockExporter(ExportContext ctx, SceneSink sceneSink, Level level, BlockEntityRenderBatch blockEntityBatch) {
+    public BlockExporter(ExportContext ctx, IrSink sceneSink, Level level, BlockEntityRenderBatch blockEntityBatch) {
         this(ctx, sceneSink, level, blockEntityBatch, sceneSink);
     }
 
-    public BlockExporter(ExportContext ctx, SceneSink sceneSink, Level level, BlockEntityRenderBatch blockEntityBatch, SceneSink blockEntitySceneSink) {
+    public BlockExporter(ExportContext ctx, IrSink sceneSink, Level level, BlockEntityRenderBatch blockEntityBatch, IrSink blockEntitySceneSink) {
         this.ctx = ctx;
         this.sceneSink = sceneSink;
         this.blockEntitySceneSink = blockEntitySceneSink != null ? blockEntitySceneSink : sceneSink;
@@ -219,7 +214,11 @@ public final class BlockExporter {
 
             // Occlusion culling
             if (dir != null) {
-                if (shouldCull(state, pos, dir)) continue;
+                if (!isTransparent) {
+                    // Opaque blocks: cull if neighbor is solid
+                    if (isFaceOccluded(pos, dir)) continue;
+                }
+                // Transparent blocks: no face culling (internal faces must remain visible)
             }
 
             // Process quad
@@ -229,7 +228,11 @@ public final class BlockExporter {
         // PASS 3: Output overlays with culling
         overlayManager.outputOverlays(sceneSink, state, dir -> {
             if (dir == null) return false;
-            return shouldCull(state, pos, dir);
+            if (!isTransparent) {
+                return isFaceOccluded(pos, dir);
+            }
+            // Transparent blocks: no face culling for overlays
+            return false;
         });
     }
 
@@ -429,50 +432,10 @@ public final class BlockExporter {
         return true;
     }
 
-    private boolean shouldCull(BlockState state, BlockPos pos, Direction dir) {
-        mutablePos.setWithOffset(pos, dir);
+    private boolean isFaceOccluded(BlockPos pos, Direction face) {
+        mutablePos.setWithOffset(pos, face);
         if (isOutsideRegion(mutablePos)) return false;
-
-        BlockState neighborState = getNeighborState(mutablePos);
-        if (neighborState == null) return false;
-
-        // Opaque blocks: standard occlusion check (is neighbor solid?)
-        if (state.isSolidRender(level, pos)) {
-            // Re-use isNeighborSolid logic but with state we already fetched
-            if (ExportRuntimeConfig.isFillCaveEnabled()) {
-                if (neighborState.isAir() && level.getBrightness(LightLayer.SKY, mutablePos) == 0) {
-                    return true;
-                }
-            }
-            return neighborState.isSolidRender(level, mutablePos);
-        }
-
-        // Transparent blocks (Glass, etc.): use skipRendering (culls against same block)
-        return state.skipRendering(neighborState, dir);
-    }
-
-    private BlockState getNeighborState(BlockPos neighbor) {
-        if (chunkCache != null) {
-            int cx = neighbor.getX() >> 4;
-            int cz = neighbor.getZ() >> 4;
-            var chunk = chunkCache.getChunk(cx, cz, false);
-            if (chunk == null || chunk.isEmpty()) return null;
-            return chunk.getBlockState(neighbor);
-        } else {
-            return level.getBlockState(neighbor);
-        }
-    }
-
-    private boolean isNeighborSolid(BlockPos neighbor) {
-        BlockState state = getNeighborState(neighbor);
-        if (state == null) return true; // Treat unloaded as solid/occluding to avoid leaks?
-
-        if (ExportRuntimeConfig.isFillCaveEnabled()) {
-            if (state.isAir() && level.getBrightness(LightLayer.SKY, neighbor) == 0) {
-                return true;
-            }
-        }
-        return state.isSolidRender(level, neighbor);
+        return isNeighborSolid(mutablePos);
     }
 
     private boolean isOutsideRegion(BlockPos pos) {
@@ -480,6 +443,28 @@ public final class BlockExporter {
         return pos.getX() < regionMin.getX() || pos.getX() > regionMax.getX()
             || pos.getY() < regionMin.getY() || pos.getY() > regionMax.getY()
             || pos.getZ() < regionMin.getZ() || pos.getZ() > regionMax.getZ();
+    }
+
+    private boolean isNeighborSolid(BlockPos neighbor) {
+        BlockState state;
+        if (chunkCache != null) {
+            int cx = neighbor.getX() >> 4;
+            int cz = neighbor.getZ() >> 4;
+            var chunk = chunkCache.getChunk(cx, cz, false);
+            if (chunk == null || chunk.isEmpty()) return true;
+            state = chunk.getBlockState(neighbor);
+        } else {
+            state = level.getBlockState(neighbor);
+        }
+
+        // FILLCAVE: Treat any air with skylight 0 as solid for occlusion culling
+        if (ExportRuntimeConfig.isFillCaveEnabled()) {
+            if (state.isAir() && level.getBrightness(LightLayer.SKY, neighbor) == 0) {
+                return true; // Pretend ALL cave_air is solid
+            }
+        }
+
+        return state.isSolidRender(level, neighbor);
     }
 
     private long computeBushSeed(BlockPos pos) {

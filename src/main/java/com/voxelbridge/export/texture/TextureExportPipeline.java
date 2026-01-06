@@ -21,7 +21,11 @@ public final class TextureExportPipeline {
         ColorMapManager.generateColorMaps(ctx, outDir);
 
         TextureExportRegistry exportRegistry = new TextureExportRegistry(ctx, outDir);
-        exportRegistry.exportSprites(ctx.getMaterialPaths().keySet());
+        if (spriteKeys != null) {
+            exportRegistry.exportSprites(spriteKeys);
+        } else {
+            exportRegistry.exportSprites(ctx.getAtlasBook().keySet());
+        }
         exportRegistry.exportSprites(ctx.getEntityTextures().keySet());
 
         if (ExportRuntimeConfig.isAnimationEnabled()) {

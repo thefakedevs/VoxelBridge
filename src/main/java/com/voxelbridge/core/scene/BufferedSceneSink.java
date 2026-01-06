@@ -1,31 +1,43 @@
 package com.voxelbridge.core.scene;
 
-import java.nio.file.Path;
-import java.util.*;
+import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.core.ir.TintMode;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Chunk-level buffered sink: buffers all quads for a chunk and deduplicates on flush.
  * Dedup is per-chunk and per-material; duplicate vertices on chunk borders are allowed.
  */
-public final class BufferedSceneSink implements SceneSink {
+public final class BufferedSceneSink implements IrSink {
 
     private static final int ESTIMATED_QUADS_PER_CHUNK = 8000;
     private final List<QuadRecord> buffer = new ArrayList<>(ESTIMATED_QUADS_PER_CHUNK);
 
     @Override
-    public void addQuad(String materialGroupKey,
+    public void addQuad(String materialKey,
                         String spriteKey,
                         String overlaySpriteKey,
+                        RenderLayer renderLayer,
+                        TintMode tintMode,
+                        boolean doubleSided,
+                        boolean emissive,
                         float[] positions,
                         float[] uv0,
                         float[] uv1,
                         float[] normal,
-                        float[] colors,
-                        boolean doubleSided) {
+                        float[] colors) {
         buffer.add(new QuadRecord(
-            materialGroupKey,
+            materialKey,
             spriteKey,
             overlaySpriteKey,
+            renderLayer,
+            tintMode,
+            emissive,
             positions,
             uv0,
             uv1,
@@ -36,39 +48,36 @@ public final class BufferedSceneSink implements SceneSink {
     }
 
     @Override
-    public Path write(SceneWriteRequest request) {
-        throw new UnsupportedOperationException("Buffered sink cannot write to file directly. Use flushTo().");
+    public void onChunkStart(int chunkX, int chunkZ) {
+        // No-op; buffering is per-chunk and managed by caller.
+    }
+
+    @Override
+    public void onChunkEnd(int chunkX, int chunkZ, boolean successful) {
+        // No-op; buffering is per-chunk and managed by caller.
     }
 
     /**
-     * Flush buffered quads to the target sink after per-material dedup.
-     * Dedup is per-chunk (allows duplicates across chunk borders).
+     * Flush buffered quads to the target IR sink after per-material dedup.
      */
-    public void flushTo(SceneSink target) {
+    public void flushTo(IrSink target) {
         if (buffer.isEmpty()) {
             return;
         }
 
-        // Group by material.
         Map<String, List<QuadRecord>> byMaterial = new HashMap<>();
         for (QuadRecord quad : buffer) {
             byMaterial.computeIfAbsent(quad.materialGroupKey, k -> new ArrayList<>()).add(quad);
         }
 
-        // Deduplicate each material group.
         for (Map.Entry<String, List<QuadRecord>> entry : byMaterial.entrySet()) {
             String materialKey = entry.getKey();
             List<QuadRecord> quads = entry.getValue();
 
-            // Create per-chunk deduplicator.
             ChunkDeduplicator deduper = new ChunkDeduplicator(materialKey);
-
-            // Process all quads.
             for (QuadRecord quad : quads) {
                 deduper.processQuad(quad);
             }
-
-            // Flush deduplicated data.
             deduper.flushTo(target);
         }
 
@@ -88,6 +97,9 @@ public final class BufferedSceneSink implements SceneSink {
         String materialGroupKey,
         String spriteKey,
         String overlaySpriteKey,
+        RenderLayer renderLayer,
+        TintMode tintMode,
+        boolean emissive,
         float[] positions,
         float[] uv0,
         float[] uv1,

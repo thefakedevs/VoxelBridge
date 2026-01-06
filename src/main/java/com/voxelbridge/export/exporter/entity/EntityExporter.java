@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter.entity;
 
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.world.entity.Entity;
@@ -21,7 +21,7 @@ public final class EntityExporter {
 
     public static void exportEntitiesInChunk(
         ExportContext ctx,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         Level level,
         AABB bounds,
         double offsetX,

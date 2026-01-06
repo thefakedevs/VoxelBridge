@@ -1,16 +1,15 @@
 package com.voxelbridge.core.texture;
 
-import java.awt.AlphaComposite;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
+import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
+
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-import com.voxelbridge.util.debug.LogModule;
-import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
 /**
  * Utility for generating PBR (Physically Based Rendering) atlas pages.

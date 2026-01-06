@@ -2,7 +2,9 @@ package com.voxelbridge.export.exporter.entity;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.export.util.color.ColorModeHandler;
 import com.voxelbridge.export.util.geometry.GeometryUtil;
 import com.voxelbridge.export.exporter.capture.RenderCapture;
@@ -30,7 +32,7 @@ import java.awt.image.BufferedImage;
 import java.util.List;
 
 /**
- * Captures entity renderer output into SceneSink.
+ * Captures entity renderer output into an IR sink.
  */
 @OnlyIn(Dist.CLIENT)
 public final class EntityRenderer {
@@ -69,7 +71,7 @@ public final class EntityRenderer {
     public static boolean render(
         ExportContext ctx,
         Entity entity,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         double offsetX,
         double offsetY,
         double offsetZ
@@ -80,7 +82,7 @@ public final class EntityRenderer {
     public static boolean renderOnMainThread(
         ExportContext ctx,
         Entity entity,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         double offsetX,
         double offsetY,
         double offsetZ
@@ -91,7 +93,7 @@ public final class EntityRenderer {
     private static boolean renderInternal(
         ExportContext ctx,
         Entity entity,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         double offsetX,
         double offsetY,
         double offsetZ,
@@ -236,7 +238,7 @@ public final class EntityRenderer {
      */
     private static class CaptureBuffer implements MultiBufferSource, RenderCapture.QuadSink {
         private final ExportContext ctx;
-        private final SceneSink sceneSink;
+        private final IrSink sceneSink;
         private final double offsetX, offsetY, offsetZ;
         private final Entity entity;
         private final RenderCapture capture;
@@ -245,7 +247,7 @@ public final class EntityRenderer {
         private float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
         private float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
 
-        CaptureBuffer(ExportContext ctx, SceneSink sceneSink, double offsetX, double offsetY, double offsetZ, Entity entity) {
+        CaptureBuffer(ExportContext ctx, IrSink sceneSink, double offsetX, double offsetY, double offsetZ, Entity entity) {
             this.ctx = ctx;
             this.sceneSink = sceneSink;
             this.offsetX = offsetX;
@@ -427,9 +429,14 @@ public final class EntityRenderer {
             }
 
             ctx.registerSpriteMaterial(spriteKey, materialGroupKey);
+            TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
+                ? TintMode.COLORMAP
+                : TintMode.VERTEX_COLOR;
             sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
-                positions, uv0, uv1, NORMAL_UP, colors,
-                RENDER_TYPE_RESOLVER.isDoubleSided(renderType));
+                RenderLayer.UNKNOWN, tintMode,
+                RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
+                false,
+                positions, uv0, uv1, NORMAL_UP, colors);
         }
 
         private void fillUvs(List<RenderCapture.Vertex> verts, float[] uv0, boolean isAtlas, float u0, float u1, float v0, float v1) {

@@ -1,270 +1,185 @@
 package com.voxelbridge.export;
 
+import com.voxelbridge.core.export.ExportState;
+import com.voxelbridge.core.texture.TextureRepository;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
-import com.voxelbridge.core.texture.UvPlacement;
-
-import com.voxelbridge.export.texture.TextureRepository;
-
 import java.awt.image.BufferedImage;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Shared export context used by every exporter (thread-safe).
+ * Wraps Minecraft runtime services plus MC-agnostic export state.
  */
 @OnlyIn(Dist.CLIENT)
 public final class ExportContext {
 
-    private final Minecraft mc;
-    private final BlockColors blockColors;
-
-    // Thread-safe containers shared by multiple worker threads.
-    private final Map<String, TintAtlas> atlasBook = new ConcurrentHashMap<>();
-    private final Map<String, String> materialNames = new ConcurrentHashMap<>();
-    private final Map<String, String> materialPaths = new ConcurrentHashMap<>();
-    private final Map<String, String> spriteToMaterial = new ConcurrentHashMap<>();
-    
-    // OPTIMIZATION: Use FastUtil primitives to avoid boxing overhead
-    private final it.unimi.dsi.fastutil.ints.Int2ObjectMap<TexturePlacement> colorMap = 
-        it.unimi.dsi.fastutil.ints.Int2ObjectMaps.synchronize(new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>());
-        
-    private final AtomicInteger nextColorSlot = new AtomicInteger(0); // Will be set to 1 after white is reserved in slot 0
-    
-    // OPTIMIZATION: Use FastUtil LongOpenHashSet for primitive long storage (wrapped for thread safety)
-    private final java.util.Set<Long> consumedBlocks = java.util.Collections.synchronizedSet(new it.unimi.dsi.fastutil.longs.LongOpenHashSet());
-    
-    private final Map<String, EntityTexture> entityTextures = new ConcurrentHashMap<>();
-    private final Map<String, BlockEntityAtlasPlacement> blockEntityAtlasPlacements = new ConcurrentHashMap<>();
-    private final TextureRepository textureRepository = new TextureRepository();
-    
-    // String Deduplication Pool (Concurrent)
-    private final Map<String, String> stringPool = new ConcurrentHashMap<>();
-
-    private boolean blockEntityExportEnabled = true;
-    private CoordinateMode coordinateMode = CoordinateMode.CENTERED;
-    private boolean vanillaRandomTransformEnabled = true;
-    private boolean discoveryMode = false;
+    private final SamplerContext sampler;
+    private final ExportState state;
 
     public ExportContext(Minecraft mc) {
-        this.mc = mc;
-        this.blockColors = mc.getBlockColors();
+        this.sampler = new SamplerContext(mc);
+        this.state = new ExportState();
+    }
+
+    public SamplerContext sampler() {
+        return sampler;
+    }
+
+    public ExportState state() {
+        return state;
     }
 
     public Minecraft getMc() {
-        return mc;
+        return sampler.getMc();
     }
 
     public BlockColors getBlockColors() {
-        return blockColors;
+        return sampler.getBlockColors();
     }
 
-    public Map<String, TintAtlas> getAtlasBook() {
-        return atlasBook;
+    public Map<String, ExportState.TintAtlas> getAtlasBook() {
+        return state.getAtlasBook();
     }
 
     public Map<String, String> getMaterialNames() {
-        return materialNames;
+        return state.getMaterialNames();
     }
 
     public Map<String, String> getMaterialPaths() {
-        return materialPaths;
+        return state.getMaterialPaths();
     }
 
     public Map<String, String> getSpriteToMaterial() {
-        return spriteToMaterial;
+        return state.getSpriteToMaterial();
     }
 
     public void registerSpriteMaterial(String spriteKey, String materialKey) {
-        if (spriteKey != null && materialKey != null) {
-            spriteToMaterial.putIfAbsent(intern(spriteKey), intern(materialKey));
-        }
+        state.registerSpriteMaterial(spriteKey, materialKey);
     }
 
-    public it.unimi.dsi.fastutil.ints.Int2ObjectMap<TexturePlacement> getColorMap() {
-        return colorMap;
+    public it.unimi.dsi.fastutil.ints.Int2ObjectMap<ExportState.TexturePlacement> getColorMap() {
+        return state.getColorMap();
     }
 
     /**
      * Deduplicates string instances to save memory.
      */
     public String intern(String s) {
-        if (s == null) return null;
-        return stringPool.computeIfAbsent(s, k -> k);
+        return state.intern(s);
     }
 
     public AtomicInteger getNextColorSlot() {
-        return nextColorSlot;
+        return state.getNextColorSlot();
     }
 
     /**
      * Gets or creates the tint atlas for a sprite.
      */
-    public TintAtlas getOrCreateTintAtlas(String spriteKey) {
-        return atlasBook.computeIfAbsent(spriteKey, k -> new TintAtlas());
+    public ExportState.TintAtlas getOrCreateTintAtlas(String spriteKey) {
+        return state.getOrCreateTintAtlas(spriteKey);
     }
 
     /**
      * Gets or creates a safe material name (thread-safe).
      */
     public String getMaterialNameForSprite(String spriteKey) {
-        return materialNames.computeIfAbsent(spriteKey, k -> "mat_" + safe(k));
+        return state.getMaterialNameForSprite(spriteKey);
     }
 
     public boolean isBlockConsumed(BlockPos pos) {
-        return consumedBlocks.contains(pos.asLong());
+        return state.isBlockConsumed(pos.asLong());
     }
 
     public void markBlockConsumed(BlockPos pos) {
-        consumedBlocks.add(pos.asLong());
+        state.markBlockConsumed(pos.asLong());
     }
 
     public void resetConsumedBlocks() {
-        consumedBlocks.clear();
+        state.resetConsumedBlocks();
     }
 
-    public Map<String, EntityTexture> getEntityTextures() {
-        return entityTextures;
+    public Map<String, ExportState.EntityTexture> getEntityTextures() {
+        return state.getEntityTextures();
     }
 
-    public Map<String, BlockEntityAtlasPlacement> getBlockEntityAtlasPlacements() {
-        return blockEntityAtlasPlacements;
+    public Map<String, ExportState.BlockEntityAtlasPlacement> getBlockEntityAtlasPlacements() {
+        return state.getBlockEntityAtlasPlacements();
     }
 
     public TextureRepository getTextureRepository() {
-        return textureRepository;
+        return state.getTextureRepository();
     }
 
     /**
      * Clears all texture-related state to isolate export sessions.
      */
     public void clearTextureState() {
-        textureRepository.clear();
-        materialPaths.clear();
-        blockEntityAtlasPlacements.clear();
-        entityTextures.clear();
-        atlasBook.clear();
-        materialNames.clear();
-        spriteToMaterial.clear();
-        colorMap.clear();
-        consumedBlocks.clear();
-        stringPool.clear();
-        nextColorSlot.set(0);
+        state.clearTextureState();
     }
 
     public void clearEntityTextures() {
-        entityTextures.clear();
+        state.clearEntityTextures();
     }
 
     public Map<String, BufferedImage> getGeneratedEntityTextures() {
-        return textureRepository.getSpriteCache();
+        return state.getGeneratedEntityTextures();
     }
 
     public void registerGeneratedEntityTexture(String key, BufferedImage image) {
-        textureRepository.putGenerated(key, image);
+        state.registerGeneratedEntityTexture(key, image);
     }
 
     public void cacheSpriteImage(String spriteKey, BufferedImage image) {
-        textureRepository.put(null, spriteKey, image);
+        state.cacheSpriteImage(spriteKey, image);
     }
 
     public BufferedImage getCachedSpriteImage(String spriteKey) {
-        return textureRepository.getBySpriteKey(spriteKey);
+        return state.getCachedSpriteImage(spriteKey);
     }
 
     /**
      * Exposes keys of cached sprite images (including dynamically loaded CTM/PBR companions).
      */
     public Set<String> getCachedSpriteKeys() {
-        return textureRepository.getSpriteKeys();
+        return state.getCachedSpriteKeys();
     }
 
     public boolean isBlockEntityExportEnabled() {
-        return blockEntityExportEnabled;
+        return state.isBlockEntityExportEnabled();
     }
 
     public void setBlockEntityExportEnabled(boolean enabled) {
-        this.blockEntityExportEnabled = enabled;
+        state.setBlockEntityExportEnabled(enabled);
     }
 
     public CoordinateMode getCoordinateMode() {
-        return coordinateMode;
+        return state.getCoordinateMode();
     }
 
     public void setCoordinateMode(CoordinateMode mode) {
-        this.coordinateMode = mode;
+        state.setCoordinateMode(mode);
     }
 
     public boolean isVanillaRandomTransformEnabled() {
-        return vanillaRandomTransformEnabled;
+        return state.isVanillaRandomTransformEnabled();
     }
 
     public void setVanillaRandomTransformEnabled(boolean enabled) {
-        this.vanillaRandomTransformEnabled = enabled;
+        state.setVanillaRandomTransformEnabled(enabled);
     }
 
     public boolean isDiscoveryMode() {
-        return discoveryMode;
+        return state.isDiscoveryMode();
     }
 
     public void setDiscoveryMode(boolean discoveryMode) {
-        this.discoveryMode = discoveryMode;
-    }
-
-    private static String safe(String s) {
-        return s.replace(':', '_').replace('/', '_').replace(' ', '_');
-    }
-
-    /**
-     * Tracks tint variants gathered for a sprite and the atlas placement.
-     */
-    public static final class TintAtlas {
-        public final Map<Integer, Integer> tintToIndex = new ConcurrentHashMap<>();
-        public final Map<Integer, Integer> indexToTint = new ConcurrentHashMap<>();
-        public final Map<Integer, TexturePlacement> placements = new ConcurrentHashMap<>();
-        public final AtomicInteger nextIndex = new AtomicInteger();
-        public volatile int cols = 0;
-        public volatile Path atlasFile;
-        public volatile int texW = 0, texH = 0;
-        public volatile boolean usesAtlas = true;
-    }
-
-    public record TexturePlacement(int page, int tileU, int tileV, int x, int y, int w, int h,
-                                   float u0, float v0, float u1, float v1, String path)
-        implements UvPlacement {}
-
-    public record EntityTexture(ResourceLocation location, int width, int height) {}
-
-    /**
-     * Stores atlas placement information for block entity textures.
-     */
-    public record BlockEntityAtlasPlacement(int page, int udim, int x, int y, int width, int height, int atlasSize)
-        implements UvPlacement {
-        public float u0() {
-            double tileU = page % 10;
-            return (float) (tileU + (double) x / atlasSize);
-        }
-        public float v0() {
-            double tileV = page / 10;
-            // Fix UDIM V coordinate: negate tileV to compensate for coordinate flip elsewhere
-            return (float) (-tileV + (double) y / atlasSize);
-        }
-        public float u1() {
-            double tileU = page % 10;
-            return (float) (tileU + (double) (x + width) / atlasSize);
-        }
-        public float v1() {
-            double tileV = page / 10;
-            // Fix UDIM V coordinate: negate tileV to compensate for coordinate flip elsewhere
-            return (float) (-tileV + (double) (y + height) / atlasSize);
-        }
+        state.setDiscoveryMode(discoveryMode);
     }
 }

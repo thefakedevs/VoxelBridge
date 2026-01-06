@@ -1,7 +1,7 @@
 package com.voxelbridge.export.texture;
 
+import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.ExportContext.TexturePlacement;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
@@ -27,11 +27,15 @@ public final class ColorMapManager {
      * Reserves slot 0 for pure white color (4x4 region).
      */
     public static void initializeReservedSlots(ExportContext ctx) {
+        initializeReservedSlots(ctx.state());
+    }
+
+    public static void initializeReservedSlots(ExportState state) {
         int whiteColor = 0xFFFFFFFF;
 
         // Temporarily set nextColorSlot to 0 to force white into slot 0
-        ctx.getNextColorSlot().set(0);
-        TexturePlacement whitePlacement = registerColor(ctx, whiteColor);
+        state.getNextColorSlot().set(0);
+        ExportState.TexturePlacement whitePlacement = registerColor(state, whiteColor);
 
         // Verify slot 0 is indeed white
         if (whitePlacement.x() != 0 || whitePlacement.y() != 0) {
@@ -40,7 +44,7 @@ public final class ColorMapManager {
         }
 
         // Other colors start from slot 1
-        ctx.getNextColorSlot().set(1);
+        state.getNextColorSlot().set(1);
 
         VoxelBridgeLogger.info(LogModule.TEXTURE, "[ColorMap] Reserved slot 0 for white color (4x4)");
     }
@@ -48,18 +52,22 @@ public final class ColorMapManager {
     /**
      * Registers a color and returns its placement.
      */
-    public static TexturePlacement registerColor(ExportContext ctx, int argb) {
+    public static ExportState.TexturePlacement registerColor(ExportContext ctx, int argb) {
+        return registerColor(ctx.state(), argb);
+    }
+
+    public static ExportState.TexturePlacement registerColor(ExportState state, int argb) {
         // normalize alpha to 255 for mapping
         int norm = argb | 0xFF000000;
-        var map = ctx.getColorMap();
-        TexturePlacement existing = map.get(norm);
+        var map = state.getColorMap();
+        ExportState.TexturePlacement existing = map.get(norm);
         if (existing != null) return existing;
 
         int pageSize = com.voxelbridge.config.ExportRuntimeConfig.getAtlasSize().getSize();
         int slotsPerRow = pageSize / SLOT_SIZE;
         long slotsPerPage = (long) slotsPerRow * slotsPerRow;
 
-        long slot = ctx.getNextColorSlot().getAndIncrement();
+        long slot = state.getNextColorSlot().getAndIncrement();
         long page = slot / slotsPerPage;
         long idx = slot % slotsPerPage;
 
@@ -79,7 +87,7 @@ public final class ColorMapManager {
         float u1 = tileU + (x + SLOT_SIZE - 0.5f) / pageSize;
         float v1 = -tileV + (y + SLOT_SIZE - 0.5f) / pageSize;
 
-        TexturePlacement placement = new TexturePlacement((int) page, tileU, tileV, x, y, SLOT_SIZE, SLOT_SIZE, u0, v0, u1, v1, null);
+        ExportState.TexturePlacement placement = new ExportState.TexturePlacement((int) page, tileU, tileV, x, y, SLOT_SIZE, SLOT_SIZE, u0, v0, u1, v1, null);
         map.put(norm, placement);
         return placement;
     }
@@ -90,6 +98,10 @@ public final class ColorMapManager {
      * White color is pre-reserved in slot 0 by initializeReservedSlots().
      */
     public static void generateColorMaps(ExportContext ctx, Path outDir) throws IOException {
+        generateColorMaps(ctx.state(), outDir);
+    }
+
+    public static void generateColorMaps(ExportState state, Path outDir) throws IOException {
         // Skip colormap generation in VertexColor mode
         if (com.voxelbridge.config.ExportRuntimeConfig.getColorMode() == com.voxelbridge.config.ExportRuntimeConfig.ColorMode.VERTEX_COLOR) {
             VoxelBridgeLogger.info(LogModule.TEXTURE, "[ColorMap] Skipping colormap generation (VertexColor mode)");
@@ -101,14 +113,14 @@ public final class ColorMapManager {
 
         // compute max page
         int maxPage = 0;
-        for (TexturePlacement p : ctx.getColorMap().values()) {
+        for (ExportState.TexturePlacement p : state.getColorMap().values()) {
             maxPage = Math.max(maxPage, p.page());
         }
 
         int pageSize = com.voxelbridge.config.ExportRuntimeConfig.getAtlasSize().getSize();
         
-        VoxelBridgeLogger.info(LogModule.TEXTURE, "[ColorMap] entries=" + ctx.getColorMap().size()
-                + " nextSlot=" + ctx.getNextColorSlot().get()
+        VoxelBridgeLogger.info(LogModule.TEXTURE, "[ColorMap] entries=" + state.getColorMap().size()
+                + " nextSlot=" + state.getNextColorSlot().get()
                 + " pages=" + (maxPage + 1)
                 + " pageSize=" + pageSize);
 
@@ -120,7 +132,7 @@ public final class ColorMapManager {
 
         // fill colors
         final int[] sampleCount = {0};
-        ctx.getColorMap().forEach((color, placement) -> {
+        state.getColorMap().forEach((color, placement) -> {
             BufferedImage img = pages[placement.page()];
             for (int dx = 0; dx < SLOT_SIZE; dx++) {
                 for (int dy = 0; dy < SLOT_SIZE; dy++) {
@@ -154,7 +166,11 @@ public final class ColorMapManager {
      * @return A float array containing [u0, v0, u1, v1] for the color's slot in the colormap.
      */
     public static float[] remapColorUV(ExportContext ctx, int argb) {
-        TexturePlacement placement = registerColor(ctx, argb);
+        return remapColorUV(ctx.state(), argb);
+    }
+
+    public static float[] remapColorUV(ExportState state, int argb) {
+        ExportState.TexturePlacement placement = registerColor(state, argb);
         return new float[] { placement.u0(), placement.v0(), placement.u1(), placement.v1() };
     }
 }

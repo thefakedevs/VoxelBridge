@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter;
 
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -30,7 +30,7 @@ public final class FluidExporter {
      * Samples fluid geometry and sends it to the scene sink.
      */
     public static void sample(ExportContext ctx,
-                              SceneSink sceneSink,
+                              IrSink sceneSink,
                               Level level,
                               BlockState state,
                               BlockPos pos,

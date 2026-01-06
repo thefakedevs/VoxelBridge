@@ -1,6 +1,7 @@
 package com.voxelbridge.export.texture;
 
 import com.voxelbridge.VoxelBridge;
+import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.export.ExportContext;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.util.debug.LogModule;
@@ -35,38 +36,39 @@ public final class EntityTextureManager {
 
         // Ensure the texture repository has an entry for this sprite.
         var repo = ctx.getTextureRepository();
-        BufferedImage cached = repo.get(texFinal);
+        String resourceKey = texFinal.toString();
+        BufferedImage cached = repo.get(resourceKey);
         if (cached == null) {
             ResourceLocation pngLoc = resolveTexturePath(texFinal);
             BufferedImage img = com.voxelbridge.export.texture.TextureLoader.readTexture(pngLoc, com.voxelbridge.config.ExportRuntimeConfig.isAnimationEnabled());
             if (img != null) {
-                repo.put(texFinal, key, img);
+                repo.put(resourceKey, key, img);
             } else {
                 // Preserve mapping so later sprite cache inserts can replace it.
-                repo.register(key, texFinal);
+                repo.register(key, resourceKey);
             }
         } else {
-            repo.register(key, texFinal);
+            repo.register(key, resourceKey);
         }
 
         return new TextureHandle(key, materialName, relativePath, texture);
     }
 
-    private static ExportContext.EntityTexture loadTextureInfo(ExportContext ctx, ResourceLocation texture) {
+    private static ExportState.EntityTexture loadTextureInfo(ExportContext ctx, ResourceLocation texture) {
         texture = com.voxelbridge.util.ResourceLocationUtil.sanitize(texture.toString());
         Minecraft mc = ctx.getMc();
         try {
             Optional<Resource> resource = mc.getResourceManager().getResource(resolveTexturePath(texture));
             if (resource.isEmpty()) {
-                return new ExportContext.EntityTexture(texture, DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
+                return new ExportState.EntityTexture(texture.toString(), DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
             }
             Resource res = resource.get();
             try (InputStream in = res.open(); NativeImage img = NativeImage.read(in)) {
-                return new ExportContext.EntityTexture(texture, img.getWidth(), img.getHeight());
+                return new ExportState.EntityTexture(texture.toString(), img.getWidth(), img.getHeight());
             }
         } catch (IOException e) {
             VoxelBridgeLogger.warn(LogModule.TEXTURE, String.format("[VoxelBridge][WARN] Failed to read entity texture %s: %s", texture, e.getMessage()));
-            return new ExportContext.EntityTexture(texture, DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
+            return new ExportState.EntityTexture(texture.toString(), DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
         }
     }
 
@@ -89,7 +91,7 @@ public final class EntityTextureManager {
         ResourceLocation generatedLoc = generatedLocation(key);
         ctx.getGeneratedEntityTextures().putIfAbsent(key, image);
         ctx.getMaterialPaths().putIfAbsent(key, relativePath);
-        ctx.getEntityTextures().putIfAbsent(key, new ExportContext.EntityTexture(generatedLoc, image.getWidth(), image.getHeight()));
+        ctx.getEntityTextures().putIfAbsent(key, new ExportState.EntityTexture(generatedLoc.toString(), image.getWidth(), image.getHeight()));
         String materialName = ctx.getMaterialNameForSprite(key);
         return new TextureHandle(key, materialName, relativePath, generatedLoc);
     }

@@ -1,26 +1,21 @@
 package com.voxelbridge.export.scene.gltf;
 
-import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportProgressTracker;
-import com.voxelbridge.core.scene.BulkQuadSink;
-import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.ir.IrBulkQuadSink;
+import com.voxelbridge.core.ir.IrFlags;
+import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.core.scene.SceneWriteRequest;
-import com.voxelbridge.export.texture.TextureExportPipeline;
-import com.voxelbridge.export.texture.TextureLoader;
-import com.voxelbridge.export.texture.AnimatedTextureHelper;
 import com.voxelbridge.export.texture.ColorMapManager;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import com.voxelbridge.util.debug.LogModule;
-import com.voxelbridge.util.client.ProgressNotifier;
 import de.javagl.jgltf.impl.v2.*;
 import de.javagl.jgltf.model.io.GltfAsset;
 import de.javagl.jgltf.model.io.GltfAssetWriter;
 import de.javagl.jgltf.model.io.v2.GltfAssetV2;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.resources.ResourceLocation;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -41,8 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 3. UV remapping -> uvraw.bin -> finaluv.bin
  * 4. Assemble glTF -> Build directly from geometry.bin + finaluv.bin
  */
-public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
-    private final ExportContext ctx;
+public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
+    private final ExportState state;
     private final Path outputDir;
     private final TextureRegistry textureRegistry;
     private static final int BYTES_PER_QUAD_GEOMETRY = 140;
@@ -54,7 +49,7 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
     private final GeometryIndex geometryIndex;
 
     // Thread communication
-    private static final QuadBatch POISON_PILL = new QuadBatch(null, null, null, null, null, null, null, null, false, null);
+    private static final QuadBatch POISON_PILL = new QuadBatch(null, null, null, 0, null, null, null, null, null, null);
     // OPTIMIZATION: Increased queue capacity 4x to reduce sampling thread blocking
     // Large scenes with many quads benefit from larger producer-consumer buffer
     // Changed to Object to support both single QuadBatch and BulkQuadBatch
@@ -67,12 +62,12 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
         String materialGroupKey,
         String spriteKey,
         String overlaySpriteKey,
+        int quadFlags,
         float[] positions,
         float[] uv0,
         float[] uv1,
         float[] normal,
         float[] colors,
-        boolean doubleSided,
         String bucketKey
     ) {}
 
@@ -88,13 +83,13 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
         float[] flatUv1s,
         float[] flatNormals,
         float[] flatColors,
-        List<Boolean> doubleSideds
+        int[] quadFlags
     ) {}
 
-    public GltfSceneBuilder(ExportContext ctx, Path outDir) throws IOException {
-        this.ctx = ctx;
+    public GltfSceneBuilder(ExportState state, Path outDir) throws IOException {
+        this.state = state;
         this.outputDir = outDir;
-        this.textureRegistry = new TextureRegistry(ctx, outDir);
+        this.textureRegistry = new TextureRegistry(state);
 
         // Create streaming indices
         this.spriteIndex = new SpriteIndex();
@@ -121,7 +116,7 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                          float[] flatUv1s,
                          float[] flatNormals,
                          float[] flatColors,
-                         List<Boolean> doubleSideds) {
+                         int[] quadFlags) {
         
         if (materialGroupKey == null || spriteKeys.isEmpty()) return;
         
@@ -133,7 +128,7 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                 materialGroupKey,
                 spriteKeys, overlaySpriteKeys, 
                 flatPositions, flatUv0s, flatUv1s, flatNormals, flatColors, 
-                doubleSideds
+                quadFlags
             ));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -141,23 +136,27 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
     }
 
     @Override
-    public void addQuad(String materialGroupKey,
+    public void addQuad(String materialKey,
                         String spriteKey,
                         String overlaySpriteKey,
+                        RenderLayer renderLayer,
+                        TintMode tintMode,
+                        boolean doubleSided,
+                        boolean emissive,
                         float[] positions,
                         float[] uv0,
                         float[] uv1,
                         float[] normal,
-                        float[] colors,
-                        boolean doubleSided) {
-        if (materialGroupKey == null || spriteKey == null) return;
+                        float[] colors) {
+        if (materialKey == null || spriteKey == null) return;
+        int quadFlags = IrFlags.encode(renderLayer, tintMode, doubleSided, emissive);
         String animName = resolveAnimationName(spriteKey);
-        String bucketKey = animName != null ? animName : materialGroupKey;
+        String bucketKey = animName != null ? animName : materialKey;
 
         // Colormap mode: all quads must have TEXCOORD_1; non-tinted points to reserved white slot
         if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP) {
             if (uv1 == null || uv1.length < 8) {
-                float[] lut = ColorMapManager.remapColorUV(ctx, 0xFFFFFFFF);
+                float[] lut = ColorMapManager.remapColorUV(state, 0xFFFFFFFF);
                 float u0 = lut[0], v0 = lut[1], u1v = lut[2], v1v = lut[3];
                 uv1 = new float[]{
                     u0, v0,
@@ -174,23 +173,19 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
         // Enqueue
         try {
             queue.put(new QuadBatch(
-                materialGroupKey, spriteKey, overlaySpriteKey,
-                positions, uv0, uv1, normal, colors, doubleSided, bucketKey
+                materialKey, spriteKey, overlaySpriteKey, quadFlags,
+                positions, uv0, uv1, normal, colors, bucketKey
             ));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
 
-    @Override
     public Path write(SceneWriteRequest request) throws IOException {
-        Minecraft mc = ctx.getMc();
-
         try {
             // 1. 
             ExportProgressTracker.setStage(ExportProgressTracker.Stage.SAMPLING, "Sampling complete");
             ExportProgressTracker.setPhasePercent(null);
-            ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
             VoxelBridgeLogger.info(LogModule.GLTF, "[GltfBuilder] Stage 1/3: Finalizing sampling...");
             long tFinalizeSampling = VoxelBridgeLogger.now();
 
@@ -219,17 +214,10 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
             // 2. 
             ExportProgressTracker.setStage(ExportProgressTracker.Stage.ATLAS, "Building atlases");
             ExportProgressTracker.setPhasePercent(null);
-            ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
-            VoxelBridgeLogger.info(LogModule.GLTF, "[GltfBuilder] Stage 2/3: Generating texture atlases...");
-            long tAtlas = VoxelBridgeLogger.now();
-
-            TextureExportPipeline.build(ctx, request.outputDir(), spriteIndex.getAllKeys());
-            VoxelBridgeLogger.info(LogModule.GLTF, "[GltfBuilder] Texture atlas generation complete");
-            VoxelBridgeLogger.duration("gltf_atlas_generation", VoxelBridgeLogger.elapsedSince(tAtlas));
+            VoxelBridgeLogger.info(LogModule.GLTF, "[GltfBuilder] Stage 2/3: Using prebuilt texture atlases...");
 
             // 3. glTF Assembly (Includes on-the-fly UV Remap)
             ExportProgressTracker.setStage(ExportProgressTracker.Stage.FINALIZE, "Assembling glTF");
-            ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
             VoxelBridgeLogger.info(LogModule.GLTF, "[GltfBuilder] Stage 3/3: Assembling glTF...");
             long tAssemble = VoxelBridgeLogger.now();
 
@@ -243,7 +231,6 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
             VoxelBridgeLogger.info(LogModule.GLTF, "[GltfBuilder] glTF assembly complete: " + result);
             VoxelBridgeLogger.duration("gltf_assembly", VoxelBridgeLogger.elapsedSince(tAssemble));
             ExportProgressTracker.setPhasePercent(1.0f);
-            ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
 
             return result;
         } catch (Exception e) {
@@ -278,12 +265,12 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                             batch.bucketKey,
                             batch.spriteKey,
                             batch.overlaySpriteKey,
+                            batch.quadFlags,
                             batch.positions,
                             batch.uv0,
                             batch.uv1,
                             batch.normal,
-                            batch.colors,
-                            batch.doubleSided
+                            batch.colors
                         );
                     } else if (item instanceof BulkQuadBatch bulk) {
                         // Iterate and write bulk items
@@ -293,7 +280,7 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                         float[] defaultUv1 = null;
                         if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP) {
                             if (bulk.flatUv1s() == null || bulk.flatUv1s().length == 0) {
-                                float[] lut = ColorMapManager.remapColorUV(ctx, 0xFFFFFFFF);
+                                float[] lut = ColorMapManager.remapColorUV(state, 0xFFFFFFFF);
                                 float u0 = lut[0], v0 = lut[1], u1v = lut[2], v1v = lut[3];
                                 defaultUv1 = new float[]{
                                     u0, v0,
@@ -304,6 +291,7 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                             }
                         }
 
+                        int[] flags = bulk.quadFlags();
                         for (int i = 0; i < count; i++) {
                             String spriteKey = bulk.spriteKeys().get(i);
                             String animName = resolveAnimationName(spriteKey);
@@ -321,16 +309,17 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                                 currentUv1Offset = 0;
                             }
 
+                            int quadFlags = (flags != null && i < flags.length) ? flags[i] : 0;
                             streamingWriter.writeQuadFlat(
                                 bucketKey,
                                 spriteKey,
                                 bulk.overlaySpriteKeys().get(i),
+                                quadFlags,
                                 bulk.flatPositions(), i * 12,
                                 bulk.flatUv0s(), i * 8,
                                 currentUv1, currentUv1Offset,
                                 bulk.flatNormals(), i * 3,
-                                bulk.flatColors(), i * 16,
-                                bulk.doubleSideds().get(i)
+                                bulk.flatColors(), i * 16
                             );
                         }
                     }
@@ -535,7 +524,6 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                                 float mapped = 0.6f + 0.4f * frac;
                                 if (phase.shouldPush(mapped)) {
                                     ExportProgressTracker.setPhasePercent(mapped);
-                                    ProgressNotifier.showDetailed(ctx.getMc(), ExportProgressTracker.progress());
                                 }
                             }
                         } catch (Exception e) {
@@ -738,21 +726,21 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                     String overlayKey = overlaySpriteId >= 0 ? spriteIndex.getKey(overlaySpriteId) : null;
                     
                     // Remap UV0
-                    if (com.voxelbridge.export.texture.UvRemapUtil.shouldRemap(ctx, spriteKey)) {
+                    if (com.voxelbridge.export.texture.UvRemapUtil.shouldRemap(state, spriteKey)) {
                         for (int v = 0; v < 4; v++) {
-                            float[] remapped = com.voxelbridge.export.texture.UvRemapUtil.remapUv(ctx, spriteKey, qUv0[v * 2], qUv0[v * 2 + 1]);
+                            float[] remapped = com.voxelbridge.export.texture.UvRemapUtil.remapUv(state, spriteKey, qUv0[v * 2], qUv0[v * 2 + 1]);
                             qUv0[v * 2] = remapped[0];
                             qUv0[v * 2 + 1] = remapped[1];
                         }
                     }
                     
                     // Remap UV1 (Overlay)
-                    if (!isColormapMode && com.voxelbridge.export.texture.UvRemapUtil.shouldRemap(ctx, overlayKey)) {
+                    if (!isColormapMode && com.voxelbridge.export.texture.UvRemapUtil.shouldRemap(state, overlayKey)) {
                          boolean hasUV1 = false;
                          for (float f : qUv1) if (f != 0) { hasUV1 = true; break; }
                          if (hasUV1) {
                              for (int v = 0; v < 4; v++) {
-                                 float[] remapped = com.voxelbridge.export.texture.UvRemapUtil.remapUv(ctx, overlayKey, qUv1[v * 2], qUv1[v * 2 + 1]);
+                                 float[] remapped = com.voxelbridge.export.texture.UvRemapUtil.remapUv(state, overlayKey, qUv1[v * 2], qUv1[v * 2 + 1]);
                                  qUv1[v * 2] = remapped[0];
                                  qUv1[v * 2 + 1] = remapped[1];
                              }
@@ -774,7 +762,7 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
                 
                 currentVertexBase += 4;
                 
-                if ((flags & 1) != 0) doubleSided = true;
+                if (IrFlags.isDoubleSided(flags)) doubleSided = true;
             }
         }
 
@@ -1034,32 +1022,9 @@ public final class GltfSceneBuilder implements SceneSink, BulkQuadSink {
             return null;
         }
         if (spriteKey == null) return null;
-        var repo = ctx.getTextureRepository();
-        if (!repo.hasAnimation(spriteKey)) {
-            detectAnimation(spriteKey, repo);
-        }
+        var repo = state.getTextureRepository();
         if (!repo.hasAnimation(spriteKey)) return null;
         return animationBaseName(spriteKey);
-    }
-
-    private void detectAnimation(String spriteKey, com.voxelbridge.export.texture.TextureRepository repo) {
-        try {
-            TextureAtlas atlas = ctx.getMc().getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS);
-            ResourceLocation spriteLoc = com.voxelbridge.util.ResourceLocationUtil.sanitize(spriteKey);
-            TextureAtlasSprite sprite = atlas.getSprite(spriteLoc);
-            if (sprite != null) {
-                AnimatedTextureHelper.extractFromSprite(spriteKey, sprite, repo);
-                if (repo.hasAnimation(spriteKey)) return;
-            }
-        } catch (Exception ignored) {
-            // fallback to metadata
-        }
-        try {
-            ResourceLocation texLoc = TextureLoader.spriteKeyToTexturePNG(spriteKey);
-            AnimatedTextureHelper.detectFromMetadata(spriteKey, texLoc, repo);
-        } catch (Exception e) {
-            VoxelBridgeLogger.warn(LogModule.ANIMATION, "[Animation][WARN] glTF detection failed for " + spriteKey + ": " + e.getMessage());
-        }
     }
 
     private String animationBaseName(String spriteKey) {

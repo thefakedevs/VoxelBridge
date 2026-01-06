@@ -3,16 +3,16 @@ package com.voxelbridge.thread;
 import com.voxelbridge.export.scene.gltf.GltfExportService;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
-import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
-import java.nio.file.Path;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Path;
 
 /** Asynchronous glTF export thread with completion notifications. */
 @OnlyIn(Dist.CLIENT)

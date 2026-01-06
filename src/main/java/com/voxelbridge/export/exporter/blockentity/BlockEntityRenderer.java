@@ -1,7 +1,9 @@
 package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import com.voxelbridge.config.ExportRuntimeConfig;
@@ -29,7 +31,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import java.util.List;
 
 /**
- * Renders BlockEntities and captures their geometry to a SceneSink.
+ * Renders BlockEntities and captures their geometry to an IR sink.
  * This replaces the old BerRenderHelper + BerCaptureBuffer system.
  */
 @OnlyIn(Dist.CLIENT)
@@ -81,7 +83,7 @@ public final class BlockEntityRenderer {
     public static boolean render(
         ExportContext ctx,
         BlockEntity blockEntity,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         double offsetX,
         double offsetY,
         double offsetZ
@@ -92,7 +94,7 @@ public final class BlockEntityRenderer {
     public static boolean render(
         ExportContext ctx,
         BlockEntity blockEntity,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         double offsetX,
         double offsetY,
         double offsetZ,
@@ -112,7 +114,7 @@ public final class BlockEntityRenderer {
     public static RenderTask createTask(
         ExportContext ctx,
         BlockEntity blockEntity,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         double offsetX,
         double offsetY,
         double offsetZ,
@@ -141,7 +143,7 @@ public final class BlockEntityRenderer {
     private static boolean renderDirect(
         ExportContext ctx,
         BlockEntity blockEntity,
-        SceneSink sceneSink,
+        IrSink sceneSink,
         double offsetX,
         double offsetY,
         double offsetZ,
@@ -191,7 +193,7 @@ public final class BlockEntityRenderer {
     public static final class RenderTask implements Runnable {
         private final ExportContext ctx;
         private final BlockEntity blockEntity;
-        private final SceneSink sceneSink;
+        private final IrSink sceneSink;
         private final double offsetX;
         private final double offsetY;
         private final double offsetZ;
@@ -204,7 +206,7 @@ public final class BlockEntityRenderer {
         RenderTask(
             ExportContext ctx,
             BlockEntity blockEntity,
-            SceneSink sceneSink,
+            IrSink sceneSink,
             double offsetX,
             double offsetY,
             double offsetZ,
@@ -245,14 +247,14 @@ public final class BlockEntityRenderer {
      */
     private static class CaptureBuffer implements MultiBufferSource, RenderCapture.QuadSink {
         private final ExportContext ctx;
-        private final SceneSink sceneSink;
+        private final IrSink sceneSink;
         private final double offsetX, offsetY, offsetZ;
         private final BlockEntity blockEntity;
         private final RenderCapture capture;
         private boolean hadGeometry = false;
         private final TextureOverrideMap overrides;
 
-        CaptureBuffer(ExportContext ctx, SceneSink sceneSink, double offsetX, double offsetY, double offsetZ, BlockEntity blockEntity) {
+        CaptureBuffer(ExportContext ctx, IrSink sceneSink, double offsetX, double offsetY, double offsetZ, BlockEntity blockEntity) {
             this.ctx = ctx;
             this.sceneSink = sceneSink;
             this.offsetX = offsetX;
@@ -411,8 +413,14 @@ public final class BlockEntityRenderer {
                         System.arraycopy(GeometryUtil.whiteColor(), 0, colors, 0, colors.length);
                     }
 
-                    sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent", positions, uv0, uv1, NORMAL_UP, colors,
-                        RENDER_TYPE_RESOLVER.isDoubleSided(renderType));
+                    TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
+                        ? TintMode.COLORMAP
+                        : TintMode.VERTEX_COLOR;
+                    sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
+                        RenderLayer.UNKNOWN, tintMode,
+                        RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
+                        false,
+                        positions, uv0, uv1, NORMAL_UP, colors);
                     return;
                 }
             }
@@ -464,8 +472,14 @@ public final class BlockEntityRenderer {
 
             // Send quad to scene sink using the BlockEntity type as group key (block entities typically don't have overlays)
             ctx.registerSpriteMaterial(spriteKey, materialGroupKey);
-            sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent", positions, uv0, uv1, NORMAL_UP, colors,
-                RENDER_TYPE_RESOLVER.isDoubleSided(renderType));
+            TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
+                ? TintMode.COLORMAP
+                : TintMode.VERTEX_COLOR;
+            sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
+                RenderLayer.UNKNOWN, tintMode,
+                RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
+                false,
+                positions, uv0, uv1, NORMAL_UP, colors);
         }
 
         private void fillUvs(List<RenderCapture.Vertex> verts, float[] uv0, boolean isAtlas, float u0, float u1, float v0, float v1) {

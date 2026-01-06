@@ -1,5 +1,6 @@
 package com.voxelbridge.export.scene.gltf;
 
+import com.voxelbridge.core.ir.IrFlags;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
@@ -75,12 +76,12 @@ final class StreamingGeometryWriter implements AutoCloseable {
         String materialGroupKey,
         String spriteKey,
         String overlaySpriteKey,
+        int quadFlags,
         float[] flatPositions, int posOffset,
         float[] flatUv0, int uv0Offset,
         float[] flatUv1, int uv1Offset,
         float[] flatNormal, int normOffset,
-        float[] flatColors, int colOffset,
-        boolean doubleSided
+        float[] flatColors, int colOffset
     ) throws IOException {
         if (closed) {
             throw new IllegalStateException("Writer is closed");
@@ -109,7 +110,7 @@ final class StreamingGeometryWriter implements AutoCloseable {
         buf.putInt(materialGroupKey.hashCode());
         buf.putInt(spriteId);
         buf.putInt(overlaySpriteId);
-        buf.putInt(doubleSided ? 1 : 0); // Flags (using int for alignment/padding simplified)
+        buf.putInt(quadFlags); // Flags packed via IrFlags
         
         // Pos (48)
         for (int i = 0; i < 12; i++) buf.putFloat(flatPositions[posOffset + i]);
@@ -136,7 +137,7 @@ final class StreamingGeometryWriter implements AutoCloseable {
         bucket.quadCount++;
         bucket.usedSprites.add(spriteKey);
         if (overlaySpriteKey != null) bucket.usedSprites.add(overlaySpriteKey);
-        if (doubleSided) bucket.doubleSided = true;
+        if (IrFlags.isDoubleSided(quadFlags)) bucket.doubleSided = true;
 
         return logicalOffset;
     }
@@ -178,21 +179,21 @@ final class StreamingGeometryWriter implements AutoCloseable {
         String materialGroupKey,
         String spriteKey,
         String overlaySpriteKey,
+        int quadFlags,
         float[] positions,
         float[] uv0,
         float[] uv1,
         float[] normal,
-        float[] colors,
-        boolean doubleSided
+        float[] colors
     ) throws IOException {
         return writeQuadFlat(
             materialGroupKey, spriteKey, overlaySpriteKey,
+            quadFlags,
             positions, 0,
             uv0, 0,
             uv1, 0,
             normal, 0,
-            colors, 0,
-            doubleSided
+            colors, 0
         );
     }
 

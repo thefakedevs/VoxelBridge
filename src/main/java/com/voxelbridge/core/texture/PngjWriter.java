@@ -1,13 +1,13 @@
 package com.voxelbridge.core.texture;
 
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferInt;
-import java.nio.file.Path;
-
 import ar.com.hjg.pngj.FilterType;
 import ar.com.hjg.pngj.ImageInfo;
 import ar.com.hjg.pngj.ImageLineInt;
 import ar.com.hjg.pngj.PngWriter;
+
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
+import java.nio.file.Path;
 
 /**
  * Fast PNG writer using PNGJ (shaded at build). Writes RGBA, compression level 0.

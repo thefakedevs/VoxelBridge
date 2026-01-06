@@ -2,7 +2,9 @@ package com.voxelbridge.export.exporter;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.core.scene.SceneSink;
+import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.export.texture.TextureLoader;
 import com.voxelbridge.export.util.color.ColorModeHandler;
@@ -28,7 +30,7 @@ public final class QuadProcessor {
 
     private final ExportContext ctx;
     private final Level level;
-    private final SceneSink sceneSink;
+    private final IrSink sceneSink;
     private final double offsetX, offsetY, offsetZ;
 
     // Placeholder to ensure tool reads the file first
@@ -37,7 +39,7 @@ public final class QuadProcessor {
     // Track processed quads to avoid duplicates (Optimization: Use FastUtil primitive set)
     private final it.unimi.dsi.fastutil.longs.LongOpenHashSet quadKeys = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
 
-    public QuadProcessor(ExportContext ctx, Level level, SceneSink sceneSink,
+    public QuadProcessor(ExportContext ctx, Level level, IrSink sceneSink,
                          double offsetX, double offsetY, double offsetZ) {
         this.ctx = ctx;
         this.level = level;
@@ -130,8 +132,12 @@ public final class QuadProcessor {
         ctx.registerSpriteMaterial(spriteKey, blockKey);
 
         // Output quad (Intern keys)
-        sceneSink.addQuad(ctx.intern(blockKey), ctx.intern(spriteKey), null, vertexData.positions(), vertexData.uvs(),
-                colorData.uv1(), vertexData.normal(), colorData.colors(), doubleSided);
+        TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
+            ? TintMode.COLORMAP
+            : TintMode.VERTEX_COLOR;
+        sceneSink.addQuad(ctx.intern(blockKey), ctx.intern(spriteKey), null,
+            RenderLayer.UNKNOWN, tintMode, doubleSided, false,
+            vertexData.positions(), vertexData.uvs(), colorData.uv1(), vertexData.normal(), colorData.colors());
     }
 
     /**

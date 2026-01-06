@@ -1,9 +1,9 @@
 package com.voxelbridge.export.exporter.blockentity;
 
+import com.voxelbridge.util.debug.LogModule;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import com.voxelbridge.util.debug.LogModule;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 

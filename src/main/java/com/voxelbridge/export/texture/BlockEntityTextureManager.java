@@ -1,5 +1,7 @@
 package com.voxelbridge.export.texture;
 
+import com.voxelbridge.core.export.ExportState;
+import com.voxelbridge.core.texture.TextureRepository;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.util.debug.LogModule;
@@ -40,12 +42,12 @@ public final class BlockEntityTextureManager {
         ResourceLocation loc = handle.textureLocation();
 
         TextureRepository repo = repo(ctx);
-        repo.put(loc, spriteKey, image);
+        repo.put(loc.toString(), spriteKey, image);
 
         ctx.getGeneratedEntityTextures().put(spriteKey, image);
         ctx.getMaterialPaths().putIfAbsent(spriteKey, handle.relativePath());
         ctx.getEntityTextures().putIfAbsent(spriteKey,
-            new ExportContext.EntityTexture(loc, image.getWidth(), image.getHeight()));
+            new ExportState.EntityTexture(loc.toString(), image.getWidth(), image.getHeight()));
         // Register into main atlas (merged atlas path)
         TextureAtlasManager.registerTint(ctx, spriteKey, 0xFFFFFF);
 
@@ -67,12 +69,13 @@ public final class BlockEntityTextureManager {
         ResourceLocation pngLocation = ensurePngLocation(textureLoc);
 
         TextureRepository repo = repo(ctx);
-        BufferedImage texture = repo.computeIfAbsent(pngLocation, loc -> {
-            BufferedImage img = loadTextureFromResolved(textureRes, loc);
+        String pngKey = pngLocation.toString();
+        BufferedImage texture = repo.computeIfAbsent(pngKey, key -> {
+            BufferedImage img = loadTextureFromResolved(textureRes, pngLocation);
             if (img != null) {
-                VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Loaded texture: " + loc + " (" + img.getWidth() + "x" + img.getHeight() + ")");
+                VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Loaded texture: " + pngLocation + " (" + img.getWidth() + "x" + img.getHeight() + ")");
             } else {
-                VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Failed to load texture: " + loc);
+                VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Failed to load texture: " + pngLocation);
             }
             return img;
         });
@@ -85,7 +88,7 @@ public final class BlockEntityTextureManager {
                     texture = frames.frames().get(0);
                 }
             }
-            repo.put(pngLocation, spriteKey, texture);
+            repo.put(pngKey, spriteKey, texture);
 
             // Register material path (EntityTextureManager line 29-30)
             String relativePath = TexturePathResolver.ensureEntityLikePath(ctx, spriteKey);
@@ -94,7 +97,7 @@ public final class BlockEntityTextureManager {
             final BufferedImage texRef = texture;
             final ResourceLocation locRef = pngLocation;
             ctx.getEntityTextures().computeIfAbsent(spriteKey,
-                k -> new ExportContext.EntityTexture(locRef, texRef.getWidth(), texRef.getHeight()));
+                k -> new ExportState.EntityTexture(locRef.toString(), texRef.getWidth(), texRef.getHeight()));
 
             VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Registered: " + spriteKey + " -> " + relativePath);
             // Register into shared atlas flow (default tint)
@@ -103,18 +106,18 @@ public final class BlockEntityTextureManager {
             // PBR companions (_n/_s) if present in RP
             var pbr = com.voxelbridge.export.texture.PbrTextureHelper.ensurePbrCached(ctx, spriteKey, textureRes.sprite());
             if (pbr.normalImage() != null && pbr.normalLocation() != null) {
-                repo.put(pbr.normalLocation(), normalKey(spriteKey), pbr.normalImage());
+                repo.put(pbr.normalLocation().toString(), normalKey(spriteKey), pbr.normalImage());
                 ctx.getMaterialPaths().putIfAbsent(normalKey(spriteKey),
                     "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_n.png");
                 ctx.getEntityTextures().putIfAbsent(normalKey(spriteKey),
-                    new ExportContext.EntityTexture(pbr.normalLocation(), pbr.normalImage().getWidth(), pbr.normalImage().getHeight()));
+                    new ExportState.EntityTexture(pbr.normalLocation().toString(), pbr.normalImage().getWidth(), pbr.normalImage().getHeight()));
             }
             if (pbr.specularImage() != null && pbr.specularLocation() != null) {
-                repo.put(pbr.specularLocation(), specKey(spriteKey), pbr.specularImage());
+                repo.put(pbr.specularLocation().toString(), specKey(spriteKey), pbr.specularImage());
                 ctx.getMaterialPaths().putIfAbsent(specKey(spriteKey),
                     "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_s.png");
                 ctx.getEntityTextures().putIfAbsent(specKey(spriteKey),
-                    new ExportContext.EntityTexture(pbr.specularLocation(), pbr.specularImage().getWidth(), pbr.specularImage().getHeight()));
+                    new ExportState.EntityTexture(pbr.specularLocation().toString(), pbr.specularImage().getWidth(), pbr.specularImage().getHeight()));
             }
 
             // If atlas texture and _n/_s still missing, attempt atlas companion crop (e.g., chest atlas)
@@ -136,20 +139,20 @@ public final class BlockEntityTextureManager {
      * This must be called to populate the texture cache before atlas generation.
      */
     public static BufferedImage getTexture(ExportContext ctx, ResourceLocation location) {
-        return repo(ctx).get(location);
+        return repo(ctx).get(location.toString());
     }
 
     /**
      * Checks if a texture is loaded.
      */
     public static boolean hasTexture(ExportContext ctx, ResourceLocation location) {
-        return repo(ctx).contains(location);
+        return repo(ctx).contains(location.toString());
     }
 
     /**
      * Returns the registered PNG location for a spriteKey, if any.
      */
-    public static ResourceLocation getRegisteredLocation(ExportContext ctx, String spriteKey) {
+    public static String getRegisteredLocation(ExportContext ctx, String spriteKey) {
         return repo(ctx).getRegisteredLocation(spriteKey);
     }
 
@@ -245,11 +248,11 @@ public final class BlockEntityTextureManager {
             BufferedImage cropped = crop(atlasImg, u0, u1, v0, v1);
             if (cropped != null) {
                 ResourceLocation genLoc = generatedLocation(normalKey(spriteKey));
-                repo(ctx).put(genLoc, normalKey(spriteKey), cropped);
+                repo(ctx).put(genLoc.toString(), normalKey(spriteKey), cropped);
                 ctx.getMaterialPaths().putIfAbsent(normalKey(spriteKey),
                     "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_n.png");
                 ctx.getEntityTextures().putIfAbsent(normalKey(spriteKey),
-                    new ExportContext.EntityTexture(genLoc, cropped.getWidth(), cropped.getHeight()));
+                    new ExportState.EntityTexture(genLoc.toString(), cropped.getWidth(), cropped.getHeight()));
                 VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex][PBR] Cropped normal from atlas " + atlasNormal + " for " + spriteKey);
             }
         }
@@ -259,11 +262,11 @@ public final class BlockEntityTextureManager {
             BufferedImage cropped = crop(atlasImg, u0, u1, v0, v1);
             if (cropped != null) {
                 ResourceLocation genLoc = generatedLocation(specKey(spriteKey));
-                repo(ctx).put(genLoc, specKey(spriteKey), cropped);
+                repo(ctx).put(genLoc.toString(), specKey(spriteKey), cropped);
                 ctx.getMaterialPaths().putIfAbsent(specKey(spriteKey),
                     "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_s.png");
                 ctx.getEntityTextures().putIfAbsent(specKey(spriteKey),
-                    new ExportContext.EntityTexture(genLoc, cropped.getWidth(), cropped.getHeight()));
+                    new ExportState.EntityTexture(genLoc.toString(), cropped.getWidth(), cropped.getHeight()));
                 VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex][PBR] Cropped specular from atlas " + atlasSpec + " for " + spriteKey);
             }
         }
@@ -299,11 +302,11 @@ public final class BlockEntityTextureManager {
             ResourceLocation sibNormal = appendSuffix(pngBase, "_n");
             BufferedImage img = TextureLoader.readTexture(sibNormal);
             if (img != null) {
-                repo(ctx).put(sibNormal, normalKey(spriteKey), img);
+                repo(ctx).put(sibNormal.toString(), normalKey(spriteKey), img);
                 ctx.getMaterialPaths().putIfAbsent(normalKey(spriteKey),
                     "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_n.png");
                 ctx.getEntityTextures().putIfAbsent(normalKey(spriteKey),
-                    new ExportContext.EntityTexture(sibNormal, img.getWidth(), img.getHeight()));
+                    new ExportState.EntityTexture(sibNormal.toString(), img.getWidth(), img.getHeight()));
             }
         }
 
@@ -311,11 +314,11 @@ public final class BlockEntityTextureManager {
             ResourceLocation sibSpec = appendSuffix(pngBase, "_s");
             BufferedImage img = TextureLoader.readTexture(sibSpec);
             if (img != null) {
-                repo(ctx).put(sibSpec, specKey(spriteKey), img);
+                repo(ctx).put(sibSpec.toString(), specKey(spriteKey), img);
                 ctx.getMaterialPaths().putIfAbsent(specKey(spriteKey),
                     "entity_textures/" + TexturePathResolver.safe(spriteKey) + "_s.png");
                 ctx.getEntityTextures().putIfAbsent(specKey(spriteKey),
-                    new ExportContext.EntityTexture(sibSpec, img.getWidth(), img.getHeight()));
+                    new ExportState.EntityTexture(sibSpec.toString(), img.getWidth(), img.getHeight()));
             }
         }
     }

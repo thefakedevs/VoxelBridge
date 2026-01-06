@@ -1,6 +1,4 @@
-package com.voxelbridge.export.texture;
-
-import net.minecraft.resources.ResourceLocation;
+package com.voxelbridge.core.texture;
 
 import java.awt.image.BufferedImage;
 import java.util.Map;
@@ -10,43 +8,43 @@ import java.util.function.Function;
 
 /**
  * Session-scoped texture repository used to avoid static cache leakage.
- * Supports both ResourceLocation-based keys and spriteKey-based keys for generated or virtual textures.
+ * Supports both resource-key strings and spriteKey-based keys for generated or virtual textures.
  */
 public final class TextureRepository {
-    private final Map<ResourceLocation, BufferedImage> locationCache = new ConcurrentHashMap<>();
-    private final Map<String, ResourceLocation> keyToLocation = new ConcurrentHashMap<>();
+    private final Map<String, BufferedImage> locationCache = new ConcurrentHashMap<>();
+    private final Map<String, String> keyToLocation = new ConcurrentHashMap<>();
     private final Map<String, BufferedImage> spriteCache = new ConcurrentHashMap<>();
-    private final Map<String, com.voxelbridge.core.texture.AnimatedFrameSet> animatedCache = new ConcurrentHashMap<>();
+    private final Map<String, AnimatedFrameSet> animatedCache = new ConcurrentHashMap<>();
 
-    public BufferedImage get(ResourceLocation loc) {
-        return locationCache.get(loc);
+    public BufferedImage get(String resourceKey) {
+        return resourceKey == null ? null : locationCache.get(resourceKey);
     }
 
     public BufferedImage getBySpriteKey(String spriteKey) {
         if (spriteKey == null) return null;
-        ResourceLocation loc = keyToLocation.get(spriteKey);
-        if (loc != null) {
-            BufferedImage img = locationCache.get(loc);
+        String resourceKey = keyToLocation.get(spriteKey);
+        if (resourceKey != null) {
+            BufferedImage img = locationCache.get(resourceKey);
             if (img != null) return img;
         }
         return spriteCache.get(spriteKey);
     }
 
-    public boolean contains(ResourceLocation loc) {
-        return locationCache.containsKey(loc);
+    public boolean contains(String resourceKey) {
+        return resourceKey != null && locationCache.containsKey(resourceKey);
     }
 
     /**
-     * Put an image with both ResourceLocation and optional spriteKey mapping.
-     * If loc is provided, it is stored in locationCache; spriteKey will map to loc.
+     * Put an image with both resourceKey and optional spriteKey mapping.
+     * If resourceKey is provided, it is stored in locationCache; spriteKey will map to resourceKey.
      * If spriteKey is provided without loc, it will be stored in spriteCache (generated/virtual).
      */
-    public BufferedImage put(ResourceLocation loc, String spriteKey, BufferedImage img) {
+    public BufferedImage put(String resourceKey, String spriteKey, BufferedImage img) {
         if (img == null) return null;
-        if (loc != null) {
-            locationCache.put(loc, img);
+        if (resourceKey != null) {
+            locationCache.put(resourceKey, img);
             if (spriteKey != null) {
-                keyToLocation.put(spriteKey, loc);
+                keyToLocation.put(spriteKey, resourceKey);
             }
         } else if (spriteKey != null) {
             spriteCache.put(spriteKey, img);
@@ -54,21 +52,22 @@ public final class TextureRepository {
         return img;
     }
 
-    public BufferedImage computeIfAbsent(ResourceLocation loc, Function<ResourceLocation, BufferedImage> loader) {
-        return locationCache.computeIfAbsent(loc, loader);
+    public BufferedImage computeIfAbsent(String resourceKey, Function<String, BufferedImage> loader) {
+        if (resourceKey == null) return null;
+        return locationCache.computeIfAbsent(resourceKey, loader);
     }
 
-    public void register(String spriteKey, ResourceLocation loc) {
-        if (spriteKey != null && loc != null) {
-            keyToLocation.put(spriteKey, loc);
+    public void register(String spriteKey, String resourceKey) {
+        if (spriteKey != null && resourceKey != null) {
+            keyToLocation.put(spriteKey, resourceKey);
         }
     }
 
-    public ResourceLocation getRegisteredLocation(String spriteKey) {
+    public String getRegisteredLocation(String spriteKey) {
         return keyToLocation.get(spriteKey);
     }
 
-    public Map<String, ResourceLocation> getRegisteredTextures() {
+    public Map<String, String> getRegisteredTextures() {
         return keyToLocation;
     }
 
@@ -79,14 +78,14 @@ public final class TextureRepository {
         }
     }
 
-    public void putAnimation(String spriteKey, com.voxelbridge.core.texture.AnimatedFrameSet frames) {
+    public void putAnimation(String spriteKey, AnimatedFrameSet frames) {
         // Accept empty frames as markers (indicates animation exists but frames couldn't be extracted)
         if (spriteKey != null && frames != null) {
             animatedCache.put(spriteKey, frames);
         }
     }
 
-    public com.voxelbridge.core.texture.AnimatedFrameSet getAnimation(String spriteKey) {
+    public AnimatedFrameSet getAnimation(String spriteKey) {
         return spriteKey == null ? null : animatedCache.get(spriteKey);
     }
 
@@ -94,7 +93,7 @@ public final class TextureRepository {
         return spriteKey != null && animatedCache.containsKey(spriteKey);
     }
 
-    public Map<String, com.voxelbridge.core.texture.AnimatedFrameSet> getAnimatedCache() {
+    public Map<String, AnimatedFrameSet> getAnimatedCache() {
         return animatedCache;
     }
 

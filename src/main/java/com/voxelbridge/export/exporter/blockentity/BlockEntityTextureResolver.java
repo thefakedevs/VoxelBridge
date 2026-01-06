@@ -1,28 +1,15 @@
 package com.voxelbridge.export.exporter.blockentity;
 
-import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.util.debug.LogModule;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import com.voxelbridge.util.debug.LogModule;
 import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.CeilingHangingSignBlock;
-import net.minecraft.world.level.block.EnderChestBlock;
-import net.minecraft.world.level.block.SignBlock;
-import net.minecraft.world.level.block.TrappedChestBlock;
-import net.minecraft.world.level.block.WallHangingSignBlock;
-import net.minecraft.world.level.block.WallSignBlock;
-import net.minecraft.world.level.block.entity.BedBlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
-import net.minecraft.world.level.block.entity.HangingSignBlockEntity;
-import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.entity.*;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.block.state.properties.WoodType;
 import net.neoforged.api.distmarker.Dist;
@@ -37,19 +24,11 @@ import net.neoforged.api.distmarker.OnlyIn;
 @OnlyIn(Dist.CLIENT)
 public final class BlockEntityTextureResolver implements TextureResolver<BlockEntity> {
 
-    private BlockEntityTextureResolver() {
-    }
-
     public static final BlockEntityTextureResolver INSTANCE = new BlockEntityTextureResolver();
-    private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
+
+    private BlockEntityTextureResolver() {}
 
     private static final boolean IS_CHRISTMAS = isChristmasWindow();
-
-    public static void setRenderTypeResolver(RenderTypeResolver resolver) {
-        if (resolver != null) {
-            RENDER_TYPE_RESOLVER = resolver;
-        }
-    }
 
     /**
      * Resolve the texture for a block entity render, falling back to the render
@@ -57,7 +36,7 @@ public final class BlockEntityTextureResolver implements TextureResolver<BlockEn
      */
     @Override
     public ResolvedTexture resolve(BlockEntity blockEntity, RenderType renderType) {
-        ResourceLocation base = RENDER_TYPE_RESOLVER.resolve(renderType);
+        ResourceLocation base = RenderTypeTextureResolver.INSTANCE.resolve(renderType);
 
         // First try entity-specific resolution (for known BlockEntity types)
         ResolvedTexture mapped = resolveFromBlockEntity(blockEntity, base);
@@ -262,5 +241,3 @@ public final class BlockEntityTextureResolver implements TextureResolver<BlockEn
         return new ResolvedTexture(texture, 0f, 1f, 0f, 1f, false, null, null);
     }
 }
-
-

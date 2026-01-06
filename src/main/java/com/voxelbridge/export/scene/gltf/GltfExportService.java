@@ -1,12 +1,13 @@
 package com.voxelbridge.export.scene.gltf;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.StreamingRegionSampler;
 import com.voxelbridge.export.ExportProgressTracker;
-import com.voxelbridge.core.scene.SceneSink;
 import com.voxelbridge.core.scene.SceneWriteRequest; // Fixed: missing import
 import com.voxelbridge.export.texture.TextureAtlasManager;
+import com.voxelbridge.export.texture.TextureExportPipeline;
 import com.voxelbridge.util.client.ProgressNotifier;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
@@ -100,18 +101,21 @@ public final class GltfExportService {
         // Single-pass sampling: collect geometry and texture usage together
         ctx.setDiscoveryMode(false);
         ExportProgressTracker.setStage(ExportProgressTracker.Stage.SAMPLING, "Sampling blocks");
-        SceneSink sceneSink = new GltfSceneBuilder(ctx, gltfDir);
+        GltfSceneBuilder sceneBuilder = new GltfSceneBuilder(ctx.state(), gltfDir);
+        IrSink irSink = sceneBuilder;
         long tSampling = VoxelBridgeLogger.now();
-        StreamingRegionSampler.sampleRegion(level, pos1, pos2, sceneSink, ctx);
+        StreamingRegionSampler.sampleRegion(level, pos1, pos2, irSink, ctx);
         VoxelBridgeLogger.duration("block_sampling", VoxelBridgeLogger.elapsedSince(tSampling));
         ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
+
+        // Texture export is handled before glTF assembly so the writer is MC-agnostic.
+        TextureExportPipeline.build(ctx, gltfDir, ctx.getAtlasBook().keySet());
 
         // OPTIMIZATION: Removed forced GC calls to eliminate 1-5 second Full GC pauses
         // Let JVM manage GC automatically for better throughput
         // System.gc();
         // try { Thread.sleep(50); } catch (InterruptedException e) { /* ignore */ }
 
-        // Texture export is handled by TextureExportPipeline in GltfSceneBuilder
         SceneWriteRequest request = new SceneWriteRequest(baseName, gltfDir);
 
         // OPTIMIZATION: Removed second forced GC call
@@ -123,7 +127,7 @@ public final class GltfExportService {
         try {
             VoxelBridgeLogger.memory("before_geometry_write");
             long tSceneWrite = VoxelBridgeLogger.now();
-            outputPath = sceneSink.write(request);
+            outputPath = sceneBuilder.write(request);
             VoxelBridgeLogger.duration("geometry_write", VoxelBridgeLogger.elapsedSince(tSceneWrite));
             VoxelBridgeLogger.memory("after_geometry_write");
             VoxelBridgeLogger.duration("total_export", VoxelBridgeLogger.elapsedSince(tTotal));

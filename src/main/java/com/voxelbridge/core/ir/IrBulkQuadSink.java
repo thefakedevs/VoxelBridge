@@ -1,11 +1,12 @@
-package com.voxelbridge.core.scene;
+package com.voxelbridge.core.ir;
 
 import java.util.List;
 
 /**
- * Optional bulk-quad ingestion for high-throughput scene sinks.
+ * Optional bulk-quad ingestion for high-throughput IR sinks.
+ * quadFlags should be encoded using {@link IrFlags}.
  */
-public interface BulkQuadSink {
+public interface IrBulkQuadSink {
     void addBatch(String materialGroupKey,
                   List<String> spriteKeys,
                   List<String> overlaySpriteKeys,
@@ -14,5 +15,5 @@ public interface BulkQuadSink {
                   float[] flatUv1s,
                   float[] flatNormals,
                   float[] flatColors,
-                  List<Boolean> doubleSideds);
+                  int[] quadFlags);
 }

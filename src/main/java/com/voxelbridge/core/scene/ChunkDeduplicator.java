@@ -1,6 +1,8 @@
 package com.voxelbridge.core.scene;
 
+import com.voxelbridge.core.ir.*;
 import gnu.trove.map.hash.TObjectIntHashMap;
+
 import java.util.*;
 
 /**
@@ -33,6 +35,9 @@ final class ChunkDeduplicator {
     record DeduplicatedQuad(
         String spriteKey,
         String overlaySpriteKey,
+        RenderLayer renderLayer,
+        TintMode tintMode,
+        boolean emissive,
         int[] vertexIndices,  // Indices of the 4 vertices in the deduped arrays.
         float[] normal,
         boolean doubleSided
@@ -123,29 +128,30 @@ final class ChunkDeduplicator {
         quads.add(new DeduplicatedQuad(
             quad.spriteKey(),
             quad.overlaySpriteKey(),
+            quad.renderLayer(),
+            quad.tintMode(),
+            quad.emissive(),
             verts,
             quad.normal(),
             quad.doubleSided()
         ));
     }
 
-    // Flush deduplicated data to the target sink.
-    void flushTo(SceneSink target) {
+    // Flush deduplicated data to the target IR sink.
+    void flushTo(IrSink target) {
         if (quads.isEmpty()) return;
 
-        // OPTIMIZATION: Batch transfer for bulk-capable sinks to reduce lock contention
-        if (target instanceof BulkQuadSink bulkSink) {
+        if (target instanceof IrBulkQuadSink bulkSink) {
             int count = quads.size();
             List<String> spriteKeys = new ArrayList<>(count);
             List<String> overlaySpriteKeys = new ArrayList<>(count);
-            
-            // Allocate flat arrays (Single allocation per batch instead of N per quad)
+
             float[] flatPositions = new float[count * 12];
             float[] flatUv0s = new float[count * 8];
             float[] flatUv1s = new float[count * 8];
             float[] flatNormals = new float[count * 3];
             float[] flatColors = new float[count * 16];
-            List<Boolean> allDoubleSided = new ArrayList<>(count);
+            int[] quadFlags = new int[count];
 
             for (int i = 0; i < count; i++) {
                 DeduplicatedQuad quad = quads.get(i);
@@ -157,20 +163,16 @@ final class ChunkDeduplicator {
                 for (int v = 0; v < 4; v++) {
                     int vertIdx = quad.vertexIndices()[v];
 
-                    // positions
                     flatPositions[posBase + v * 3]     = positions.get(vertIdx * 3);
                     flatPositions[posBase + v * 3 + 1] = positions.get(vertIdx * 3 + 1);
                     flatPositions[posBase + v * 3 + 2] = positions.get(vertIdx * 3 + 2);
 
-                    // uv0
                     flatUv0s[uvBase + v * 2]     = uv0.get(vertIdx * 2);
                     flatUv0s[uvBase + v * 2 + 1] = uv0.get(vertIdx * 2 + 1);
 
-                    // uv1
                     flatUv1s[uvBase + v * 2]     = uv1.get(vertIdx * 2);
                     flatUv1s[uvBase + v * 2 + 1] = uv1.get(vertIdx * 2 + 1);
 
-                    // colors
                     flatColors[colBase + v * 4]     = colors.get(vertIdx * 4);
                     flatColors[colBase + v * 4 + 1] = colors.get(vertIdx * 4 + 1);
                     flatColors[colBase + v * 4 + 2] = colors.get(vertIdx * 4 + 2);
@@ -190,7 +192,7 @@ final class ChunkDeduplicator {
 
                 spriteKeys.add(quad.spriteKey());
                 overlaySpriteKeys.add(quad.overlaySpriteKey());
-                allDoubleSided.add(quad.doubleSided());
+                quadFlags[i] = IrFlags.encode(quad.renderLayer(), quad.tintMode(), quad.doubleSided(), quad.emissive());
             }
 
             bulkSink.addBatch(
@@ -202,7 +204,7 @@ final class ChunkDeduplicator {
                 flatUv1s,
                 flatNormals,
                 flatColors,
-                allDoubleSided
+                quadFlags
             );
             return;
         }
@@ -236,12 +238,15 @@ final class ChunkDeduplicator {
                 materialKey,
                 quad.spriteKey(),
                 quad.overlaySpriteKey(),
+                quad.renderLayer(),
+                quad.tintMode(),
+                quad.doubleSided(),
+                quad.emissive(),
                 quadPositions,
                 quadUv0,
                 quadUv1,
                 quad.normal(),
-                quadColors,
-                quad.doubleSided()
+                quadColors
             );
         }
     }

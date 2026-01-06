@@ -1,11 +1,11 @@
 package com.voxelbridge.export.texture;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.core.texture.TextureRepository;
 import com.voxelbridge.core.texture.UvRemap;
 import com.voxelbridge.config.ExportRuntimeConfig.AtlasMode;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.ExportContext.BlockEntityAtlasPlacement;
-import com.voxelbridge.export.ExportContext.TexturePlacement;
+import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -65,7 +65,7 @@ public final class TextureAtlasManager {
         ctx.cacheSpriteImage(transparentKey, transparentImg);
 
         // Force occupy the first slot (index 0)
-        ExportContext.TintAtlas atlas = ctx.getOrCreateTintAtlas(transparentKey);
+        ExportState.TintAtlas atlas = ctx.getOrCreateTintAtlas(transparentKey);
         atlas.tintToIndex.put(0xFFFFFF, 0);  // tint 0xFFFFFF ?slot 0
         atlas.indexToTint.put(0, 0xFFFFFF);
         atlas.nextIndex.set(1);  // Next available slot starts from 1
@@ -74,7 +74,11 @@ public final class TextureAtlasManager {
     }
 
     public static void registerTint(ExportContext ctx, String spriteKey, int tint) {
-        ExportContext.TintAtlas atlas = ctx.getOrCreateTintAtlas(spriteKey);
+        registerTint(ctx.state(), spriteKey, tint);
+    }
+
+    public static void registerTint(ExportState state, String spriteKey, int tint) {
+        ExportState.TintAtlas atlas = state.getOrCreateTintAtlas(spriteKey);
         int normalized = sanitizeTintValue(tint);
         atlas.tintToIndex.computeIfAbsent(normalized, key -> {
             int slot = reserveTintSlot(atlas, key);
@@ -87,18 +91,18 @@ public final class TextureAtlasManager {
         });
     }
 
-    public static int getTintIndex(ExportContext ctx, String spriteKey, int tint) {
-        ExportContext.TintAtlas atlas = ctx.getAtlasBook().computeIfAbsent(spriteKey,
-                k -> new ExportContext.TintAtlas());
+    public static int getTintIndex(ExportState state, String spriteKey, int tint) {
+        ExportState.TintAtlas atlas = state.getAtlasBook().computeIfAbsent(spriteKey,
+                k -> new ExportState.TintAtlas());
         int normalized = sanitizeTintValue(tint);
         if (!atlas.tintToIndex.containsKey(normalized)) {
-            registerTint(ctx, spriteKey, tint);
+            registerTint(state, spriteKey, tint);
         }
         return atlas.tintToIndex.getOrDefault(normalized, 0);
     }
 
     public static boolean hasMultipleTints(ExportContext ctx, String spriteKey) {
-        ExportContext.TintAtlas atlas = ctx.getAtlasBook().get(spriteKey);
+        ExportState.TintAtlas atlas = ctx.getAtlasBook().get(spriteKey);
         if (atlas == null) {
             return false;
         }
@@ -179,7 +183,7 @@ public final class TextureAtlasManager {
             }
         }
 
-        Map<String, ExportContext.TintAtlas> blockEntries = new java.util.LinkedHashMap<>();
+        Map<String, ExportState.TintAtlas> blockEntries = new java.util.LinkedHashMap<>();
         ctx.getAtlasBook().forEach((key, atlas) -> {
             if (ExportRuntimeConfig.isAnimationEnabled()) {
                 ensureAnimationDetection(ctx, key);
@@ -208,16 +212,16 @@ public final class TextureAtlasManager {
 
     private static void generateIndividualTextures(ExportContext ctx,
                                                    Path outDir,
-                                                   Map<String, ExportContext.TintAtlas> entries,
+                                                   Map<String, ExportState.TintAtlas> entries,
                                                    String subDir) throws IOException {
         if (entries.isEmpty()) {
             return;
         }
 
         long tIndividual = VoxelBridgeLogger.now();
-        for (Map.Entry<String, ExportContext.TintAtlas> entry : entries.entrySet()) {
+        for (Map.Entry<String, ExportState.TintAtlas> entry : entries.entrySet()) {
             String spriteKey = entry.getKey();
-            ExportContext.TintAtlas atlas = entry.getValue();
+            ExportState.TintAtlas atlas = entry.getValue();
             atlas.placements.clear();
 
             if (atlas.tintToIndex.isEmpty()) {
@@ -280,7 +284,7 @@ public final class TextureAtlasManager {
 
     private static void generatePackedAtlas(ExportContext ctx,
                                             Path outDir,
-                                            Map<String, ExportContext.TintAtlas> entries,
+                                            Map<String, ExportState.TintAtlas> entries,
                                             String atlasDirName,
                                             String atlasPrefix) throws IOException {
         if (entries.isEmpty()) {
@@ -295,9 +299,9 @@ public final class TextureAtlasManager {
         Map<Integer, Integer> pageToUdim = new java.util.HashMap<>();
 
         // Collect and tint
-        for (Map.Entry<String, ExportContext.TintAtlas> entry : entries.entrySet()) {
+        for (Map.Entry<String, ExportState.TintAtlas> entry : entries.entrySet()) {
             String spriteKey = entry.getKey();
-            ExportContext.TintAtlas atlas = entry.getValue();
+            ExportState.TintAtlas atlas = entry.getValue();
             atlas.placements.clear();
 
             if (atlas.tintToIndex.isEmpty()) {
@@ -405,8 +409,8 @@ public final class TextureAtlasManager {
             float u1 = (float) u1d;
             float v1 = (float) v1d;
 
-            ExportContext.TintAtlas atlas = ctx.getAtlasBook().get(req.spriteKey);
-            TexturePlacement placement = new TexturePlacement(
+            ExportState.TintAtlas atlas = ctx.getAtlasBook().get(req.spriteKey);
+            ExportState.TexturePlacement placement = new ExportState.TexturePlacement(
                     p.page(), tileU, tileV, p.x(), p.y(), p.width(), p.height(),
                     u0, v0, u1, v1, atlasDirName + "/" + atlasPrefix + p.udim() + ".png");
             atlas.placements.put(req.tintIndex, placement);
@@ -420,7 +424,7 @@ public final class TextureAtlasManager {
             // Mirror placement to block entity atlas map for unified atlas usage
             if (isBlockEntitySprite(req.spriteKey)) {
                 int udim = p.udim();
-                BlockEntityAtlasPlacement bePlacement = new BlockEntityAtlasPlacement(
+                ExportState.BlockEntityAtlasPlacement bePlacement = new ExportState.BlockEntityAtlasPlacement(
                     p.page(), udim, innerX, innerY, innerW, innerH, atlasSize
                 );
                 ctx.getBlockEntityAtlasPlacements().put(req.spriteKey, bePlacement);
@@ -428,9 +432,9 @@ public final class TextureAtlasManager {
         }
 
         // Record material paths per sprite (use first placement page)
-        for (Map.Entry<String, ExportContext.TintAtlas> entry : entries.entrySet()) {
-            ExportContext.TintAtlas atlas = entry.getValue();
-            TexturePlacement placement = atlas.placements.getOrDefault(0, atlas.placements.values().stream().findFirst().orElse(null));
+        for (Map.Entry<String, ExportState.TintAtlas> entry : entries.entrySet()) {
+            ExportState.TintAtlas atlas = entry.getValue();
+            ExportState.TexturePlacement placement = atlas.placements.getOrDefault(0, atlas.placements.values().stream().findFirst().orElse(null));
             if (placement != null) {
                 String rel = placement.path() != null ? placement.path() : pagePathMap.getOrDefault(placement.page(), atlasDirName + "/" + atlasPrefix + "1001.png");
                 ctx.getMaterialPaths().put(entry.getKey(), rel);
@@ -444,15 +448,15 @@ public final class TextureAtlasManager {
         VoxelBridgeLogger.duration("pbr_atlas_generation", VoxelBridgeLogger.elapsedSince(tPbr));
     }
 
-    public static float[] remapUV(ExportContext ctx, String spriteKey, int tint, float u, float v) {
-        boolean animated = ExportRuntimeConfig.isAnimationEnabled() && ctx.getTextureRepository().hasAnimation(spriteKey);
+    public static float[] remapUV(ExportState state, String spriteKey, int tint, float u, float v) {
+        boolean animated = ExportRuntimeConfig.isAnimationEnabled() && state.getTextureRepository().hasAnimation(spriteKey);
         if (ExportRuntimeConfig.getAtlasMode() != AtlasMode.ATLAS || animated) {
             return new float[]{u, v};
         }
 
         int normalizedTint = sanitizeTintValue(tint);
-        int tintIndex = getTintIndex(ctx, spriteKey, normalizedTint);
-        ExportContext.TintAtlas atlas = ctx.getAtlasBook().get(spriteKey);
+        int tintIndex = getTintIndex(state, spriteKey, normalizedTint);
+        ExportState.TintAtlas atlas = state.getAtlasBook().get(spriteKey);
         if (atlas == null) {
             VoxelBridgeLogger.warn(LogModule.TEXTURE_ATLAS, String.format("[RemapUV][WARN] No atlas found for %s", spriteKey));
             return new float[]{u, v};
@@ -462,7 +466,7 @@ public final class TextureAtlasManager {
             return new float[]{u, v};
         }
 
-        TexturePlacement placement = atlas.placements.getOrDefault(tintIndex, atlas.placements.get(0));
+        ExportState.TexturePlacement placement = atlas.placements.getOrDefault(tintIndex, atlas.placements.get(0));
         if (placement == null) {
             placement = atlas.placements.values().stream().findFirst().orElse(null);
         }
@@ -481,7 +485,7 @@ public final class TextureAtlasManager {
         return tint & 0xFFFFFF;
     }
 
-    private static int reserveTintSlot(ExportContext.TintAtlas atlas, int tint) {
+    private static int reserveTintSlot(ExportState.TintAtlas atlas, int tint) {
         int idx = atlas.nextIndex.get();
         if (idx < MAX_TINT_SLOTS) {
             atlas.indexToTint.put(idx, tint);
@@ -515,7 +519,7 @@ public final class TextureAtlasManager {
         return dr * dr + dg * dg + db * db;
     }
 
-    private static int[] resolveTintSlots(ExportContext.TintAtlas atlas, int tintSlots) {
+    private static int[] resolveTintSlots(ExportState.TintAtlas atlas, int tintSlots) {
         int[] result = new int[tintSlots];
         boolean[] filled = new boolean[tintSlots];
         atlas.indexToTint.forEach((index, tint) -> {
@@ -740,7 +744,7 @@ public final class TextureAtlasManager {
      */
     private static void generatePbrAtlases(ExportContext ctx,
                                            Path outDir,
-                                           Map<String, ExportContext.TintAtlas> entries,
+                                           Map<String, ExportState.TintAtlas> entries,
                                            Set<Integer> usedPages,
                                            int atlasSize,
                                            String atlasDirName,
@@ -755,12 +759,12 @@ public final class TextureAtlasManager {
         // Build a flat map of all placements (spriteKey#tintIndex -> placement)
         // This allows com.voxelbridge.core.texture.PbrAtlasWriter to handle each tint variant independently
         Map<String, com.voxelbridge.core.texture.PbrAtlasWriter.Placement> flatPlacements = new java.util.LinkedHashMap<>();
-        for (Map.Entry<String, ExportContext.TintAtlas> entry : entries.entrySet()) {
+        for (Map.Entry<String, ExportState.TintAtlas> entry : entries.entrySet()) {
             String spriteKey = entry.getKey();
-            ExportContext.TintAtlas atlas = entry.getValue();
-            for (Map.Entry<Integer, ExportContext.TexturePlacement> placementEntry : atlas.placements.entrySet()) {
+            ExportState.TintAtlas atlas = entry.getValue();
+            for (Map.Entry<Integer, ExportState.TexturePlacement> placementEntry : atlas.placements.entrySet()) {
                 int tintIndex = placementEntry.getKey();
-                ExportContext.TexturePlacement placement = placementEntry.getValue();
+                ExportState.TexturePlacement placement = placementEntry.getValue();
                 String key = tintIndex == 0 ? spriteKey : spriteKey + "#t" + tintIndex;
                 flatPlacements.put(key, new PbrPlacementAdapters.TexturePlacementAdapter(placement));
             }
@@ -1011,7 +1015,8 @@ public final class TextureAtlasManager {
     private static BufferedImage loadTextureForAtlas(ExportContext ctx, String spriteKey) {
         ResourceLocation textureLocation = TextureLoader.spriteKeyToTexturePNG(spriteKey);
 
-        BufferedImage cached = ctx.getTextureRepository().get(textureLocation);
+        String resourceKey = textureLocation.toString();
+        BufferedImage cached = ctx.getTextureRepository().get(resourceKey);
         if (cached == null) {
             cached = ctx.getCachedSpriteImage(spriteKey);
         }
@@ -1032,7 +1037,7 @@ public final class TextureAtlasManager {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen][DISK HIT] Loaded %s from disk (%dx%d)",
                     spriteKey, diskImage.getWidth(), diskImage.getHeight()));
             }
-            ctx.getTextureRepository().put(textureLocation, spriteKey, diskImage);
+            ctx.getTextureRepository().put(resourceKey, spriteKey, diskImage);
         } else {
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen][DISK MISS] Failed to load %s from disk", spriteKey));

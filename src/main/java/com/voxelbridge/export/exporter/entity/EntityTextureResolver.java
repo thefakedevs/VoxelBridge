@@ -1,11 +1,12 @@
 package com.voxelbridge.export.exporter.entity;
 
-import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
-import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
-import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.export.exporter.blockentity.RenderTypeTextureResolver;
-import net.minecraft.client.renderer.Sheets;
+import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
+import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -15,31 +16,19 @@ import net.minecraft.world.entity.decoration.PaintingVariant;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import com.voxelbridge.util.debug.LogModule;
-import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
 /**
  * Resolves textures for entity renderers with entity-specific overrides.
  */
 @OnlyIn(Dist.CLIENT)
 public final class EntityTextureResolver implements TextureResolver<Entity> {
+
     public static final EntityTextureResolver INSTANCE = new EntityTextureResolver();
-    private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
 
     private EntityTextureResolver() {}
 
-    public static void setRenderTypeResolver(RenderTypeResolver resolver) {
-        if (resolver != null) {
-            RENDER_TYPE_RESOLVER = resolver;
-        }
-    }
-
     @Override
     public ResolvedTexture resolve(Entity entity, RenderType renderType) {
-        return resolveInternal(entity, renderType);
-    }
-
-    private static ResolvedTexture resolveInternal(Entity entity, RenderType renderType) {
         // Try entity-specific resolvers first
         ResolvedTexture specific = resolveEntitySpecific(entity, renderType);
         if (specific != null) {
@@ -47,7 +36,7 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
         }
 
         // Fall back to generic RenderType-based resolution
-        ResourceLocation base = RENDER_TYPE_RESOLVER.resolve(renderType);
+        ResourceLocation base = RenderTypeTextureResolver.INSTANCE.resolve(renderType);
         if (base == null) {
             return null;
         }
@@ -138,7 +127,7 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
                 itemFrame.getType(), "direction", itemFrame.getDirection()));
 
             // Item frames use the block atlas; resolve to an atlas sprite via RenderType first.
-            ResourceLocation base = RENDER_TYPE_RESOLVER.resolve(renderType);
+            ResourceLocation base = RenderTypeTextureResolver.INSTANCE.resolve(renderType);
             if (base != null) {
                 VoxelBridgeLogger.debug(LogModule.ENTITY, "[ItemFrame] Resolved texture from RenderType: " + base);
                 return resolveTextureWithAtlasDetection(base);

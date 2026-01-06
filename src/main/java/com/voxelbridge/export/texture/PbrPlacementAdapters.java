@@ -9,13 +9,13 @@ public final class PbrPlacementAdapters {
     private PbrPlacementAdapters() {}
 
     /**
-     * Adapter to convert {@link com.voxelbridge.export.ExportContext.TexturePlacement}
+     * Adapter to convert {@link com.voxelbridge.core.export.ExportState.TexturePlacement}
      * to the core {@link com.voxelbridge.core.texture.PbrAtlasWriter.Placement} interface.
      */
     public static final class TexturePlacementAdapter implements com.voxelbridge.core.texture.PbrAtlasWriter.Placement {
-        private final com.voxelbridge.export.ExportContext.TexturePlacement placement;
+        private final com.voxelbridge.core.export.ExportState.TexturePlacement placement;
 
-        public TexturePlacementAdapter(com.voxelbridge.export.ExportContext.TexturePlacement placement) {
+        public TexturePlacementAdapter(com.voxelbridge.core.export.ExportState.TexturePlacement placement) {
             this.placement = placement;
         }
 

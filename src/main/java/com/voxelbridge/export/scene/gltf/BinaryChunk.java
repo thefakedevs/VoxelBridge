@@ -1,6 +1,7 @@
 package com.voxelbridge.export.scene.gltf;
 
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
+
 import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.IOException;

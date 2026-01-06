@@ -3,8 +3,8 @@ package com.voxelbridge.export;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.exporter.BlockExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
+import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.scene.BufferedSceneSink;
-import com.voxelbridge.core.scene.SceneSink;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import com.voxelbridge.util.client.ProgressNotifier;
@@ -42,7 +42,7 @@ public final class StreamingRegionSampler {
     public static void sampleRegion(Level level,
                                     BlockPos pos1,
                                     BlockPos pos2,
-                                    SceneSink sink,
+                                    IrSink sink,
                                     ExportContext ctx) {
         VoxelBridgeLogger.info(LogModule.EXPORT, "[StreamingRegionSampler] Starting streaming export (Atomic Mode)");
 
@@ -254,7 +254,7 @@ public final class StreamingRegionSampler {
     }
 
     private static void exportChunk(LevelChunk chunk, ChunkPos chunkPos, Level level,
-                                   ClientChunkCache chunkCache, SceneSink finalSink, ExportContext ctx,
+                                   ClientChunkCache chunkCache, IrSink finalSink, ExportContext ctx,
                                    BlockPos regionMin, BlockPos regionMax,
                                    int minX, int maxX, int minZ, int maxZ,
                                    int minY, int maxY,
@@ -295,7 +295,7 @@ public final class StreamingRegionSampler {
             }
 
             // ATOMIC EXPORT
-            BufferedSceneSink buffer = new BufferedSceneSink();
+        BufferedSceneSink buffer = new BufferedSceneSink();
             finalSink.onChunkStart(chunkPos.x, chunkPos.z);
             started = true;
             // OPTIMIZATION: Use shared BlockEntityRenderBatch instead of per-chunk instance
@@ -423,7 +423,7 @@ public final class StreamingRegionSampler {
      * This path scans the full block volume inside the chunk bounds.
      */
     private static void forceExportChunk(LevelChunk chunk, ChunkPos chunkPos, Level level,
-                                        SceneSink finalSink, ExportContext ctx,
+                                        IrSink finalSink, ExportContext ctx,
                                         BlockPos regionMin, BlockPos regionMax,
                                         int minX, int maxX, int minZ, int maxZ,
                                         int minY, int maxY,

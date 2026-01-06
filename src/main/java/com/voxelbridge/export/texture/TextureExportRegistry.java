@@ -1,8 +1,9 @@
 package com.voxelbridge.export.texture;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.core.texture.AnimatedFrameSet;
+import com.voxelbridge.core.texture.TextureRepository;
 import com.voxelbridge.export.ExportContext;
-
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.resources.ResourceLocation;
@@ -80,21 +81,22 @@ public final class TextureExportRegistry {
         spriteRelativePaths.put(spriteKey, rel);
         if (!Files.exists(png)) {
             ResourceLocation pngRes = TextureLoader.spriteKeyToTexturePNG(spriteKey);
-            BufferedImage image = repo.get(pngRes);
+            String pngKey = pngRes.toString();
+            BufferedImage image = repo.get(pngKey);
             if (image == null) {
                 image = ctx.getCachedSpriteImage(spriteKey);
             }
             if (image == null) {
                 image = TextureLoader.readTexture(pngRes, ExportRuntimeConfig.isAnimationEnabled());
                 if (image != null) {
-                    repo.put(pngRes, spriteKey, image);
+                    repo.put(pngKey, spriteKey, image);
                 }
             }
             if (image == null) {
                 throw new IllegalStateException("Failed to resolve texture for spriteKey=" + spriteKey);
             }
             if (ExportRuntimeConfig.isAnimationEnabled()) {
-                com.voxelbridge.core.texture.AnimatedFrameSet framesForWrite = repo.getAnimation(spriteKey);
+                AnimatedFrameSet framesForWrite = repo.getAnimation(spriteKey);
                 if (framesForWrite == null) {
                     framesForWrite = AnimatedTextureHelper.extractAndStore(spriteKey, image, repo);
                 }
@@ -114,7 +116,7 @@ public final class TextureExportRegistry {
     private String ensureEntityLikeExport(String spriteKey) {
         String rel = ctx.getMaterialPaths().get(spriteKey);
         if (rel == null) {
-            ResourceLocation registered = BlockEntityTextureManager.getRegisteredLocation(ctx, spriteKey);
+            String registered = BlockEntityTextureManager.getRegisteredLocation(ctx, spriteKey);
             if (registered != null && repo.get(registered) != null) {
                 rel = BlockEntityTextureManager.getTextureFilename(spriteKey);
             }

@@ -2,9 +2,9 @@
  * VoxelBridge mod entry point.
  */
 package com.voxelbridge;
+
 import com.voxelbridge.platform.NeoForgePlatformBootstrap;
 import com.voxelbridge.platform.PlatformBootstrap;
-
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;

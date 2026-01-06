@@ -1,6 +1,6 @@
 package com.voxelbridge.export.scene.gltf;
 
-import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.export.texture.UvRemapUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
@@ -28,14 +28,14 @@ final class UVRemapper {
      * @param uvrawBin uvraw.bin path
      * @param finaluvBin output finaluv.bin path
      * @param spriteIndex sprite index
-     * @param ctx export context
+     * @param state export state
      */
     static void remapUVs(
         Path geometryBin,
         Path uvrawBin,
         Path finaluvBin,
         SpriteIndex spriteIndex,
-        ExportContext ctx,
+        ExportState state,
         DoubleConsumer progressCallback
     ) throws IOException {
         boolean logRemap = VoxelBridgeLogger.isDebugEnabled(LogModule.UV_REMAP);
@@ -110,9 +110,9 @@ final class UVRemapper {
                     for (int j = 0; j < 8; j++) uv1[j] = uvInBuffer.getFloat();
 
                     // Remap uv0
-                    if (UvRemapUtil.shouldRemap(ctx, spriteKey)) {
+                    if (UvRemapUtil.shouldRemap(state, spriteKey)) {
                         for (int v = 0; v < 4; v++) {
-                            float[] remapped = UvRemapUtil.remapUv(ctx, spriteKey, uv0[v * 2], uv0[v * 2 + 1]);
+                            float[] remapped = UvRemapUtil.remapUv(state, spriteKey, uv0[v * 2], uv0[v * 2 + 1]);
                             uv0[v * 2] = remapped[0];
                             uv0[v * 2 + 1] = remapped[1];
                         }
@@ -122,12 +122,12 @@ final class UVRemapper {
                     // IMPORTANT: In colormap mode, uv1 contains color map coordinates (LUT UV), not sprite texture UV
                     // Color map UVs should NOT be remapped - they already point to the correct position in the color LUT texture
                     boolean isColormapMode = UvRemapUtil.isColormapMode();
-                    if (!isColormapMode && UvRemapUtil.shouldRemap(ctx, overlayKey)) {
+                    if (!isColormapMode && UvRemapUtil.shouldRemap(state, overlayKey)) {
                         boolean hasUV1 = false;
                         for (float f : uv1) if (f != 0) { hasUV1 = true; break; }
                         if (hasUV1) {
                             for (int v = 0; v < 4; v++) {
-                                float[] remapped = UvRemapUtil.remapUv(ctx, overlayKey, uv1[v * 2], uv1[v * 2 + 1]);
+                                float[] remapped = UvRemapUtil.remapUv(state, overlayKey, uv1[v * 2], uv1[v * 2 + 1]);
                                 uv1[v * 2] = remapped[0];
                                 uv1[v * 2 + 1] = remapped[1];
                             }

@@ -6,6 +6,7 @@ import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
+import com.voxelbridge.core.texture.TextureRepository;
 import net.minecraft.resources.ResourceLocation;
 
 import java.awt.image.BufferedImage;
