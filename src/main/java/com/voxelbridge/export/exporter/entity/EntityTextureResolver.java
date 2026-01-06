@@ -1,8 +1,8 @@
 package com.voxelbridge.export.exporter.entity;
 
-import com.voxelbridge.export.exporter.blockentity.RenderTypeTextureResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.RenderType;

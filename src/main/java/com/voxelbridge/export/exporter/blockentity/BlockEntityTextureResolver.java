@@ -2,6 +2,7 @@ package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.util.debug.LogModule;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;

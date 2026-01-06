@@ -1,5 +1,7 @@
 package com.voxelbridge.export.util.geometry;
 
+import com.voxelbridge.core.util.geometry.GeometryUtil;
+
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;

@@ -1,4 +1,4 @@
-package com.voxelbridge.export.texture;
+package com.voxelbridge.platform.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.config.ExportRuntimeConfig;

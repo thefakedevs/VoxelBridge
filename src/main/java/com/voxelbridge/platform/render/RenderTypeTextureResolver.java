@@ -1,4 +1,4 @@
-package com.voxelbridge.export.exporter.blockentity;
+package com.voxelbridge.platform.render;
 
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.util.debug.LogModule;

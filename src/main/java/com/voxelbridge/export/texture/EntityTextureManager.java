@@ -1,21 +1,16 @@
 package com.voxelbridge.export.texture;
 
-import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.VoxelBridge;
 import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.Resource;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.io.InputStream;
-import java.util.Optional;
+import java.util.Locale;
 
 @OnlyIn(Dist.CLIENT)
 public final class EntityTextureManager {
@@ -24,59 +19,70 @@ public final class EntityTextureManager {
 
     private EntityTextureManager() {}
 
-    public static TextureHandle register(ExportContext ctx, ResourceLocation texture) {
-        texture = com.voxelbridge.util.ResourceLocationUtil.sanitize(texture.toString());
-        final ResourceLocation texFinal = texture;
-        String spritePath = (texFinal.getNamespace() + "/" + texFinal.getPath()).replace(':', '/');
+    public static TextureHandle register(ExportContext ctx, String resourceKey) {
+        String sanitized = com.voxelbridge.util.ResourceLocationUtil.sanitizeKey(resourceKey);
+        String[] parts = splitKey(sanitized);
+        if (parts == null) {
+            return new TextureHandle("entity:unknown", "mat_unknown", "entity_textures/unknown.png", sanitized);
+        }
+        String namespace = parts[0];
+        String path = parts[1];
+        String spritePath = (namespace + "/" + path).replace(':', '/');
         String key = "entity:" + spritePath;
         String materialName = ctx.getMaterialNameForSprite(key);
         String relativePath = TexturePathResolver.ensureEntityLikePath(ctx, key);
 
-        ctx.getEntityTextures().computeIfAbsent(key, k -> loadTextureInfo(ctx, texFinal));
+        ctx.getEntityTextures().computeIfAbsent(key, k -> loadTextureInfo(ctx, sanitized));
 
         // Ensure the texture repository has an entry for this sprite.
         var repo = ctx.getTextureRepository();
-        String resourceKey = texFinal.toString();
-        BufferedImage cached = repo.get(resourceKey);
+        BufferedImage cached = repo.get(sanitized);
         if (cached == null) {
-            ResourceLocation pngLoc = resolveTexturePath(texFinal);
-            BufferedImage img = ctx.getTextureAccess().readTexture(pngLoc.toString(), com.voxelbridge.config.ExportRuntimeConfig.isAnimationEnabled());
+            String pngKey = resolveTexturePath(sanitized);
+            BufferedImage img = ctx.getTextureAccess().readTexture(pngKey, com.voxelbridge.config.ExportRuntimeConfig.isAnimationEnabled());
             if (img != null) {
-                repo.put(resourceKey, key, img);
+                repo.put(sanitized, key, img);
             } else {
                 // Preserve mapping so later sprite cache inserts can replace it.
-                repo.register(key, resourceKey);
+                repo.register(key, sanitized);
             }
         } else {
-            repo.register(key, resourceKey);
+            repo.register(key, sanitized);
         }
 
-        return new TextureHandle(key, materialName, relativePath, texture);
+        return new TextureHandle(key, materialName, relativePath, sanitized);
     }
 
-    private static ExportState.EntityTexture loadTextureInfo(ExportContext ctx, ResourceLocation texture) {
-        texture = com.voxelbridge.util.ResourceLocationUtil.sanitize(texture.toString());
-        Minecraft mc = ctx.getMc();
+    private static ExportState.EntityTexture loadTextureInfo(ExportContext ctx, String resourceKey) {
+        String sanitized = com.voxelbridge.util.ResourceLocationUtil.sanitizeKey(resourceKey);
         try {
-            Optional<Resource> resource = mc.getResourceManager().getResource(resolveTexturePath(texture));
-            if (resource.isEmpty()) {
-                return new ExportState.EntityTexture(texture.toString(), DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
+            String pngKey = resolveTexturePath(sanitized);
+            try (InputStream in = ctx.getTextureAccess().openResource(pngKey)) {
+                if (in == null) {
+                    return new ExportState.EntityTexture(sanitized, DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
+                }
+                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(in);
+                if (img == null) {
+                    return new ExportState.EntityTexture(sanitized, DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
+                }
+                return new ExportState.EntityTexture(sanitized, img.getWidth(), img.getHeight());
             }
-            Resource res = resource.get();
-            try (InputStream in = res.open(); NativeImage img = NativeImage.read(in)) {
-                return new ExportState.EntityTexture(texture.toString(), img.getWidth(), img.getHeight());
-            }
-        } catch (IOException e) {
-            VoxelBridgeLogger.warn(LogModule.TEXTURE, String.format("[VoxelBridge][WARN] Failed to read entity texture %s: %s", texture, e.getMessage()));
-            return new ExportState.EntityTexture(texture.toString(), DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
+        } catch (Exception e) {
+            VoxelBridgeLogger.warn(LogModule.TEXTURE, String.format("[VoxelBridge][WARN] Failed to read entity texture %s: %s", sanitized, e.getMessage()));
+            return new ExportState.EntityTexture(sanitized, DEFAULT_TEX_SIZE, DEFAULT_TEX_SIZE);
         }
     }
 
-    private static ResourceLocation resolveTexturePath(ResourceLocation texture) {
-        String path = texture.getPath();
+    private static String resolveTexturePath(String resourceKey) {
+        String[] parts = splitKey(resourceKey);
+        if (parts == null) {
+            return resourceKey;
+        }
+        String namespace = parts[0];
+        String path = parts[1];
         // Dynamic skins (e.g., minecraft:skins/aw-*) live in TextureManager, not resources.
         if (path.startsWith("skins/") || path.startsWith("skin/")) {
-            return texture;
+            return resourceKey;
         }
         if (!path.startsWith("textures/")) {
             path = "textures/" + path;
@@ -84,20 +90,20 @@ public final class EntityTextureManager {
         if (!path.endsWith(".png")) {
             path = path + ".png";
         }
-        return ResourceLocation.fromNamespaceAndPath(texture.getNamespace(), path);
+        return namespace + ":" + path;
     }
 
     public static TextureHandle registerGenerated(ExportContext ctx, String key, String relativePath, BufferedImage image) {
-        ResourceLocation generatedLoc = generatedLocation(key);
+        String generatedKey = generatedLocation(key);
         ctx.getGeneratedEntityTextures().putIfAbsent(key, image);
         ctx.getMaterialPaths().putIfAbsent(key, relativePath);
-        ctx.getEntityTextures().putIfAbsent(key, new ExportState.EntityTexture(generatedLoc.toString(), image.getWidth(), image.getHeight()));
+        ctx.getEntityTextures().putIfAbsent(key, new ExportState.EntityTexture(generatedKey, image.getWidth(), image.getHeight()));
         String materialName = ctx.getMaterialNameForSprite(key);
-        return new TextureHandle(key, materialName, relativePath, generatedLoc);
+        return new TextureHandle(key, materialName, relativePath, generatedKey);
     }
 
-    private static ResourceLocation generatedLocation(String key) {
-        return ResourceLocation.fromNamespaceAndPath(VoxelBridge.MODID, "generated/" + safe(key));
+    private static String generatedLocation(String key) {
+        return VoxelBridge.MODID + ":generated/" + safe(key);
     }
 
     private static String safe(String s) {
@@ -113,8 +119,19 @@ public final class EntityTextureManager {
         return sb.toString();
     }
 
-    public record TextureHandle(String spriteKey, String materialName, String relativePath, ResourceLocation textureLocation) {}
+    private static String[] splitKey(String resourceKey) {
+        if (resourceKey == null) {
+            return null;
+        }
+        int split = resourceKey.indexOf(':');
+        if (split <= 0 || split == resourceKey.length() - 1) {
+            return null;
+        }
+        String namespace = resourceKey.substring(0, split).toLowerCase(Locale.ROOT);
+        String path = resourceKey.substring(split + 1);
+        return new String[] { namespace, path };
+    }
+
+    public record TextureHandle(String spriteKey, String materialName, String relativePath, String textureLocation) {}
 }
-
-
 

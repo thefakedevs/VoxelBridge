@@ -1,13 +1,13 @@
 package com.voxelbridge.export.exporter;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.core.ir.TintMode;
+import com.voxelbridge.core.util.color.ColorMode;
+import com.voxelbridge.core.util.color.ColorModeHandler;
+import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.util.color.ColorModeHandler;
-import com.voxelbridge.export.util.geometry.GeometryUtil;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 
@@ -144,13 +144,15 @@ final class QuadCollector implements VertexConsumer {
         String spriteKey = ctx.getTextureAccess().resolveSpriteKey(sprite);
         // Register sprite so animation scan/export (e.g., water_still) is whitelisted
         com.voxelbridge.export.texture.TextureAtlasManager.registerTint(ctx, spriteKey, 0xFFFFFF);
-        float[] normalizedUVs = GeometryUtil.normalizeUVs(uvs, sprite);
+        float[] normalizedUVs = GeometryUtil.normalizeUVs(
+            uvs, sprite.getU0(), sprite.getU1(), sprite.getV0(), sprite.getV1());
 
         // Use ColorModeHandler to prepare colors
-        ColorModeHandler.ColorData colorData = ColorModeHandler.prepareColorsWithUV(ctx, quadArgb, normalizedUVs);
+        ColorModeHandler.ColorData colorData = ColorModeHandler.prepareColorsWithUV(
+            ctx.getColorMode(), ctx.getColorMapAccess(), quadArgb, normalizedUVs);
 
         // Send to sink (fluids typically do not have overlays)
-        TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
+        TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
             ? TintMode.COLORMAP
             : TintMode.VERTEX_COLOR;
         sink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",

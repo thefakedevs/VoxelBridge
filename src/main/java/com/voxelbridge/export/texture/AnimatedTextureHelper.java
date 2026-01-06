@@ -1,13 +1,13 @@
 package com.voxelbridge.export.texture;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.core.texture.AnimationMetadata;
 import com.voxelbridge.core.texture.TextureRepository;
+import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
-import net.minecraft.resources.ResourceLocation;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -45,34 +45,27 @@ public final class AnimatedTextureHelper {
      * Detect animation from .mcmeta file.
      * STRICT MODE: Only accepts textures with valid .mcmeta animation section.
      */
-    public static com.voxelbridge.core.texture.AnimatedFrameSet detectFromMetadata(String spriteKey, ResourceLocation png, TextureRepository repo) {
-        if (!ExportRuntimeConfig.isAnimationEnabled() || spriteKey == null || png == null || repo == null) {
+    public static com.voxelbridge.core.texture.AnimatedFrameSet detectFromMetadata(ExportContext ctx, String spriteKey,
+                                                                                   String resourceKey, TextureRepository repo) {
+        if (!ExportRuntimeConfig.isAnimationEnabled() || spriteKey == null || resourceKey == null || repo == null) {
             return null;
         }
         if (repo.hasAnimation(spriteKey)) {
             return repo.getAnimation(spriteKey);
         }
         try {
-            var rm = Minecraft.getInstance().getResourceManager();
-            var resOpt = rm.getResource(png);
-            if (resOpt.isEmpty()) {
+            AnimationMetadata meta = ctx.getTextureAccess().readAnimationMetadata(resourceKey);
+            if (meta == null) {
                 return null;
             }
-            var res = resOpt.get();
-            var metaOpt = res.metadata().getSection(AnimationMetadataSection.SERIALIZER);
-            AnimationMetadataSection meta = metaOpt.orElse(null);
-            if (meta == null) {
-                VoxelBridgeLogger.warn(LogModule.ANIMATION, "[Animation][WARN] No animation metadata for: " + png);
-                return null; // No .mcmeta animation section - not an animation.
-            }
-            BufferedImage full = TextureLoader.readTexture(png, true);
+            BufferedImage full = ctx.getTextureAccess().readTexture(resourceKey, true);
             if (full != null) {
                 // STRICT: Only use .mcmeta-based splitting.
                 return splitWithMetadata(spriteKey, full, meta, repo);
             }
             return null;
         } catch (Exception e) {
-            VoxelBridgeLogger.warn(LogModule.ANIMATION, "[Animation][WARN] Failed to read metadata for " + png + ": " + e.getMessage());
+            VoxelBridgeLogger.warn(LogModule.ANIMATION, "[Animation][WARN] Failed to read metadata for " + resourceKey + ": " + e.getMessage());
             return null;
         }
     }
@@ -82,8 +75,9 @@ public final class AnimatedTextureHelper {
      * Now acts as a fallback that tries to load from metadata if not already cached.
      */
     @Deprecated
-    public static com.voxelbridge.core.texture.AnimatedFrameSet extractAndStore(String spriteKey, BufferedImage img, TextureRepository repo) {
-        if (!ExportRuntimeConfig.isAnimationEnabled() || spriteKey == null || repo == null) {
+    public static com.voxelbridge.core.texture.AnimatedFrameSet extractAndStore(ExportContext ctx, String spriteKey,
+                                                                                BufferedImage img, TextureRepository repo) {
+        if (!ExportRuntimeConfig.isAnimationEnabled() || spriteKey == null || repo == null || ctx == null) {
             return null;
         }
 
@@ -93,9 +87,9 @@ public final class AnimatedTextureHelper {
         }
 
         // Try to detect from metadata as fallback
-        ResourceLocation pngLoc = TextureLoader.spriteKeyToTexturePNG(spriteKey);
-        if (pngLoc != null) {
-            return detectFromMetadata(spriteKey, pngLoc, repo);
+        String resourceKey = ctx.getTextureAccess().spriteKeyToResourceKey(spriteKey);
+        if (resourceKey != null) {
+            return detectFromMetadata(ctx, spriteKey, resourceKey, repo);
         }
 
         return null;
@@ -105,13 +99,21 @@ public final class AnimatedTextureHelper {
      * Split animation frames according to .mcmeta specification.
      * Follows frame order and timing from metadata.
      */
-    private static com.voxelbridge.core.texture.AnimatedFrameSet splitWithMetadata(String spriteKey, BufferedImage img, AnimationMetadataSection meta, TextureRepository repo) {
+    private static com.voxelbridge.core.texture.AnimatedFrameSet splitWithMetadata(String spriteKey, BufferedImage img,
+                                                                                   AnimationMetadata meta, TextureRepository repo) {
         if (meta == null || img == null) {
             return null;
         }
-        var size = meta.calculateFrameSize(img.getWidth(), img.getHeight());
-        int frameW = size.width();
-        int frameH = size.height();
+        int frameW = meta.frameWidth();
+        int frameH = meta.frameHeight();
+        if (frameW <= 0 && frameH <= 0) {
+            frameW = img.getWidth();
+            frameH = img.getHeight();
+        } else if (frameW <= 0) {
+            frameW = img.getWidth();
+        } else if (frameH <= 0) {
+            frameH = img.getHeight();
+        }
         int cols = frameW > 0 ? img.getWidth() / frameW : 0;
         int rows = frameH > 0 ? img.getHeight() / frameH : 0;
         int totalFrames = (frameW > 0 && frameH > 0) ? cols * rows : 0;
@@ -143,15 +145,16 @@ public final class AnimatedTextureHelper {
         final int frameCount = totalFrames;
 
         List<Integer> frameOrder = new ArrayList<>();
-        List<com.voxelbridge.core.texture.AnimationMetadata.FrameTiming> frameTimings = new ArrayList<>();
+        List<AnimationMetadata.FrameTiming> frameTimings = new ArrayList<>();
 
         // Capture both frame order AND timing information
-        meta.forEachFrame((idx, time) -> {
+        for (AnimationMetadata.FrameTiming timing : meta.frameTimings()) {
+            int idx = timing.index();
             if (idx >= 0 && idx < frameCount) {
                 frameOrder.add(idx);
-                frameTimings.add(new com.voxelbridge.core.texture.AnimationMetadata.FrameTiming(idx, time));
+                frameTimings.add(timing);
             }
-        });
+        }
 
         if (frameOrder.isEmpty()) {
             // Default: sequential frames with default timing
@@ -184,17 +187,10 @@ public final class AnimatedTextureHelper {
         }
 
         // Create complete com.voxelbridge.core.texture.AnimationMetadata with captured timing information
-        boolean interpolate = false;
-        try {
-            interpolate = meta.isInterpolatedFrames();
-        } catch (NoSuchMethodError e) {
-            VoxelBridgeLogger.info(LogModule.ANIMATION, "[Animation][DEBUG] AnimationMetadataSection.isInterpolatedFrames() not available, using false");
-        }
-
-        com.voxelbridge.core.texture.AnimationMetadata animMetadata = new com.voxelbridge.core.texture.AnimationMetadata(
-            meta.getDefaultFrameTime(),
+        AnimationMetadata animMetadata = new AnimationMetadata(
+            meta.defaultFrameTime(),
             frameTimings,
-            interpolate,
+            meta.interpolate(),
             frameW,
             frameH
         );
@@ -213,7 +209,8 @@ public final class AnimatedTextureHelper {
     /**
      * Extract animation frames directly from a loaded atlas sprite (uses SpriteContents metadata).
      */
-    public static com.voxelbridge.core.texture.AnimatedFrameSet extractFromSprite(String spriteKey, TextureAtlasSprite sprite, TextureRepository repo) {
+    public static com.voxelbridge.core.texture.AnimatedFrameSet extractFromSprite(ExportContext ctx, String spriteKey,
+                                                                                  TextureAtlasSprite sprite, TextureRepository repo) {
         if (!ExportRuntimeConfig.isAnimationEnabled() || sprite == null || spriteKey == null || repo == null) {
             return null;
         }
@@ -230,9 +227,10 @@ public final class AnimatedTextureHelper {
             }
 
             // Read full texture from sprite
-            BufferedImage full = TextureLoader.readTexture(contents.name(), true);
+            BufferedImage full = ctx.getTextureAccess().readTexture(contents.name().toString(), true);
             if (full != null) {
-                com.voxelbridge.core.texture.AnimatedFrameSet frames = splitWithMetadata(spriteKey, full, meta, repo);
+                AnimationMetadata anim = toCoreMetadata(meta);
+                com.voxelbridge.core.texture.AnimatedFrameSet frames = splitWithMetadata(spriteKey, full, anim, repo);
                 return frames;
             }
             return null;
@@ -247,7 +245,7 @@ public final class AnimatedTextureHelper {
      * Logs all detection attempts for debugging.
      * OPTIMIZATION: Uses static cache to avoid repeated filesystem scans.
      */
-    public static void scanAllAnimations(com.voxelbridge.export.ExportContext ctx, java.util.Set<String> whitelist) {
+    public static void scanAllAnimations(ExportContext ctx, java.util.Set<String> whitelist) {
         TextureRepository repo = ctx.getTextureRepository();
 
         // OPTIMIZATION: Skip expensive filesystem scan if cache is already warmed up
@@ -266,26 +264,24 @@ public final class AnimatedTextureHelper {
             for (String key : whitelist) {
                 if (repo.hasAnimation(key)) continue;
                 if (key.endsWith("_n") || key.endsWith("_s")) continue; // skip PBR companions
-                ResourceLocation pngLoc = TextureLoader.spriteKeyToTexturePNG(key);
-                if (pngLoc == null) continue;
-                com.voxelbridge.core.texture.AnimatedFrameSet frames = detectFromMetadata(key, pngLoc, repo);
+                String resourceKey = ctx.getTextureAccess().spriteKeyToResourceKey(key);
+                if (resourceKey == null) continue;
+                com.voxelbridge.core.texture.AnimatedFrameSet frames = detectFromMetadata(ctx, key, resourceKey, repo);
                 if (frames != null) {
                     whitelistFound++;
                     com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(
                         "[Animation][WHITELIST] %s (%d frames)", key, frames.frames().size()
                     ));
                 } else {
-                    com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, "[Animation][WHITELIST][MISS] No animation metadata for: " + pngLoc);
-                }
+                com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, "[Animation][WHITELIST][MISS] No animation metadata for: " + resourceKey);
+            }
             }
             totalFound += whitelistFound;
             com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format("[Animation] Whitelist scan complete: %d animations found", whitelistFound));
         } else {
             // Fallback path: broader scan (atlas + standard paths) if no whitelist available.
             try {
-                net.minecraft.client.renderer.texture.TextureAtlas blockAtlas =
-                    ctx.getMc().getModelManager().getAtlas(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
-                int atlasCount = scanAtlasAnimations(blockAtlas, repo, whitelist);
+                int atlasCount = scanAtlasAnimations(repo, whitelist);
                 totalFound += atlasCount;
                 com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format("[Animation] Atlas scan: %d animations found", atlasCount));
             } catch (Exception e) {
@@ -294,8 +290,6 @@ public final class AnimatedTextureHelper {
             }
 
             try {
-                net.minecraft.server.packs.resources.ResourceManager rm =
-                    net.minecraft.client.Minecraft.getInstance().getResourceManager();
                 String[] additionalPaths = {
                     "textures/block/",
                     "textures/entity/",
@@ -306,7 +300,7 @@ public final class AnimatedTextureHelper {
                 };
 
                 for (String path : additionalPaths) {
-                    int pathCount = scanPathForMetadata(rm, null, path, repo, whitelist);
+                    int pathCount = scanPathForMetadata(ctx, path, repo, whitelist);
                     totalFound += pathCount;
                     com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format("[Animation] Path '%s': %d animations found", path, pathCount));
                 }
@@ -329,8 +323,7 @@ public final class AnimatedTextureHelper {
      * This method is kept as a placeholder for future API support.
      * For now, animation detection relies entirely on file system scanning.
      */
-    private static int scanAtlasAnimations(net.minecraft.client.renderer.texture.TextureAtlas atlas,
-                                           TextureRepository repo,
+    private static int scanAtlasAnimations(TextureRepository repo,
                                            java.util.Set<String> whitelist) {
         com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, "[Animation][INFO] Atlas.getSprites() API not available, skipping atlas scan");
         com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, "[Animation][INFO] Relying on file system scanning for animation detection");
@@ -340,8 +333,7 @@ public final class AnimatedTextureHelper {
     /**
      * Scan a specific path for .mcmeta files.
      */
-    private static int scanPathForMetadata(net.minecraft.server.packs.resources.ResourceManager rm,
-                                           String namespace,
+    private static int scanPathForMetadata(ExportContext ctx,
                                            String path,
                                            TextureRepository repo,
                                            java.util.Set<String> whitelist) {
@@ -351,30 +343,19 @@ public final class AnimatedTextureHelper {
         String cleanPath = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
 
         try {
-            // List resources in the path - correct API signature
-            java.util.Map<ResourceLocation, net.minecraft.server.packs.resources.Resource> resources =
-                rm.listResources(cleanPath, loc -> loc.getPath().endsWith(".png"));
+            java.util.Set<String> resources = ctx.getTextureAccess().listPngResources(cleanPath);
 
             com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(
                 "[Animation][DEBUG] listResources('%s') available: %d files",
                 cleanPath, resources.size()
             ));
 
-            for (ResourceLocation pngLoc : resources.keySet()) {
+            for (String pngKey : resources) {
                 try {
-                    // Only process files from the specified namespace (if provided)
-                    if (namespace != null && !namespace.equals(pngLoc.getNamespace())) {
-                        continue;
-                    }
-
                     // Check for .mcmeta companion
-                    ResourceLocation metaLoc = ResourceLocation.fromNamespaceAndPath(
-                        pngLoc.getNamespace(),
-                        pngLoc.getPath() + ".mcmeta"
-                    );
-
-                    if (rm.getResource(metaLoc).isPresent()) {
-                        String spriteKey = pngLocToSpriteKey(pngLoc);
+                    String metaKey = pngKey + ".mcmeta";
+                    if (ctx.getTextureAccess().hasResource(metaKey)) {
+                        String spriteKey = pngKeyToSpriteKey(pngKey);
                         if (whitelist != null && !whitelist.isEmpty() && !whitelist.contains(spriteKey)) {
                             // ? whitelist ?sprite
                             if (!spriteKey.startsWith("minecraft:")) {
@@ -384,12 +365,12 @@ public final class AnimatedTextureHelper {
                         }
                         // Record every discovered .mcmeta for debugging
                         com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(
-                            "[Animation][MCMETA] %s meta=%s", spriteKey, metaLoc
+                            "[Animation][MCMETA] %s meta=%s", spriteKey, metaKey
                         ));
 
                         if (!repo.hasAnimation(spriteKey)) {
                             // Only treat as animated when .mcmeta is present AND valid
-                            com.voxelbridge.core.texture.AnimatedFrameSet frames = detectFromMetadata(spriteKey, pngLoc, repo);
+                            com.voxelbridge.core.texture.AnimatedFrameSet frames = detectFromMetadata(ctx, spriteKey, pngKey, repo);
                             if (frames != null) {
                                 foundCount++;
                                 com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(
@@ -400,7 +381,7 @@ public final class AnimatedTextureHelper {
                         }
                     }
                 } catch (Exception e) {
-                    com.voxelbridge.util.debug.VoxelBridgeLogger.warn(LogModule.ANIMATION, "[Animation][WARN] File check error for " + pngLoc + ": " + e.getMessage());
+                    com.voxelbridge.util.debug.VoxelBridgeLogger.warn(LogModule.ANIMATION, "[Animation][WARN] File check error for " + pngKey + ": " + e.getMessage());
                 }
             }
         } catch (Exception e) {
@@ -411,15 +392,31 @@ public final class AnimatedTextureHelper {
         return foundCount;
     }
 
-    private static String pngLocToSpriteKey(ResourceLocation pngLoc) {
-        String path = pngLoc.getPath();
+    private static String pngKeyToSpriteKey(String pngKey) {
+        int split = pngKey.indexOf(':');
+        if (split <= 0) {
+            return null;
+        }
+        String namespace = pngKey.substring(0, split);
+        String path = pngKey.substring(split + 1);
         if (path.startsWith("textures/")) {
             path = path.substring("textures/".length());
         }
         if (path.endsWith(".png")) {
             path = path.substring(0, path.length() - 4);
         }
-        return pngLoc.getNamespace() + ":" + path;
+        return namespace + ":" + path;
+    }
+
+    private static AnimationMetadata toCoreMetadata(AnimationMetadataSection meta) {
+        List<AnimationMetadata.FrameTiming> timings = new ArrayList<>();
+        meta.forEachFrame((idx, time) -> timings.add(new AnimationMetadata.FrameTiming(idx, time)));
+        boolean interpolate = false;
+        try {
+            interpolate = meta.isInterpolatedFrames();
+        } catch (NoSuchMethodError ignored) {
+        }
+        return new AnimationMetadata(meta.getDefaultFrameTime(), timings, interpolate, 0, 0);
     }
 }
 

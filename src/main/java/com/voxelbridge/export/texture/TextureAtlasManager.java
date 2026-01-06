@@ -989,7 +989,7 @@ public final class TextureAtlasManager {
             ResourceLocation spriteLoc = com.voxelbridge.util.ResourceLocationUtil.sanitize(spriteKey);
             TextureAtlasSprite sprite = atlas.getSprite(spriteLoc);
             if (sprite != null) {
-                AnimatedTextureHelper.extractFromSprite(spriteKey, sprite, ctx.getTextureRepository());
+                AnimatedTextureHelper.extractFromSprite(ctx, spriteKey, sprite, ctx.getTextureRepository());
                 if (ctx.getTextureRepository().hasAnimation(spriteKey)) {
                     return;
                 }
@@ -997,18 +997,22 @@ public final class TextureAtlasManager {
         } catch (Exception e) {
             VoxelBridgeLogger.warn(LogModule.ANIMATION, "[Animation][WARN] Atlas probe failed for " + spriteKey + ": " + e.getMessage());
         }
-        ResourceLocation textureLocation = TextureLoader.spriteKeyToTexturePNG(spriteKey);
+        String resourceKey = ctx.getTextureAccess().spriteKeyToResourceKey(spriteKey);
+        if (resourceKey == null) {
+            return;
+        }
         // Prefer metadata-driven detection to catch animations even when frame strips are square
-        AnimatedTextureHelper.detectFromMetadata(spriteKey, textureLocation, ctx.getTextureRepository());
+        AnimatedTextureHelper.detectFromMetadata(ctx, spriteKey, resourceKey, ctx.getTextureRepository());
     }
 
     /**
      * Loads a texture for atlas generation (block + block entity).
      */
     private static BufferedImage loadTextureForAtlas(ExportContext ctx, String spriteKey) {
-        ResourceLocation textureLocation = TextureLoader.spriteKeyToTexturePNG(spriteKey);
-
-        String resourceKey = textureLocation.toString();
+        String resourceKey = ctx.getTextureAccess().spriteKeyToResourceKey(spriteKey);
+        if (resourceKey == null) {
+            return null;
+        }
         BufferedImage cached = ctx.getTextureRepository().get(resourceKey);
         if (cached == null) {
             cached = ctx.getCachedSpriteImage(spriteKey);
@@ -1024,7 +1028,7 @@ public final class TextureAtlasManager {
         if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
             VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen][CACHE MISS] %s not in cache, trying disk", spriteKey));
         }
-        BufferedImage diskImage = ctx.getTextureAccess().readTexture(textureLocation.toString(), ExportRuntimeConfig.isAnimationEnabled());
+        BufferedImage diskImage = ctx.getTextureAccess().readTexture(resourceKey, ExportRuntimeConfig.isAnimationEnabled());
         if (diskImage != null) {
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen][DISK HIT] Loaded %s from disk (%dx%d)",
@@ -1059,21 +1063,16 @@ public final class TextureAtlasManager {
 
     private static void copyOriginalMcmeta(ExportContext ctx, String spriteKey, Path spriteDir, String baseName) {
         try {
-            ResourceLocation pngLoc = TextureLoader.spriteKeyToTexturePNG(spriteKey);
-            if (pngLoc == null) {
+            String pngKey = ctx.getTextureAccess().spriteKeyToResourceKey(spriteKey);
+            if (pngKey == null) {
                 return;
             }
-            ResourceLocation mcmetaLoc = ResourceLocation.fromNamespaceAndPath(
-                pngLoc.getNamespace(),
-                pngLoc.getPath() + ".mcmeta"
-            );
-            var resOpt = ctx.getMc().getResourceManager().getResource(mcmetaLoc);
-            if (resOpt.isEmpty()) {
-                return;
-            }
-            var res = resOpt.get();
+            String mcmetaKey = pngKey + ".mcmeta";
             Path target = spriteDir.resolve(baseName + ".mcmeta");
-            try (var in = res.open()) {
+            try (var in = ctx.getTextureAccess().openResource(mcmetaKey)) {
+                if (in == null) {
+                    return;
+                }
                 Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
             VoxelBridgeLogger.info(LogModule.ANIMATION, String.format("[Animation] Copied original mcmeta for %s -> %s", spriteKey, target.getFileName()));

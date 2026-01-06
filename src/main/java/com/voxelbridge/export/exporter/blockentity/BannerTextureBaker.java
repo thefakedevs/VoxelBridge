@@ -2,7 +2,7 @@ package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.texture.EntityTextureManager;
-import com.voxelbridge.export.texture.TextureLoader;
+import com.voxelbridge.platform.texture.TextureLoader;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.resources.ResourceKey;
@@ -36,7 +36,7 @@ final class BannerTextureBaker {
     static BannerTextures bake(ExportContext ctx, BannerBlockEntity banner) {
         String key = BannerTextureBaker.buildKey(banner);
         String bakedPath = OUTPUT_DIR + "/" + BannerTextureBaker.safe(key) + ".png";
-        BufferedImage bakedImage = ctx.getGeneratedEntityTextures().computeIfAbsent(key, k -> BannerTextureBaker.composeTexture(banner));
+        BufferedImage bakedImage = ctx.getGeneratedEntityTextures().computeIfAbsent(key, k -> BannerTextureBaker.composeTexture(ctx, banner));
         EntityTextureManager.TextureHandle bakedHandle = EntityTextureManager.registerGenerated(ctx, key, bakedPath, bakedImage);
 
         BannerTextureOverrides overrides = new BannerTextureOverrides();
@@ -64,18 +64,18 @@ final class BannerTextureBaker {
         return new BannerTextures(bakedHandle, overrides);
     }
 
-    private static BufferedImage composeTexture(BannerBlockEntity banner) {
-        BufferedImage base = BannerTextureBaker.copy(BannerTextureBaker.loadSprite(BASE_WITH_POLE_TEXTURE));
+    private static BufferedImage composeTexture(ExportContext ctx, BannerBlockEntity banner) {
+        BufferedImage base = BannerTextureBaker.copy(BannerTextureBaker.loadSprite(ctx, BASE_WITH_POLE_TEXTURE));
         BufferedImage result = BannerTextureBaker.copy(base);
-        BannerTextureBaker.applyTinted(result, FLAG_ONLY_TEXTURE, banner.getBaseColor());
+        BannerTextureBaker.applyTinted(ctx, result, FLAG_ONLY_TEXTURE, banner.getBaseColor());
         for (BannerPatternLayers.Layer layer : banner.getPatterns().layers()) {
-            BannerTextureBaker.applyTinted(result, Sheets.getBannerMaterial(layer.pattern()).texture(), layer.color());
+            BannerTextureBaker.applyTinted(ctx, result, Sheets.getBannerMaterial(layer.pattern()).texture(), layer.color());
         }
         return result;
     }
 
-    private static void applyTinted(BufferedImage target, ResourceLocation sprite, DyeColor color) {
-        BufferedImage texture = BannerTextureBaker.loadSprite(sprite);
+    private static void applyTinted(ExportContext ctx, BufferedImage target, ResourceLocation sprite, DyeColor color) {
+        BufferedImage texture = BannerTextureBaker.loadSprite(ctx, sprite);
         if (texture == null) {
             return;
         }
@@ -128,9 +128,9 @@ final class BannerTextureBaker {
         return outA << 24 | outR << 16 | outG << 8 | outB;
     }
 
-    private static BufferedImage loadSprite(ResourceLocation sprite) {
-        ResourceLocation png = TextureLoader.spriteKeyToTexturePNG(sprite.toString());
-        return TextureLoader.readTexture(png);
+    private static BufferedImage loadSprite(ExportContext ctx, ResourceLocation sprite) {
+        String resourceKey = ctx.getTextureAccess().spriteKeyToResourceKey(sprite.toString());
+        return ctx.getTextureAccess().readTexture(resourceKey);
     }
 
     private static BufferedImage copy(BufferedImage src) {

@@ -1,12 +1,11 @@
 package com.voxelbridge.export.exporter;
 
-import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.core.ir.TintMode;
+import com.voxelbridge.core.util.color.ColorMode;
+import com.voxelbridge.core.util.color.ColorModeHandler;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.texture.TextureLoader;
-import com.voxelbridge.export.util.color.ColorModeHandler;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -108,9 +107,10 @@ public final class QuadProcessor {
 
         if (hasBaked) {
             // Prefer baked vertex colors (e.g., FRAPI-provided tint) over vanilla tint.
-            if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP) {
+            if (ctx.getColorMode() == ColorMode.COLORMAP) {
                 int bakedTint = extractBakedTintArgb(vertexData.colors());
-                colorData = ColorModeHandler.prepareColors(ctx, bakedTint, true);
+                colorData = ColorModeHandler.prepareColors(
+                    ctx.getColorMode(), ctx.getColorMapAccess(), bakedTint, true);
             } else {
                 float[] linearColors = convertABGRtoLinearRGBA(vertexData.colors());
                 colorData = new ColorModeHandler.ColorData(null, linearColors);
@@ -120,10 +120,12 @@ public final class QuadProcessor {
             int tintColor = computeTintColor(state, pos, quad);
             if (tintColor != -1) {
                 // Found a valid block tint color
-                colorData = ColorModeHandler.prepareColors(ctx, tintColor, true);
+                colorData = ColorModeHandler.prepareColors(
+                    ctx.getColorMode(), ctx.getColorMapAccess(), tintColor, true);
             } else {
                 // Default to white
-                colorData = ColorModeHandler.prepareColors(ctx, 0xFFFFFFFF, false);
+                colorData = ColorModeHandler.prepareColors(
+                    ctx.getColorMode(), ctx.getColorMapAccess(), 0xFFFFFFFF, false);
             }
         }
 
@@ -131,7 +133,7 @@ public final class QuadProcessor {
         ctx.registerSpriteMaterial(spriteKey, blockKey);
 
         // Output quad (Intern keys)
-        TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
+        TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
             ? TintMode.COLORMAP
             : TintMode.VERTEX_COLOR;
         sceneSink.addQuad(ctx.intern(blockKey), ctx.intern(spriteKey), null,

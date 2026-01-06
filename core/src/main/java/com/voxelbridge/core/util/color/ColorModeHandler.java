@@ -1,9 +1,6 @@
-package com.voxelbridge.export.util.color;
+package com.voxelbridge.core.util.color;
 
-import com.voxelbridge.config.ExportRuntimeConfig;
-import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.texture.ColorMapManager;
-import com.voxelbridge.export.util.geometry.GeometryUtil;
+import com.voxelbridge.core.util.geometry.GeometryUtil;
 
 /**
  * Handles color mode logic for quad exporters.
@@ -32,8 +29,8 @@ public final class ColorModeHandler {
      * @param hasTint whether tint should be applied
      * @return ColorData containing uv1 and colors
      */
-    public static ColorData prepareColors(ExportContext ctx, int argb, boolean hasTint) {
-        if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.VERTEX_COLOR) {
+    public static ColorData prepareColors(ColorMode mode, ColorMapAccess colorMaps, int argb, boolean hasTint) {
+        if (mode == ColorMode.VERTEX_COLOR) {
             // VertexColor mode: colors in COLOR_0
             return new ColorData(
                 null,  // no TEXCOORD_1
@@ -42,7 +39,7 @@ public final class ColorModeHandler {
         } else {
             // ColorMap mode: use TEXCOORD_1
             // Force white slot for non-tinted to avoid extra LUT entries
-            float[] colorUv = getColormapUV(ctx, hasTint ? argb : 0xFFFFFFFF);
+            float[] colorUv = getColormapUV(colorMaps, hasTint ? argb : 0xFFFFFFFF);
             return new ColorData(
                 colorUv,
                 GeometryUtil.whiteColor()
@@ -58,8 +55,9 @@ public final class ColorModeHandler {
      * @param normalizedUVs normalized UV coordinates [0,1] for 4 vertices
      * @return ColorData containing uv1 and colors
      */
-    public static ColorData prepareColorsWithUV(ExportContext ctx, int argb, float[] normalizedUVs) {
-        if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.VERTEX_COLOR) {
+    public static ColorData prepareColorsWithUV(ColorMode mode, ColorMapAccess colorMaps,
+                                                int argb, float[] normalizedUVs) {
+        if (mode == ColorMode.VERTEX_COLOR) {
             // VertexColor mode: colors in COLOR_0
             return new ColorData(
                 null,  // no TEXCOORD_1
@@ -67,8 +65,8 @@ public final class ColorModeHandler {
             );
         } else {
             // ColorMap mode: remap UVs to colormap texture
-            float[] lut = ColorMapManager.remapColorUV(ctx, argb);
-            float u0 = lut[0], v0 = lut[1], u1 = lut[2], v1 = lut[3];
+            ColorMapUv lut = colorMaps.registerColor(argb);
+            float u0 = lut.u0(), v0 = lut.v0(), u1 = lut.u1(), v1 = lut.v1();
             float du = u1 - u0, dv = v1 - v0;
 
             float[] uv1 = new float[8];
@@ -87,12 +85,12 @@ public final class ColorModeHandler {
     /**
      * Gets colormap UV coordinates for a color value using ColorMapManager.
      *
-     * @param ctx export context
+     * @param colorMaps colormap access
      * @param argb ARGB color value
      * @return 8 floats representing UV coordinates for 4 vertices (quad format)
      */
-    private static float[] getColormapUV(ExportContext ctx, int argb) {
-        var p = ColorMapManager.registerColor(ctx, argb);
+    private static float[] getColormapUV(ColorMapAccess colorMaps, int argb) {
+        ColorMapUv p = colorMaps.registerColor(argb);
         return new float[]{
             p.u0(), p.v0(),  // vertex 0
             p.u1(), p.v0(),  // vertex 1

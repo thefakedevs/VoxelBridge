@@ -1,4 +1,4 @@
-package com.voxelbridge.export.exporter.capture;
+package com.voxelbridge.platform.render.capture;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;

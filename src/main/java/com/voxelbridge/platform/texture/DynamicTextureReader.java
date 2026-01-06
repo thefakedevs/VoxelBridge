@@ -1,4 +1,4 @@
-package com.voxelbridge.export.texture;
+package com.voxelbridge.platform.texture;
 
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;

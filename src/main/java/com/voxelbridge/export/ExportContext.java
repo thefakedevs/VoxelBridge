@@ -1,9 +1,13 @@
 package com.voxelbridge.export;
 
 import com.voxelbridge.core.export.ExportState;
+import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.texture.TextureAccess;
 import com.voxelbridge.core.texture.TextureRepository;
+import com.voxelbridge.core.util.color.ColorMapAccess;
+import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.export.texture.MinecraftTextureAccess;
+import com.voxelbridge.export.texture.ExportColorMapAccess;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -26,11 +30,13 @@ public final class ExportContext {
     private final SamplerContext sampler;
     private final ExportState state;
     private final TextureAccess<TextureAtlasSprite> textureAccess;
+    private final ColorMapAccess colorMapAccess;
 
     public ExportContext(Minecraft mc) {
         this.sampler = new SamplerContext(mc);
         this.state = new ExportState();
         this.textureAccess = MinecraftTextureAccess.INSTANCE;
+        this.colorMapAccess = new ExportColorMapAccess(this);
     }
 
     public SamplerContext sampler() {
@@ -45,8 +51,22 @@ public final class ExportContext {
         return sampler.getMc();
     }
 
+    public void runOnMainThread(Runnable task) {
+        sampler.getMc().executeBlocking(task);
+    }
+
     public TextureAccess<TextureAtlasSprite> getTextureAccess() {
         return textureAccess;
+    }
+
+    public ColorMapAccess getColorMapAccess() {
+        return colorMapAccess;
+    }
+
+    public ColorMode getColorMode() {
+        return ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
+            ? ColorMode.COLORMAP
+            : ColorMode.VERTEX_COLOR;
     }
 
     public BlockColors getBlockColors() {

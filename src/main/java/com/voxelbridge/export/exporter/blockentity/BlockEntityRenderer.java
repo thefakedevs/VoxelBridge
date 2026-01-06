@@ -1,23 +1,20 @@
 package com.voxelbridge.export.exporter.blockentity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
-import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.exporter.capture.RenderCapture;
+import com.voxelbridge.platform.render.capture.CaptureBufferBase;
+import com.voxelbridge.platform.render.capture.RenderCapture;
+import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
-import com.voxelbridge.export.util.color.ColorModeHandler;
-import com.voxelbridge.export.util.geometry.GeometryUtil;
+import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -104,7 +101,7 @@ public final class BlockEntityRenderer {
         if (task == null) {
             return false;
         }
-        Minecraft.getInstance().executeBlocking(task);
+        ctx.runOnMainThread(task);
         return task.wasSuccessful();
     }
 
@@ -245,46 +242,26 @@ public final class BlockEntityRenderer {
     /**
      * Captures rendered geometry from BlockEntity renderers.
      */
-    private static class CaptureBuffer implements MultiBufferSource, RenderCapture.QuadSink {
-        private final ExportContext ctx;
-        private final IrSink sceneSink;
+    private static class CaptureBuffer extends CaptureBufferBase {
         private final double offsetX, offsetY, offsetZ;
         private final BlockEntity blockEntity;
-        private final RenderCapture capture;
-        private boolean hadGeometry = false;
         private final TextureOverrideMap overrides;
 
         CaptureBuffer(ExportContext ctx, IrSink sceneSink, double offsetX, double offsetY, double offsetZ, BlockEntity blockEntity) {
-            this.ctx = ctx;
-            this.sceneSink = sceneSink;
+            super(ctx, sceneSink, (renderType, queuedVertices) -> {
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.BLOCKENTITY)) {
+                    VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[VertexCollector] setNormal called, vertices.size=" + queuedVertices);
+                }
+            });
             this.offsetX = offsetX;
             this.offsetY = offsetY;
             this.offsetZ = offsetZ;
             this.blockEntity = blockEntity;
             this.overrides = OVERRIDES.get();
-            this.capture = new RenderCapture(this, (renderType, queuedVertices) -> {
-                if (VoxelBridgeLogger.isDebugEnabled(LogModule.BLOCKENTITY)) {
-                    VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[VertexCollector] setNormal called, vertices.size=" + queuedVertices);
-                }
-            });
-        }
-
-        @Override
-        public VertexConsumer getBuffer(RenderType renderType) {
-            VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[CaptureBuffer] getBuffer() called for RenderType: " + renderType);
-            return capture.getBuffer(renderType);
         }
 
         void flush() {
-            capture.flush();
-        }
-
-        boolean hadGeometry() {
-            return hadGeometry;
-        }
-
-        void recordGeometry() {
-            this.hadGeometry = true;
+            flushCapture();
         }
 
         TextureOverrideMap overrides() {
@@ -341,39 +318,13 @@ public final class BlockEntityRenderer {
             ResourceLocation atlasLocation = textureRes != null ? textureRes.atlasLocation() : null;
 
             int vertCount = Math.min(4, verts.size());
-            float[] rawU = new float[vertCount];
-            float[] rawV = new float[vertCount];
-            float minU = Float.POSITIVE_INFINITY, maxU = Float.NEGATIVE_INFINITY;
-            float minV = Float.POSITIVE_INFINITY, maxV = Float.NEGATIVE_INFINITY;
-            for (int i = 0; i < vertCount; i++) {
-                rawU[i] = verts.get(i).u;
-                rawV[i] = verts.get(i).v;
-                minU = Math.min(minU, rawU[i]); maxU = Math.max(maxU, rawU[i]);
-                minV = Math.min(minV, rawV[i]); maxV = Math.max(maxV, rawV[i]);
-            }
-            // Wrapped UV for atlas lookup
-            float[] wrappedU = new float[vertCount];
-            float[] wrappedV = new float[vertCount];
-            for (int i = 0; i < vertCount; i++) {
-                wrappedU[i] = wrap01(rawU[i]);
-                wrappedV[i] = wrap01(rawV[i]);
-            }
+            RenderCaptureUtil.UvStats uvStats = RenderCaptureUtil.computeUvStats(verts);
 
             // Handle atlas texture resolution via locator if needed
             if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
-                float centerU = average(wrappedU);
-                float centerV = average(wrappedV);
-                ResourceLocation atlas = atlasLocation != null ? atlasLocation : textureRes.texture();
-                TextureAtlasSprite located = ATLAS_LOCATOR.find(atlas, centerU, centerV);
-                if (located != null) {
-                    textureRes = new ResolvedTexture(
-                        located.contents().name(),
-                        located.getU0(), located.getU1(),
-                        located.getV0(), located.getV1(),
-                        true,
-                        located,
-                        atlas);
-                    atlasLocation = atlas;
+                textureRes = RenderCaptureUtil.resolveAtlasSprite(textureRes, ATLAS_LOCATOR, uvStats, atlasLocation);
+                if (textureRes != null) {
+                    atlasLocation = textureRes.atlasLocation();
                 }
             }
 
@@ -383,7 +334,7 @@ public final class BlockEntityRenderer {
                 .getKey(blockEntity.getType()).toString();
 
             if (textureRes != null && overrides != null) {
-                if (overrides.skipQuad(textureRes.texture(), rawU, rawV)) return;
+                if (overrides.skipQuad(textureRes.texture(), uvStats.rawU(), uvStats.rawV())) return;
 
                 var mappedHandle = overrides.resolve(textureRes.texture());
                 if (mappedHandle != null) {
@@ -402,25 +353,13 @@ public final class BlockEntityRenderer {
 
                     fillUvs(verts, uv0, isAtlasTexture, u0, u1, v0, v1);
 
-                    float[] uv1 = EMPTY_UV;
-                    if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.VERTEX_COLOR) {
-                        // keep vertex colors, uv1 empty
-                    } else {
-                        int argb = toArgb(colors);
-                        boolean hasTint = !isWhite(colors);
-                        ColorModeHandler.ColorData colorData = ColorModeHandler.prepareColors(ctx, argb, hasTint);
-                        uv1 = colorData.uv1() != null ? colorData.uv1() : EMPTY_UV;
-                        System.arraycopy(GeometryUtil.whiteColor(), 0, colors, 0, colors.length);
-                    }
-
-                    TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
-                        ? TintMode.COLORMAP
-                        : TintMode.VERTEX_COLOR;
+                    RenderCaptureUtil.ColorModeResult colorResult =
+                        RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
                     sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
-                        RenderLayer.UNKNOWN, tintMode,
+                        RenderLayer.UNKNOWN, colorResult.tintMode(),
                         RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
                         false,
-                        positions, uv0, uv1, NORMAL_UP, colors);
+                        positions, uv0, colorResult.uv1(), NORMAL_UP, colors);
                     return;
                 }
             }
@@ -439,8 +378,8 @@ public final class BlockEntityRenderer {
             if (isAtlasTexture && textureRes != null && textureRes.sprite() != null) {
                 float eps = 1e-4f;
                 boolean outsideSpriteBounds =
-                    minU < textureRes.u0() - eps || maxU > textureRes.u1() + eps ||
-                    minV < textureRes.v0() - eps || maxV > textureRes.v1() + eps;
+                    uvStats.minU() < textureRes.u0() - eps || uvStats.maxU() > textureRes.u1() + eps ||
+                    uvStats.minV() < textureRes.v0() - eps || uvStats.maxV() > textureRes.v1() + eps;
                 if (outsideSpriteBounds) {
                     isAtlasTexture = false;
                     u0 = 0f; u1 = 1f;
@@ -457,86 +396,25 @@ public final class BlockEntityRenderer {
             // Color/colormap handling to mirror BlockExporter behavior:
             // - ColorMap mode: always provide TEXCOORD_1; no tint -> white slot.
             // - VertexColor mode: keep per-vertex colors (already in 'colors').
-            float[] uv1 = EMPTY_UV;
-            if (ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.VERTEX_COLOR) {
-                // colors already populated from vertex data; keep uv1 empty
-            } else {
-                // Derive a single ARGB from the first vertex color (linear -> srgb approximation)
-                int argb = toArgb(colors);
-                boolean hasTint = !isWhite(colors);
-                ColorModeHandler.ColorData colorData = ColorModeHandler.prepareColors(ctx, argb, hasTint);
-                uv1 = colorData.uv1() != null ? colorData.uv1() : EMPTY_UV;
-                // Force colors to white in colormap mode
-                System.arraycopy(GeometryUtil.whiteColor(), 0, colors, 0, colors.length);
-            }
+            RenderCaptureUtil.ColorModeResult colorResult =
+                RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
 
             // Send quad to scene sink using the BlockEntity type as group key (block entities typically don't have overlays)
             ctx.registerSpriteMaterial(spriteKey, materialGroupKey);
-            TintMode tintMode = ExportRuntimeConfig.getColorMode() == ExportRuntimeConfig.ColorMode.COLORMAP
-                ? TintMode.COLORMAP
-                : TintMode.VERTEX_COLOR;
             sceneSink.addQuad(materialGroupKey, spriteKey, "voxelbridge:transparent",
-                RenderLayer.UNKNOWN, tintMode,
+                RenderLayer.UNKNOWN, colorResult.tintMode(),
                 RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
                 false,
-                positions, uv0, uv1, NORMAL_UP, colors);
+                positions, uv0, colorResult.uv1(), NORMAL_UP, colors);
         }
 
         private void fillUvs(List<RenderCapture.Vertex> verts, float[] uv0, boolean isAtlas, float u0, float u1, float v0, float v1) {
             int count = Math.min(4, verts.size());
             if (isAtlas) {
-                float du = u1 - u0;
-                float dv = v1 - v0;
-                for (int i = 0; i < count; i++) {
-                    RenderCapture.Vertex v = verts.get(i);
-                    float su = (du == 0f) ? 0f : (v.u - u0) / du;
-                    float sv = (dv == 0f) ? 0f : (v.v - v0) / dv;
-                    su = Math.max(0f, Math.min(1f, su));
-                    sv = Math.max(0f, Math.min(1f, sv));
-                    uv0[i * 2] = su;
-                    uv0[i * 2 + 1] = sv;
-                }
+                RenderCaptureUtil.fillUvsAtlas(verts, uv0, u0, u1, v0, v1);
             } else {
-                for (int i = 0; i < count; i++) {
-                    RenderCapture.Vertex v = verts.get(i);
-                    float su = Math.max(0f, Math.min(1f, v.u));
-                    float sv = Math.max(0f, Math.min(1f, v.v));
-                    uv0[i * 2] = su;
-                    uv0[i * 2 + 1] = sv;
-                }
+                RenderCaptureUtil.fillUvsClamp(verts, uv0);
             }
-        }
-
-        private float average(float[] arr) {
-            if (arr == null || arr.length == 0) return 0f;
-            float sum = 0f;
-            for (float v : arr) sum += v;
-            return sum / arr.length;
-        }
-
-        private float wrap01(float v) {
-            float wrapped = v % 1f;
-            if (wrapped < 0f) wrapped += 1f;
-            return wrapped;
-        }
-
-        private int toArgb(float[] colors) {
-            // colors length >=4; clamp to [0,1] then convert to 0xAARRGGBB with alpha=1
-            float r = colors.length >= 1 ? colors[0] : 1f;
-            float g = colors.length >= 2 ? colors[1] : 1f;
-            float b = colors.length >= 3 ? colors[2] : 1f;
-            int ri = (int) (Math.max(0f, Math.min(1f, r)) * 255f + 0.5f);
-            int gi = (int) (Math.max(0f, Math.min(1f, g)) * 255f + 0.5f);
-            int bi = (int) (Math.max(0f, Math.min(1f, b)) * 255f + 0.5f);
-            return 0xFF000000 | (ri << 16) | (gi << 8) | bi;
-        }
-
-        private boolean isWhite(float[] colors) {
-            if (colors == null || colors.length < 3) return true;
-            float eps = 1e-3f;
-            return Math.abs(colors[0] - 1f) < eps &&
-                   Math.abs(colors[1] - 1f) < eps &&
-                   Math.abs(colors[2] - 1f) < eps;
         }
 
         private float computeQuadArea(List<RenderCapture.Vertex> verts) {

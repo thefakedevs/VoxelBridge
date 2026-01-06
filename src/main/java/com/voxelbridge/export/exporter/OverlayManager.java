@@ -3,9 +3,10 @@ package com.voxelbridge.export.exporter;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.core.ir.TintMode;
+import com.voxelbridge.core.util.color.ColorMode;
+import com.voxelbridge.core.util.color.ColorModeHandler;
+import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.util.color.ColorModeHandler;
-import com.voxelbridge.export.util.geometry.GeometryUtil;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.util.pool.ObjectPool;
 import net.minecraft.client.Minecraft;
@@ -332,10 +333,10 @@ public final class OverlayManager {
 
                 // Output visible overlay
                 boolean doubleSided = state.getBlock() instanceof BushBlock;
-                ColorModeHandler.ColorData overlayColorData = ColorModeHandler.prepareColors(ctx, overlay.color, true);
+                ColorModeHandler.ColorData overlayColorData = ColorModeHandler.prepareColors(
+                    ctx.getColorMode(), ctx.getColorMapAccess(), overlay.color, true);
                 ctx.registerSpriteMaterial(overlay.spriteKey, overlayMaterialKey);
-                TintMode tintMode = com.voxelbridge.config.ExportRuntimeConfig.getColorMode()
-                    == com.voxelbridge.config.ExportRuntimeConfig.ColorMode.COLORMAP
+                TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
                     ? TintMode.COLORMAP
                     : TintMode.VERTEX_COLOR;
                 sceneSink.addQuad(overlayMaterialKey, overlay.spriteKey, overlay.spriteKey,

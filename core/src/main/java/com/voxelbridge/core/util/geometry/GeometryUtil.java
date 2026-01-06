@@ -1,6 +1,4 @@
-package com.voxelbridge.export.util.geometry;
-
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+package com.voxelbridge.core.util.geometry;
 
 /**
  * Utility class for common geometry and color calculations used across exporters.
@@ -109,10 +107,8 @@ public final class GeometryUtil {
      * @param sprite the texture atlas sprite
      * @return 8 floats representing normalized UVs in [0,1] range
      */
-    public static float[] normalizeUVs(float[] input, TextureAtlasSprite sprite) {
+    public static float[] normalizeUVs(float[] input, float u0, float u1, float v0, float v1) {
         float[] out = new float[8];
-        float u0 = sprite.getU0(), u1 = sprite.getU1();
-        float v0 = sprite.getV0(), v1 = sprite.getV1();
         float du = u1 - u0;
         if (du == 0) du = 1f;
         float dv = v1 - v0;
