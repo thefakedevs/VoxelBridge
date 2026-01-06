@@ -393,7 +393,7 @@ public final class EntityRenderer {
 
                 // Cache atlas sprite pixels for export.
                 if (isAtlasTexture && textureRes.sprite() != null) {
-                    BufferedImage spriteImg = com.voxelbridge.export.texture.TextureLoader.fromSprite(textureRes.sprite());
+                    BufferedImage spriteImg = ctx.getTextureAccess().readSprite(textureRes.sprite());
                     if (spriteImg != null) {
                         ctx.cacheSpriteImage(spriteKey, spriteImg);
                     }

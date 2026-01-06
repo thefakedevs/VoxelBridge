@@ -6,7 +6,6 @@ import com.voxelbridge.core.texture.TextureRepository;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.resources.ResourceLocation;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -80,14 +79,13 @@ public final class TextureExportRegistry {
         String rel = "textures/" + png.getFileName().toString();
         spriteRelativePaths.put(spriteKey, rel);
         if (!Files.exists(png)) {
-            ResourceLocation pngRes = TextureLoader.spriteKeyToTexturePNG(spriteKey);
-            String pngKey = pngRes.toString();
+            String pngKey = ctx.getTextureAccess().spriteKeyToResourceKey(spriteKey);
             BufferedImage image = repo.get(pngKey);
             if (image == null) {
                 image = ctx.getCachedSpriteImage(spriteKey);
             }
             if (image == null) {
-                image = TextureLoader.readTexture(pngRes, ExportRuntimeConfig.isAnimationEnabled());
+                image = ctx.getTextureAccess().readTexture(pngKey, ExportRuntimeConfig.isAnimationEnabled());
                 if (image != null) {
                     repo.put(pngKey, spriteKey, image);
                 }
@@ -147,8 +145,8 @@ public final class TextureExportRegistry {
             image = ctx.getGeneratedEntityTextures().get(spriteKey);
         }
         if (image == null) {
-            ResourceLocation loc = TextureLoader.spriteKeyToTexturePNG(spriteKey);
-            image = TextureLoader.readTexture(loc, ExportRuntimeConfig.isAnimationEnabled());
+            String resourceKey = ctx.getTextureAccess().spriteKeyToResourceKey(spriteKey);
+            image = ctx.getTextureAccess().readTexture(resourceKey, ExportRuntimeConfig.isAnimationEnabled());
         }
         if (image == null) {
             VoxelBridgeLogger.error(LogModule.TEXTURE, String.format("[TextureExport][ERROR] Missing image for %s (target=%s)", spriteKey, target));

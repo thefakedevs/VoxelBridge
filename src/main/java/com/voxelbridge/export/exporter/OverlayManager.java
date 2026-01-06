@@ -4,7 +4,6 @@ import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.texture.TextureLoader;
 import com.voxelbridge.export.util.color.ColorModeHandler;
 import com.voxelbridge.export.util.geometry.GeometryUtil;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
@@ -179,7 +178,7 @@ public final class OverlayManager {
             com.voxelbridge.export.texture.TextureAtlasManager.registerTint(ctx, spriteKey, 0xFFFFFF);
             if (ctx.getCachedSpriteImage(spriteKey) == null) {
                 try {
-                    BufferedImage image = TextureLoader.fromSprite(sprite);
+                    BufferedImage image = ctx.getTextureAccess().readSprite(sprite);
                     if (image != null) {
                         ctx.cacheSpriteImage(spriteKey, image);
                     }

@@ -71,7 +71,7 @@ public final class BlockEntityTextureManager {
         TextureRepository repo = repo(ctx);
         String pngKey = pngLocation.toString();
         BufferedImage texture = repo.computeIfAbsent(pngKey, key -> {
-            BufferedImage img = loadTextureFromResolved(textureRes, pngLocation);
+            BufferedImage img = loadTextureFromResolved(ctx, textureRes, pngLocation);
             if (img != null) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Loaded texture: " + pngLocation + " (" + img.getWidth() + "x" + img.getHeight() + ")");
             } else {
@@ -163,12 +163,12 @@ public final class BlockEntityTextureManager {
         return "textures/blockentity/" + safe(spriteKey) + ".png";
     }
 
-    private static BufferedImage loadTextureFromResource(ResourceLocation location) {
+    private static BufferedImage loadTextureFromResource(ExportContext ctx, ResourceLocation location) {
         try {
             VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Trying to load: " + location);
 
             // Load using TextureLoader to avoid gamma/ICC tweaks and to honor resource packs
-            return com.voxelbridge.export.texture.TextureLoader.readTexture(location);
+            return ctx.getTextureAccess().readTexture(location.toString());
 
         } catch (Exception e) {
             VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Error loading texture " + location + ": " + e.getMessage());
@@ -176,21 +176,21 @@ public final class BlockEntityTextureManager {
         }
     }
 
-    private static BufferedImage loadTextureFromResolved(ResolvedTexture textureRes, ResourceLocation location) {
+    private static BufferedImage loadTextureFromResolved(ExportContext ctx, ResolvedTexture textureRes, ResourceLocation location) {
         if (textureRes.isAtlasTexture()) {
             TextureAtlasSprite sprite = textureRes.sprite();
             if (sprite != null) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Loading atlas sprite " + sprite.contents().name() +
                     " from atlas " + sprite.atlasLocation());
-                return loadAtlasSprite(sprite);
+                return loadAtlasSprite(ctx, sprite);
             }
         }
-        return loadTextureFromResource(location);
+        return loadTextureFromResource(ctx, location);
     }
 
-    private static BufferedImage loadAtlasSprite(TextureAtlasSprite sprite) {
+    private static BufferedImage loadAtlasSprite(ExportContext ctx, TextureAtlasSprite sprite) {
         try {
-            return com.voxelbridge.export.texture.TextureLoader.fromSprite(sprite);
+            return ctx.getTextureAccess().readSprite(sprite);
         } catch (Exception e) {
             VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Error loading atlas sprite " + sprite.contents().name() + ": " + e.getMessage());
             return null;
@@ -244,7 +244,7 @@ public final class BlockEntityTextureManager {
 
         // Normal
         if (ctx.getCachedSpriteImage(normalKey(spriteKey)) == null) {
-            BufferedImage atlasImg = TextureLoader.readTexture(atlasNormal);
+            BufferedImage atlasImg = ctx.getTextureAccess().readTexture(atlasNormal.toString());
             BufferedImage cropped = crop(atlasImg, u0, u1, v0, v1);
             if (cropped != null) {
                 ResourceLocation genLoc = generatedLocation(normalKey(spriteKey));
@@ -258,7 +258,7 @@ public final class BlockEntityTextureManager {
         }
         // Specular
         if (ctx.getCachedSpriteImage(specKey(spriteKey)) == null) {
-            BufferedImage atlasImg = TextureLoader.readTexture(atlasSpec);
+            BufferedImage atlasImg = ctx.getTextureAccess().readTexture(atlasSpec.toString());
             BufferedImage cropped = crop(atlasImg, u0, u1, v0, v1);
             if (cropped != null) {
                 ResourceLocation genLoc = generatedLocation(specKey(spriteKey));
@@ -300,7 +300,7 @@ public final class BlockEntityTextureManager {
 
         if (needNormal) {
             ResourceLocation sibNormal = appendSuffix(pngBase, "_n");
-            BufferedImage img = TextureLoader.readTexture(sibNormal);
+            BufferedImage img = ctx.getTextureAccess().readTexture(sibNormal.toString());
             if (img != null) {
                 repo(ctx).put(sibNormal.toString(), normalKey(spriteKey), img);
                 ctx.getMaterialPaths().putIfAbsent(normalKey(spriteKey),
@@ -312,7 +312,7 @@ public final class BlockEntityTextureManager {
 
         if (needSpec) {
             ResourceLocation sibSpec = appendSuffix(pngBase, "_s");
-            BufferedImage img = TextureLoader.readTexture(sibSpec);
+            BufferedImage img = ctx.getTextureAccess().readTexture(sibSpec.toString());
             if (img != null) {
                 repo(ctx).put(sibSpec.toString(), specKey(spriteKey), img);
                 ctx.getMaterialPaths().putIfAbsent(specKey(spriteKey),

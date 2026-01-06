@@ -40,7 +40,7 @@ public final class EntityTextureManager {
         BufferedImage cached = repo.get(resourceKey);
         if (cached == null) {
             ResourceLocation pngLoc = resolveTexturePath(texFinal);
-            BufferedImage img = com.voxelbridge.export.texture.TextureLoader.readTexture(pngLoc, com.voxelbridge.config.ExportRuntimeConfig.isAnimationEnabled());
+            BufferedImage img = ctx.getTextureAccess().readTexture(pngLoc.toString(), com.voxelbridge.config.ExportRuntimeConfig.isAnimationEnabled());
             if (img != null) {
                 repo.put(resourceKey, key, img);
             } else {
@@ -115,7 +115,6 @@ public final class EntityTextureManager {
 
     public record TextureHandle(String spriteKey, String materialName, String relativePath, ResourceLocation textureLocation) {}
 }
-
 
 
 

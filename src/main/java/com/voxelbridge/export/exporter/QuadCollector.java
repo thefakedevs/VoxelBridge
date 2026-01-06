@@ -6,7 +6,6 @@ import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.export.util.color.ColorModeHandler;
 import com.voxelbridge.export.util.geometry.GeometryUtil;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -142,7 +141,7 @@ final class QuadCollector implements VertexConsumer {
             return;
         }
 
-        String spriteKey = SpriteKeyResolver.resolve(sprite);
+        String spriteKey = ctx.getTextureAccess().resolveSpriteKey(sprite);
         // Register sprite so animation scan/export (e.g., water_still) is whitelisted
         com.voxelbridge.export.texture.TextureAtlasManager.registerTint(ctx, spriteKey, 0xFFFFFF);
         float[] normalizedUVs = GeometryUtil.normalizeUVs(uvs, sprite);

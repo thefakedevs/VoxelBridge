@@ -81,6 +81,9 @@ neoForge {
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 dependencies {
+    implementation project(':core')
+    shaded project(':core')
+
     // Add Forgified Fabric API
     implementation "org.sinytra.forgified-fabric-api:forgified-fabric-api:${forgified_fabric_api_version}"
 

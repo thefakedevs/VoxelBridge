@@ -53,7 +53,7 @@ public final class PbrTextureHelper {
         // Load normal if missing
         if (normalImg == null && sprite != null && sprite.contents() != null) {
             ResourceLocation baseLoc = sprite.contents().name();
-            PbrLoadResult normalResult = tryLoadPbrResourceRobustWithLocation(baseLoc, "_n");
+            PbrLoadResult normalResult = tryLoadPbrResourceRobustWithLocation(ctx, baseLoc, "_n");
             if (normalResult.image != null) {
                 normalImg = normalResult.image;
                 normalLoc = normalResult.location;
@@ -65,7 +65,7 @@ public final class PbrTextureHelper {
         // Load specular if missing
         if (specImg == null && sprite != null && sprite.contents() != null) {
             ResourceLocation baseLoc = sprite.contents().name();
-            PbrLoadResult specResult = tryLoadPbrResourceRobustWithLocation(baseLoc, "_s");
+            PbrLoadResult specResult = tryLoadPbrResourceRobustWithLocation(ctx, baseLoc, "_s");
             if (specResult.image != null) {
                 specImg = specResult.image;
                 specLoc = specResult.location;
@@ -82,7 +82,7 @@ public final class PbrTextureHelper {
      * Handles non-standard resource pack layouts by trying multiple candidate paths.
      * Returns both the loaded image and its ResourceLocation.
      */
-    private static PbrLoadResult tryLoadPbrResourceRobustWithLocation(ResourceLocation spriteName, String suffix) {
+    private static PbrLoadResult tryLoadPbrResourceRobustWithLocation(ExportContext ctx, ResourceLocation spriteName, String suffix) {
         if (spriteName == null || suffix == null) return new PbrLoadResult(null, null);
 
         String namespace = spriteName.getNamespace();
@@ -123,7 +123,7 @@ public final class PbrTextureHelper {
         // Try each candidate
         for (String candidate : candidates) {
             ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(namespace, candidate);
-            BufferedImage result = TextureLoader.readTexture(loc);
+            BufferedImage result = ctx.getTextureAccess().readTexture(loc.toString());
             if (result != null) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[PBR] Found %s at: %s", suffix, loc));
                 return new PbrLoadResult(result, loc);

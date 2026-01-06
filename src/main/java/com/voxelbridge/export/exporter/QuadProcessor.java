@@ -5,7 +5,6 @@ import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.export.texture.TextureLoader;
 import com.voxelbridge.export.util.color.ColorModeHandler;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
@@ -71,7 +70,7 @@ public final class QuadProcessor {
         TextureAtlasSprite sprite = quad.getSprite();
         if (sprite == null) return;
 
-        String spriteKey = SpriteKeyResolver.resolve(sprite);
+        String spriteKey = ctx.getTextureAccess().resolveSpriteKey(sprite);
 
         // Load PBR textures (once per sprite)
         if (!pbrLoadedSprites.contains(spriteKey)) {
@@ -85,7 +84,7 @@ public final class QuadProcessor {
             com.voxelbridge.export.texture.TextureAtlasManager.registerTint(ctx, spriteKey, 0xFFFFFF);
             if (ctx.getCachedSpriteImage(spriteKey) == null) {
                 try {
-                    BufferedImage img = TextureLoader.fromSprite(sprite);
+                    BufferedImage img = ctx.getTextureAccess().readSprite(sprite);
                     if (img != null) ctx.cacheSpriteImage(spriteKey, img);
                 } catch (Exception ignore) {}
             }

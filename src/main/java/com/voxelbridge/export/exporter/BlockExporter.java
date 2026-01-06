@@ -7,7 +7,6 @@ import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExportResult;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
-import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.modhandler.ModHandledQuads;
 import com.voxelbridge.modhandler.ModHandlerRegistry;
@@ -182,7 +181,7 @@ public final class BlockExporter {
         for (BakedQuad quad : quads) {
             if (quad == null || quad.getSprite() == null) continue;
 
-            String spriteKey = SpriteKeyResolver.resolve(quad.getSprite());
+            String spriteKey = ctx.getTextureAccess().resolveSpriteKey(quad.getSprite());
 
             // Check vanilla overlay
             if (OverlayManager.isVanillaOverlay(spriteKey)) {
@@ -207,7 +206,7 @@ public final class BlockExporter {
             Direction dir = quad.getDirection();
 
             // Skip if processed as overlay
-            String spriteKey = SpriteKeyResolver.resolve(quad.getSprite());
+            String spriteKey = ctx.getTextureAccess().resolveSpriteKey(quad.getSprite());
             if (overlayManager.isProcessedOverlay(spriteKey)) {
                 continue;
             }
@@ -247,7 +246,7 @@ public final class BlockExporter {
             if (quad == null || quad.getSprite() == null) continue;
 
             var sprite = quad.getSprite();
-            String spriteKey = SpriteKeyResolver.resolve(sprite);
+            String spriteKey = ctx.getTextureAccess().resolveSpriteKey(sprite);
             var vertexData = VertexExtractor.extractFromQuad(quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset);
             long posHash = computePositionHash(vertexData.positions());
             boolean approxSquare = isApprox1x1Square(vertexData.positions());

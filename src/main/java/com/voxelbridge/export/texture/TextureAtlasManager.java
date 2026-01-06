@@ -1024,7 +1024,7 @@ public final class TextureAtlasManager {
         if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
             VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen][CACHE MISS] %s not in cache, trying disk", spriteKey));
         }
-        BufferedImage diskImage = TextureLoader.readTexture(textureLocation, ExportRuntimeConfig.isAnimationEnabled());
+        BufferedImage diskImage = ctx.getTextureAccess().readTexture(textureLocation.toString(), ExportRuntimeConfig.isAnimationEnabled());
         if (diskImage != null) {
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen][DISK HIT] Loaded %s from disk (%dx%d)",

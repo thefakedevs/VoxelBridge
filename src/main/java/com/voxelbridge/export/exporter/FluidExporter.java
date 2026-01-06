@@ -2,7 +2,6 @@ package com.voxelbridge.export.exporter;
 
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.export.ExportContext;
-import com.voxelbridge.export.texture.SpriteKeyResolver;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -121,8 +120,8 @@ public final class FluidExporter {
                 ResourceLocation flowLoc = ResourceLocation.fromNamespaceAndPath(namespace, pair[1]);
                 TextureAtlasSprite still = atlas.getSprite(stillLoc);
                 TextureAtlasSprite flow = atlas.getSprite(flowLoc);
-                String stillKey = SpriteKeyResolver.resolve(still);
-                String flowKey = SpriteKeyResolver.resolve(flow);
+                String stillKey = ctx.getTextureAccess().resolveSpriteKey(still);
+                String flowKey = ctx.getTextureAccess().resolveSpriteKey(flow);
 
                 if (stillKey.contains("missingno") || flowKey.contains("missingno")) {
                     continue;

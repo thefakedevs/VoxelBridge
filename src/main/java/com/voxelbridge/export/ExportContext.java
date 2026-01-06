@@ -1,9 +1,12 @@
 package com.voxelbridge.export;
 
 import com.voxelbridge.core.export.ExportState;
+import com.voxelbridge.core.texture.TextureAccess;
 import com.voxelbridge.core.texture.TextureRepository;
+import com.voxelbridge.export.texture.MinecraftTextureAccess;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -22,10 +25,12 @@ public final class ExportContext {
 
     private final SamplerContext sampler;
     private final ExportState state;
+    private final TextureAccess<TextureAtlasSprite> textureAccess;
 
     public ExportContext(Minecraft mc) {
         this.sampler = new SamplerContext(mc);
         this.state = new ExportState();
+        this.textureAccess = MinecraftTextureAccess.INSTANCE;
     }
 
     public SamplerContext sampler() {
@@ -38,6 +43,10 @@ public final class ExportContext {
 
     public Minecraft getMc() {
         return sampler.getMc();
+    }
+
+    public TextureAccess<TextureAtlasSprite> getTextureAccess() {
+        return textureAccess;
     }
 
     public BlockColors getBlockColors() {
