@@ -1,5 +1,6 @@
 package com.voxelbridge.platform.texture;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.Minecraft;
@@ -12,6 +13,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 /**
  * Attempts to read runtime textures from TextureManager when no resource exists.
@@ -29,6 +31,14 @@ final class DynamicTextureReader {
             BufferedImage fromDynamic = readDynamicTexture(texture);
             if (fromDynamic != null) {
                 return fromDynamic;
+            }
+            BufferedImage fromNative = readNativeImageTexture(texture);
+            if (fromNative != null) {
+                return fromNative;
+            }
+            BufferedImage fromGpu = readGpuTexture(texture);
+            if (fromGpu != null) {
+                return fromGpu;
             }
             BufferedImage fromHttp = readHttpTexture(texture);
             if (fromHttp != null) {
@@ -64,6 +74,82 @@ final class DynamicTextureReader {
             VoxelBridgeLogger.warn(LogModule.TEXTURE_RESOLVE, String.format("[DynamicTextureReader][WARN] Failed to read HttpTexture file %s: %s", file, e.getMessage()));
             return null;
         }
+    }
+
+    private static BufferedImage readNativeImageTexture(AbstractTexture texture) {
+        NativeImage nativeImg = findNativeImage(texture);
+        if (nativeImg == null) {
+            nativeImg = invokeNativeImageMethod(texture);
+        }
+        if (nativeImg == null) {
+            return null;
+        }
+        return TextureLoader.fromNativeImage(nativeImg);
+    }
+
+    private static NativeImage findNativeImage(AbstractTexture texture) {
+        Class<?> type = texture.getClass();
+        while (type != null && type != Object.class) {
+            for (Field field : type.getDeclaredFields()) {
+                if (!NativeImage.class.isAssignableFrom(field.getType())) {
+                    continue;
+                }
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(texture);
+                    if (value instanceof NativeImage nativeImg) {
+                        return nativeImg;
+                    }
+                } catch (IllegalAccessException ignored) {
+                    return null;
+                }
+            }
+            type = type.getSuperclass();
+        }
+        return null;
+    }
+
+    private static NativeImage invokeNativeImageMethod(AbstractTexture texture) {
+        Class<?> type = texture.getClass();
+        while (type != null && type != Object.class) {
+            for (Method method : type.getDeclaredMethods()) {
+                if (method.getParameterCount() != 0) {
+                    continue;
+                }
+                if (!NativeImage.class.isAssignableFrom(method.getReturnType())) {
+                    continue;
+                }
+                try {
+                    method.setAccessible(true);
+                    Object value = method.invoke(texture);
+                    if (value instanceof NativeImage nativeImg) {
+                        return nativeImg;
+                    }
+                } catch (ReflectiveOperationException ignored) {
+                    return null;
+                }
+            }
+            type = type.getSuperclass();
+        }
+        return null;
+    }
+
+    private static BufferedImage readGpuTexture(AbstractTexture texture) {
+        try {
+            int id = texture.getId();
+            if (id <= 0) {
+                return null;
+            }
+            Method download = NativeImage.class.getDeclaredMethod("downloadTexture", int.class, boolean.class);
+            download.setAccessible(true);
+            Object value = download.invoke(null, id, false);
+            if (value instanceof NativeImage nativeImg) {
+                return TextureLoader.fromNativeImage(nativeImg);
+            }
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+        return null;
     }
 
     private static File findFileField(AbstractTexture texture) {

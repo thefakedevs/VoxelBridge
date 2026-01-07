@@ -21,6 +21,7 @@ public final class BlockEntityExporter {
     // List of handlers in priority order (specific handlers first, generic last)
     private static final List<BlockEntityHandler> HANDLERS = List.of(
         new BannerBlockEntityHandler(),
+        new SignBlockEntityHandler(),
         new GenericBlockEntityHandler()
     );
 

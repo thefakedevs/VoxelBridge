@@ -70,17 +70,38 @@ public final class BlockEntityTextureManager {
         VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Registering texture: " + spriteKey + " from " + textureKey);
 
         String pngKey = ctx.getTextureAccess().ensurePngKey(textureKey);
+        String rawKey = textureRes.texture() != null ? textureRes.texture().toString() : null;
 
         TextureRepository repo = repo(ctx);
-        BufferedImage texture = repo.computeIfAbsent(pngKey, key -> {
-            BufferedImage img = loadTextureFromResolved(ctx, textureRes, pngKey);
-            if (img != null) {
-                VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Loaded texture: " + pngKey + " (" + img.getWidth() + "x" + img.getHeight() + ")");
-            } else {
-                VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Failed to load texture: " + pngKey);
+        BufferedImage texture = repo.get(pngKey);
+        String loadedKey = pngKey;
+
+        if (texture == null && rawKey != null && !rawKey.equals(pngKey)) {
+            texture = repo.get(rawKey);
+            if (texture != null) {
+                loadedKey = rawKey;
             }
-            return img;
-        });
+        }
+
+        if (texture == null) {
+            texture = loadTextureFromResolved(ctx, textureRes, pngKey);
+            if (texture != null) {
+                loadedKey = pngKey;
+                VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Loaded texture: " + loadedKey + " (" + texture.getWidth() + "x" + texture.getHeight() + ")");
+            }
+        }
+
+        if (texture == null && rawKey != null && !rawKey.equals(pngKey)) {
+            texture = loadTextureFromResolved(ctx, textureRes, rawKey);
+            if (texture != null) {
+                loadedKey = rawKey;
+                VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Loaded texture: " + loadedKey + " (" + texture.getWidth() + "x" + texture.getHeight() + ")");
+            }
+        }
+
+        if (texture == null) {
+            VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Failed to load texture: " + pngKey);
+        }
 
         // Register the texture with the export context (same as old EntityTextureManager)
         if (texture != null) {
@@ -90,15 +111,16 @@ public final class BlockEntityTextureManager {
                     texture = frames.frames().get(0);
                 }
             }
-            repo.put(pngKey, spriteKey, texture);
+            repo.put(loadedKey, spriteKey, texture);
 
             // Register material path (EntityTextureManager line 29-30)
             String relativePath = TexturePathResolver.ensureEntityLikePath(ctx, spriteKey);
 
             // Register texture info with context (EntityTextureManager line 32)
             final BufferedImage texRef = texture;
+            final String loadedKeyFinal = loadedKey;
             ctx.getEntityTextures().computeIfAbsent(spriteKey,
-                k -> new ExportState.EntityTexture(pngKey, texRef.getWidth(), texRef.getHeight()));
+                k -> new ExportState.EntityTexture(loadedKeyFinal, texRef.getWidth(), texRef.getHeight()));
 
             VoxelBridgeLogger.info(LogModule.TEXTURE, "[BlockEntityTex] Registered: " + spriteKey + " -> " + relativePath);
             // Register into shared atlas flow (default tint)

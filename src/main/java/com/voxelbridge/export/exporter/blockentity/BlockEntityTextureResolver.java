@@ -38,6 +38,10 @@ public final class BlockEntityTextureResolver implements TextureResolver<BlockEn
     public ResolvedTexture resolve(BlockEntity blockEntity, RenderType renderType) {
         ResourceLocation base = RenderTypeTextureResolver.INSTANCE.resolve(renderType);
 
+        if (isTextRenderType(renderType)) {
+            return base != null ? resolveTextureWithAtlasDetection(base) : null;
+        }
+
         // First try entity-specific resolution (for known BlockEntity types)
         ResolvedTexture mapped = resolveFromBlockEntity(blockEntity, base);
         if (mapped != null) {
@@ -100,6 +104,17 @@ public final class BlockEntityTextureResolver implements TextureResolver<BlockEn
      */
     private static boolean isMissingSprite(net.minecraft.client.renderer.texture.TextureAtlasSprite sprite) {
         return sprite.contents().name().toString().contains("missingno");
+    }
+
+    private static boolean isTextRenderType(RenderType renderType) {
+        if (renderType == null) {
+            return false;
+        }
+        String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
+        return name.contains("text_")
+            || name.contains("neoforge_text")
+            || name.contains("font")
+            || name.contains("glyph");
     }
 
     /**

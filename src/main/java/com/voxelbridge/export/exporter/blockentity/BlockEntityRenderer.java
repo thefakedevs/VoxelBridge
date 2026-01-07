@@ -24,7 +24,10 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
+import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Renders BlockEntities and captures their geometry to an IR sink.
@@ -242,6 +245,7 @@ public final class BlockEntityRenderer {
      * Captures rendered geometry from BlockEntity renderers.
      */
     private static class CaptureBuffer extends CaptureBufferBase {
+        private static final Set<String> LOGGED_TEXT_TYPES = ConcurrentHashMap.newKeySet();
         private final double offsetX, offsetY, offsetZ;
         private final BlockEntity blockEntity;
         private final TextureOverrideMap overrides;
@@ -270,6 +274,10 @@ public final class BlockEntityRenderer {
         @Override
         public void onQuad(RenderType renderType, List<RenderCapture.Vertex> verts) {
             if (verts.size() < 3) return;
+
+            if (shouldSkipTextQuad(renderType)) {
+                return;
+            }
 
             boolean logQuads = VoxelBridgeLogger.isDebugEnabled(LogModule.BLOCKENTITY);
             if (logQuads) {
@@ -318,6 +326,7 @@ public final class BlockEntityRenderer {
 
             int vertCount = Math.min(4, verts.size());
             RenderCaptureUtil.UvStats uvStats = RenderCaptureUtil.computeUvStats(verts);
+            logTextUvOnce(renderType, uvStats);
 
             // Handle atlas texture resolution via locator if needed
             if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
@@ -390,6 +399,13 @@ public final class BlockEntityRenderer {
 
             fillUvs(verts, uv0, isAtlasTexture, u0, u1, v0, v1);
 
+            if (!isAtlasTexture && textureRes != null && (uvStats.maxU() > 1f || uvStats.maxV() > 1f)) {
+                BufferedImage img = ctx.getCachedSpriteImage(spriteKey);
+                if (img != null) {
+                    fillUvsPixels(verts, uv0, img.getWidth(), img.getHeight());
+                }
+            }
+
             // NOTE: UV remapping to atlas space is handled by GltfSceneBuilder.remapUV()
             // to avoid double transformation. Do NOT remap UVs here.
             // Keep UVs in sprite space (0-1) for now, consistent with BlockExporter and FluidExporter.
@@ -410,6 +426,17 @@ public final class BlockEntityRenderer {
                 positions, uv0, colorResult.uv1(), NORMAL_UP, colors);
         }
 
+        private boolean shouldSkipTextQuad(RenderType renderType) {
+            if (renderType == null) {
+                return false;
+            }
+            String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
+            return name.contains("text_")
+                || name.contains("neoforge_text")
+                || name.contains("font")
+                || name.contains("glyph");
+        }
+
         private void fillUvs(List<RenderCapture.Vertex> verts, float[] uv0, boolean isAtlas, float u0, float u1, float v0, float v1) {
             int count = Math.min(4, verts.size());
             if (isAtlas) {
@@ -417,6 +444,46 @@ public final class BlockEntityRenderer {
             } else {
                 RenderCaptureUtil.fillUvsClamp(verts, uv0);
             }
+        }
+
+        private void fillUvsPixels(List<RenderCapture.Vertex> verts, float[] uv0, int width, int height) {
+            int count = Math.min(4, verts.size());
+            float invW = width <= 0 ? 1f : 1f / width;
+            float invH = height <= 0 ? 1f : 1f / height;
+            for (int i = 0; i < count; i++) {
+                RenderCapture.Vertex v = verts.get(i);
+                float su = v.u * invW;
+                float sv = v.v * invH;
+                su = Math.max(0f, Math.min(1f, su));
+                sv = Math.max(0f, Math.min(1f, sv));
+                uv0[i * 2] = su;
+                uv0[i * 2 + 1] = sv;
+            }
+        }
+
+        private void logTextUvOnce(RenderType renderType, RenderCaptureUtil.UvStats uvStats) {
+            if (renderType == null || uvStats == null) {
+                return;
+            }
+            String name = renderType.toString();
+            String lower = name.toLowerCase(java.util.Locale.ROOT);
+            boolean isText = lower.contains("text_")
+                || lower.contains("neoforge_text")
+                || lower.contains("font")
+                || lower.contains("glyph");
+            if (!isText) {
+                return;
+            }
+            if (!LOGGED_TEXT_TYPES.add(name)) {
+                return;
+            }
+            VoxelBridgeLogger.info(LogModule.TEXTURE_RESOLVE, String.format(
+                "[BlockEntityRenderer] text UV rawU=%s rawV=%s wrappedU=%s wrappedV=%s",
+                java.util.Arrays.toString(uvStats.rawU()),
+                java.util.Arrays.toString(uvStats.rawV()),
+                java.util.Arrays.toString(uvStats.wrappedU()),
+                java.util.Arrays.toString(uvStats.wrappedV())
+            ));
         }
 
         private float computeQuadArea(List<RenderCapture.Vertex> verts) {

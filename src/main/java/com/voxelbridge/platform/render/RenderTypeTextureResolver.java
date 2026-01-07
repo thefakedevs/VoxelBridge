@@ -38,6 +38,7 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
 
         ResourceLocation fromState = extractFromState(renderType);
         if (fromState != null) {
+            logTextRenderType(renderType, fromState);
             return sanitize(fromState);
         }
 
@@ -46,7 +47,13 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
             // This uses reflection since RenderType internals are not part of the public API
             ResourceLocation extracted = extractTextureViaReflection(renderType);
             if (extracted != null) {
+                logTextRenderType(renderType, extracted);
                 return sanitize(extracted);
+            }
+            ResourceLocation fromFields = extractFromRenderTypeFields(renderType);
+            if (fromFields != null) {
+                logTextRenderType(renderType, fromFields);
+                return sanitize(fromFields);
             }
         } catch (Exception e) {
             // Log reflection failure for debugging
@@ -54,6 +61,7 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
                 renderType + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
         }
 
+        logTextRenderType(renderType, null);
         return null;
     }
 
@@ -103,9 +111,48 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
             if (result instanceof Optional<?> opt && opt.isPresent() && opt.get() instanceof ResourceLocation loc) {
                 return loc;
             }
+            return extractFromTextureState(textureState);
         } catch (Exception ignored) {
         }
         return null;
+    }
+
+    private static ResourceLocation extractFromTextureState(Object textureState) {
+        if (textureState == null) {
+            return null;
+        }
+        for (String methodName : new String[] {"texture", "textureLocation", "getTexture", "getTextureLocation", "location", "getLocation"}) {
+            try {
+                Method method = textureState.getClass().getDeclaredMethod(methodName);
+                method.setAccessible(true);
+                Object value = method.invoke(textureState);
+                ResourceLocation loc = unwrapLocation(value);
+                if (loc != null) {
+                    return loc;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        for (String fieldName : new String[] {"texture", "location", "resourceLocation", "loc"}) {
+            try {
+                Field field = textureState.getClass().getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object value = field.get(textureState);
+                ResourceLocation loc = unwrapLocation(value);
+                if (loc != null) {
+                    return loc;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static ResourceLocation unwrapLocation(Object value) {
+        if (value instanceof Optional<?> opt) {
+            value = opt.orElse(null);
+        }
+        return value instanceof ResourceLocation loc ? loc : null;
     }
 
     private static RenderType.CompositeState compositeState(RenderType renderType) {
@@ -145,10 +192,103 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
                     }
                 }
             }
+            String optional = parseOptionalTexture(name);
+            if (optional != null) {
+                return ResourceLocation.parse(optional);
+            }
         } catch (Exception e) {
             // Ignore
         }
         return null;
+    }
+
+    private static ResourceLocation extractFromRenderTypeFields(RenderType renderType) {
+        if (renderType == null) {
+            return null;
+        }
+        java.util.IdentityHashMap<Object, Boolean> seen = new java.util.IdentityHashMap<>();
+        return scanForLocation(renderType, 2, seen);
+    }
+
+    private static ResourceLocation scanForLocation(Object value, int depth,
+                                                    java.util.IdentityHashMap<Object, Boolean> seen) {
+        if (value == null || depth < 0) {
+            return null;
+        }
+        if (value instanceof ResourceLocation loc) {
+            return loc;
+        }
+        if (value instanceof Optional<?> opt) {
+            Object inner = opt.orElse(null);
+            if (inner instanceof ResourceLocation loc) {
+                return loc;
+            }
+        }
+        String typeName = value.getClass().getName();
+        if (typeName.startsWith("java.") || typeName.startsWith("javax.")
+            || typeName.startsWith("sun.") || typeName.startsWith("jdk.")) {
+            return null;
+        }
+        if (value instanceof Iterable<?> iterable) {
+            for (Object item : iterable) {
+                ResourceLocation loc = scanForLocation(item, depth - 1, seen);
+                if (loc != null) {
+                    return loc;
+                }
+            }
+        }
+        Class<?> type = value.getClass();
+        if (type.isArray()) {
+            int len = java.lang.reflect.Array.getLength(value);
+            for (int i = 0; i < len; i++) {
+                Object item = java.lang.reflect.Array.get(value, i);
+                ResourceLocation loc = scanForLocation(item, depth - 1, seen);
+                if (loc != null) {
+                    return loc;
+                }
+            }
+            return null;
+        }
+        if (seen.put(value, Boolean.TRUE) != null) {
+            return null;
+        }
+        while (type != null && type != Object.class) {
+            Field[] fields = type.getDeclaredFields();
+            for (Field field : fields) {
+                try {
+                    field.setAccessible(true);
+                    Object fieldValue = field.get(value);
+                    ResourceLocation loc = scanForLocation(fieldValue, depth - 1, seen);
+                    if (loc != null) {
+                        return loc;
+                    }
+                } catch (IllegalAccessException ignored) {
+                }
+            }
+            type = type.getSuperclass();
+        }
+        return null;
+    }
+
+    private static String parseOptionalTexture(String renderTypeString) {
+        if (renderTypeString == null) {
+            return null;
+        }
+        String marker = "texture[Optional[";
+        int start = renderTypeString.indexOf(marker);
+        if (start < 0) {
+            return null;
+        }
+        int valueStart = start + marker.length();
+        int valueEnd = renderTypeString.indexOf("]", valueStart);
+        if (valueEnd <= valueStart) {
+            return null;
+        }
+        String tex = renderTypeString.substring(valueStart, valueEnd).trim();
+        if (tex.isEmpty() || "empty".equals(tex)) {
+            return null;
+        }
+        return tex;
     }
 
     private static ResourceLocation sanitize(ResourceLocation loc) {
@@ -165,5 +305,21 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
             return loc;
         }
         return ResourceLocation.fromNamespaceAndPath(namespace, path);
+    }
+
+    private static void logTextRenderType(RenderType renderType, ResourceLocation loc) {
+        if (renderType == null) {
+            return;
+        }
+        String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
+        boolean isText = name.contains("text_")
+            || name.contains("neoforge_text")
+            || name.contains("font")
+            || name.contains("glyph");
+        if (!isText) {
+            return;
+        }
+        VoxelBridgeLogger.info(LogModule.TEXTURE_RESOLVE,
+            "[RenderTypeTextureResolver] text renderType=" + renderType + " resolved=" + loc);
     }
 }
