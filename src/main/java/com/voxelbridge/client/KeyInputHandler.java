@@ -2,7 +2,7 @@ package com.voxelbridge.client;
 
 import com.voxelbridge.export.ExportControl;
 import com.voxelbridge.util.client.RayCastUtil;
-import net.minecraft.client.Minecraft;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -13,7 +13,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 public class KeyInputHandler {
 
     public static void onClientTick(ClientTickEvent.Post event) {
-        Minecraft mc = Minecraft.getInstance();
+        var mc = ClientAccessHolder.get().getMinecraft();
         if (mc.player == null || mc.level == null) {
             return;
         }

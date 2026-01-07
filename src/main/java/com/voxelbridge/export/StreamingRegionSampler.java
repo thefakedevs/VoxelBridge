@@ -8,6 +8,7 @@ import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
 import com.voxelbridge.util.client.ProgressNotifier;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -91,7 +92,7 @@ public final class StreamingRegionSampler {
             : 0;
 
         var chunkCache = clientLevel.getChunkSource();
-        Minecraft mc = Minecraft.getInstance();
+        Minecraft mc = ClientAccessHolder.get().getMinecraft();
 
         int threadCount = ExportRuntimeConfig.getExportThreadCount();
         int cpuCores = Runtime.getRuntime().availableProcessors();
@@ -563,7 +564,7 @@ public final class StreamingRegionSampler {
 
     private static boolean isChunkRenderable(Level level, ChunkPos chunkPos) {
         if (!(level instanceof ClientLevel clientLevel)) return true;
-        Minecraft mc = Minecraft.getInstance();
+        Minecraft mc = ClientAccessHolder.get().getMinecraft();
         if (mc.player != null && mc.options != null) {
             ChunkPos p = mc.player.chunkPosition();
             if (Math.max(Math.abs(chunkPos.x - p.x), Math.abs(chunkPos.z - p.z)) > mc.options.getEffectiveRenderDistance()) return true;

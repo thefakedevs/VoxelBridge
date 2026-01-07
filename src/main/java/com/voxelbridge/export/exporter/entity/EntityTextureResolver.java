@@ -2,6 +2,7 @@ package com.voxelbridge.export.exporter.entity;
 
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
@@ -68,7 +69,7 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
 
             // Paintings use the painting atlas; let the atlas locator choose the correct sprite per-quad
             try {
-                var paintingAtlas = net.minecraft.client.Minecraft.getInstance().getPaintingTextures();
+                var paintingAtlas = ClientAccessHolder.get().getPaintingTextures();
                 var backSprite = paintingAtlas.getBackSprite();
                 if (backSprite != null) {
                     ResourceLocation atlas = backSprite.atlasLocation();
@@ -162,7 +163,7 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
 
         for (ResourceLocation atlas : knownAtlases) {
             try {
-                var atlasGetter = net.minecraft.client.Minecraft.getInstance().getTextureAtlas(atlas);
+                var atlasGetter = ClientAccessHolder.get().getTextureAtlas(atlas);
                 if (atlasGetter != null) {
                     var sprite = atlasGetter.apply(texture);
                     if (sprite != null && !isMissingSprite(sprite)) {

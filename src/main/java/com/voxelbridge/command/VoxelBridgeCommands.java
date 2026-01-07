@@ -6,8 +6,8 @@ import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.export.CoordinateMode;
 import com.voxelbridge.export.ExportControl;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.util.client.RayCastUtil;
-import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -46,7 +46,7 @@ public final class VoxelBridgeCommands {
         var root = Commands.literal("voxelbridge");
 
         root.then(Commands.literal("pos1").executes(ctx -> {
-            Minecraft mc = Minecraft.getInstance();
+            var mc = ClientAccessHolder.get().getMinecraft();
             BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
             if (hit == null) {
                 ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No block targeted."));
@@ -58,7 +58,7 @@ public final class VoxelBridgeCommands {
         }));
 
         root.then(Commands.literal("pos2").executes(ctx -> {
-            Minecraft mc = Minecraft.getInstance();
+            var mc = ClientAccessHolder.get().getMinecraft();
             BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
             if (hit == null) {
                 ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No block targeted."));
@@ -321,7 +321,7 @@ public final class VoxelBridgeCommands {
         );
 
         root.then(Commands.literal("export").executes(ctx -> {
-            Minecraft mc = Minecraft.getInstance();
+            var mc = ClientAccessHolder.get().getMinecraft();
             ExportControl.ExportResult result = ExportControl.startExport(mc.level);
             ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] " + result.message()));
             return result.started() ? 1 : 0;

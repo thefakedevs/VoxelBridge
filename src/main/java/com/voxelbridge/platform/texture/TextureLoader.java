@@ -2,9 +2,9 @@ package com.voxelbridge.platform.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.config.ExportRuntimeConfig;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
@@ -37,7 +37,7 @@ public final class TextureLoader {
             VoxelBridgeLogger.info(LogModule.TEXTURE_RESOLVE, String.format("[TextureLoader] Resolving %s", png));
         }
         try {
-            var rm = Minecraft.getInstance().getResourceManager();
+            var rm = ClientAccessHolder.get().getResourceManager();
             var opt = rm.getResource(png);
             if (opt.isEmpty()) {
                 if (logResolve) {

@@ -9,7 +9,7 @@ import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.util.pool.ObjectPool;
-import net.minecraft.client.Minecraft;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -387,7 +387,7 @@ public final class OverlayManager {
         }
 
         if (quad.getTintIndex() >= 0) {
-            int argb = Minecraft.getInstance().getBlockColors().getColor(state, level, pos, quad.getTintIndex());
+            int argb = ClientAccessHolder.get().getMinecraft().getBlockColors().getColor(state, level, pos, quad.getTintIndex());
             return (argb == -1) ? 0xFFFFFFFF : argb;
         }
 

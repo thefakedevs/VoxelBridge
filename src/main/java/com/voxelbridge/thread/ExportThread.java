@@ -1,9 +1,9 @@
 package com.voxelbridge.thread;
 
 import com.voxelbridge.export.scene.gltf.GltfExportService;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
@@ -31,7 +31,7 @@ public class ExportThread extends Thread {
 
     @Override
     public void run() {
-        Minecraft mc = Minecraft.getInstance();
+        var mc = ClientAccessHolder.get().getMinecraft();
         try {
             long start = System.currentTimeMillis();
 

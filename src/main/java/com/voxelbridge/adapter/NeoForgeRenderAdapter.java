@@ -4,7 +4,7 @@ import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.modhandler.frapi.FabricApiHelper;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
 import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
-import net.minecraft.client.Minecraft;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -28,7 +28,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
 
     @Override
     public BakedModel getBlockModel(BlockState state) {
-        var modelManager = Minecraft.getInstance().getModelManager();
+        var modelManager = ClientAccessHolder.get().getModelManager();
         if (modelManager == null) {
             return null;
         }
@@ -85,7 +85,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
     }
 
     private SpriteFinder getSpriteFinder() {
-        var modelManager = Minecraft.getInstance().getModelManager();
+        var modelManager = ClientAccessHolder.get().getModelManager();
         if (modelManager == null) {
             return null;
         }

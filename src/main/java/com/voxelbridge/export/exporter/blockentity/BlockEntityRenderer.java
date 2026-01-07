@@ -8,13 +8,13 @@ import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.platform.render.capture.CaptureBufferBase;
 import com.voxelbridge.platform.render.capture.RenderCapture;
 import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -43,7 +43,7 @@ public final class BlockEntityRenderer {
         0f, 1f, 0f,
         0f, 1f, 0f
     };
-    private static AtlasLocator ATLAS_LOCATOR = new BlockEntityAtlasLocator(Minecraft.getInstance());
+    private static AtlasLocator ATLAS_LOCATOR = new BlockEntityAtlasLocator(ClientAccessHolder.get());
     private static final ThreadLocal<TextureOverrideMap> OVERRIDES = new ThreadLocal<>();
     private static TextureResolver<BlockEntity> TEXTURE_RESOLVER = BlockEntityTextureResolver.INSTANCE;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;

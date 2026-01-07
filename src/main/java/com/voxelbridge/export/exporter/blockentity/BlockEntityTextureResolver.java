@@ -2,6 +2,7 @@ package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.util.debug.LogModule;
 import net.minecraft.client.renderer.RenderType;
@@ -75,7 +76,7 @@ public final class BlockEntityTextureResolver implements TextureResolver<BlockEn
         // Try each atlas to see if the texture is there
         for (ResourceLocation atlas : knownAtlases) {
             try {
-                var atlasGetter = net.minecraft.client.Minecraft.getInstance().getTextureAtlas(atlas);
+                var atlasGetter = ClientAccessHolder.get().getTextureAtlas(atlas);
                 if (atlasGetter != null) {
                     var sprite = atlasGetter.apply(texture);
                     if (sprite != null && !isMissingSprite(sprite)) {
@@ -233,7 +234,7 @@ public final class BlockEntityTextureResolver implements TextureResolver<BlockEn
 
         try {
             // Load the sprite from the atlas to get UV bounds
-            var atlasGetter = net.minecraft.client.Minecraft.getInstance().getTextureAtlas(atlas);
+            var atlasGetter = ClientAccessHolder.get().getTextureAtlas(atlas);
             if (atlasGetter != null) {
                 var atlasSprite = atlasGetter.apply(texture);
                 if (atlasSprite != null && !isMissingSprite(atlasSprite)) {

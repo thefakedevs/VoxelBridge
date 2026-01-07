@@ -1,9 +1,9 @@
 package com.voxelbridge.platform.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.texture.HttpTexture;
@@ -24,7 +24,7 @@ final class DynamicTextureReader {
 
     static BufferedImage tryRead(ResourceLocation location) {
         try {
-            AbstractTexture texture = Minecraft.getInstance().getTextureManager().getTexture(location, null);
+            AbstractTexture texture = ClientAccessHolder.get().getTextureManager().getTexture(location, null);
             if (texture == null) {
                 return null;
             }

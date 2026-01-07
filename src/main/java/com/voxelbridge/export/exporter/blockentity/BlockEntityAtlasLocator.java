@@ -1,7 +1,7 @@
 package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
-import net.minecraft.client.Minecraft;
+import com.voxelbridge.platform.client.ClientAccess;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
@@ -13,10 +13,10 @@ import net.neoforged.api.distmarker.OnlyIn;
  */
 @OnlyIn(Dist.CLIENT)
 final class BlockEntityAtlasLocator implements AtlasLocator {
-    private final Minecraft mc;
+    private final ClientAccess clientAccess;
 
-    BlockEntityAtlasLocator(Minecraft mc) {
-        this.mc = mc;
+    BlockEntityAtlasLocator(ClientAccess clientAccess) {
+        this.clientAccess = clientAccess;
     }
 
     @Override
@@ -24,7 +24,7 @@ final class BlockEntityAtlasLocator implements AtlasLocator {
         if (atlasLocation == null) {
             return null;
         }
-        var tex = mc.getTextureManager().getTexture(atlasLocation);
+        var tex = clientAccess.getTextureManager().getTexture(atlasLocation);
         if (!(tex instanceof TextureAtlas atlas)) {
             return null;
         }

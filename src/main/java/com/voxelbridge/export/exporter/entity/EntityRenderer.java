@@ -9,13 +9,13 @@ import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.export.texture.EntityTextureManager;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.platform.render.capture.CaptureBufferBase;
 import com.voxelbridge.platform.render.capture.RenderCapture;
 import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.resources.ResourceLocation;
@@ -39,7 +39,7 @@ public final class EntityRenderer {
         0f, 1f, 0f,
         0f, 1f, 0f
     };
-    private static AtlasLocator ATLAS_LOCATOR = new EntityAtlasLocator(Minecraft.getInstance());
+    private static AtlasLocator ATLAS_LOCATOR = new EntityAtlasLocator(ClientAccessHolder.get());
     private static TextureResolver<Entity> TEXTURE_RESOLVER = EntityTextureResolver.INSTANCE;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
 

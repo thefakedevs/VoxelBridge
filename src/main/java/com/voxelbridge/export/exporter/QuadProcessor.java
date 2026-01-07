@@ -7,7 +7,7 @@ import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.core.util.color.ColorModeHandler;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
-import net.minecraft.client.Minecraft;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
@@ -147,7 +147,7 @@ public final class QuadProcessor {
      */
     private int computeTintColor(BlockState state, BlockPos pos, BakedQuad quad) {
         if (quad.getTintIndex() < 0) return -1;
-        return Minecraft.getInstance().getBlockColors().getColor(state, level, pos, quad.getTintIndex());
+        return ClientAccessHolder.get().getMinecraft().getBlockColors().getColor(state, level, pos, quad.getTintIndex());
     }
 
     private boolean hasBakedColors(int[] colors) {

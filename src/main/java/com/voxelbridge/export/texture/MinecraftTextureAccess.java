@@ -2,6 +2,7 @@ package com.voxelbridge.export.texture;
 
 import com.voxelbridge.core.texture.AnimationMetadata;
 import com.voxelbridge.core.texture.TextureAccess;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.texture.TextureLoader;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
@@ -60,7 +61,7 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
             return null;
         }
         try {
-            var rm = net.minecraft.client.Minecraft.getInstance().getResourceManager();
+            var rm = ClientAccessHolder.get().getResourceManager();
             ResourceLocation loc = ResourceLocation.parse(resourceKey);
             var resOpt = rm.getResource(loc);
             if (resOpt.isEmpty()) {
@@ -92,7 +93,7 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
             return false;
         }
         try {
-            var rm = net.minecraft.client.Minecraft.getInstance().getResourceManager();
+            var rm = ClientAccessHolder.get().getResourceManager();
             return rm.getResource(ResourceLocation.parse(resourceKey)).isPresent();
         } catch (Exception ignored) {
             return false;
@@ -106,7 +107,7 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
         }
         String cleanPath = pathPrefix.endsWith("/") ? pathPrefix.substring(0, pathPrefix.length() - 1) : pathPrefix;
         try {
-            var rm = net.minecraft.client.Minecraft.getInstance().getResourceManager();
+            var rm = ClientAccessHolder.get().getResourceManager();
             return rm.listResources(cleanPath, loc -> loc.getPath().endsWith(".png"))
                 .keySet()
                 .stream()
@@ -123,7 +124,7 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
             return null;
         }
         try {
-            var rm = net.minecraft.client.Minecraft.getInstance().getResourceManager();
+            var rm = ClientAccessHolder.get().getResourceManager();
             var resOpt = rm.getResource(ResourceLocation.parse(resourceKey));
             if (resOpt.isEmpty()) {
                 return null;

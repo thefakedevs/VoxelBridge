@@ -8,10 +8,10 @@ import com.voxelbridge.export.ExportProgressTracker;
 import com.voxelbridge.export.StreamingRegionSampler;
 import com.voxelbridge.export.texture.TextureAtlasManager;
 import com.voxelbridge.export.texture.TextureExportPipeline;
+import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.util.client.ProgressNotifier;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
@@ -74,7 +74,7 @@ public final class GltfExportService {
                 minX, maxX, minY, maxY, minZ, maxZ));
 
         // Initialize export context
-        Minecraft mc = Minecraft.getInstance();
+        var mc = ClientAccessHolder.get().getMinecraft();
         ExportContext ctx = new ExportContext(mc);
         ctx.resetConsumedBlocks();
         ctx.clearTextureState();

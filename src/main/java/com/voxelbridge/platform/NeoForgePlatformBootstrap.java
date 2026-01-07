@@ -5,9 +5,9 @@ import com.voxelbridge.client.KeyBindings;
 import com.voxelbridge.client.KeyInputHandler;
 import com.voxelbridge.client.SelectionRenderer;
 import com.voxelbridge.command.VoxelBridgeCommands;
+import com.voxelbridge.platform.neoforge.NeoForgeEventBusBridge;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.neoforge.common.NeoForge;
 
 /**
  * NeoForge event registration for client-only hooks.
@@ -28,10 +28,11 @@ public final class NeoForgePlatformBootstrap implements PlatformBootstrap {
             return;
         }
 
-        modBus.addListener(KeyBindings::onRegisterKeyMappings);
-        NeoForge.EVENT_BUS.addListener(VoxelBridgeCommands::register);
-        NeoForge.EVENT_BUS.addListener(KeyInputHandler::onClientTick);
-        NeoForge.EVENT_BUS.addListener(SelectionRenderer::onRenderLevel);
-        NeoForge.EVENT_BUS.addListener(HudOverlayRenderer::onRenderGui);
+        Object gameBus = NeoForgeEventBusBridge.resolveGameBus(modBus);
+        NeoForgeEventBusBridge.addListener(modBus, KeyBindings::onRegisterKeyMappings);
+        NeoForgeEventBusBridge.addListener(gameBus, VoxelBridgeCommands::register);
+        NeoForgeEventBusBridge.addListener(gameBus, KeyInputHandler::onClientTick);
+        NeoForgeEventBusBridge.addListener(gameBus, SelectionRenderer::onRenderLevel);
+        NeoForgeEventBusBridge.addListener(gameBus, HudOverlayRenderer::onRenderGui);
     }
 }
