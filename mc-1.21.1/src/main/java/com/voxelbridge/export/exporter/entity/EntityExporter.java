@@ -80,7 +80,7 @@ public final class EntityExporter {
         if (entity instanceof net.minecraft.world.entity.Mob mob && !mob.isNoAi()) {
             return false;
         }
-        // Explicitly skip players regardless of AI flag.
-        return !(entity instanceof Player);
+        // Players are allowed for export (model + cape/elytra render layers).
+        return true;
     }
 }

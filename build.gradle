@@ -1,169 +1,17 @@
-import org.gradle.api.tasks.bundling.Jar
-
 plugins {
-    id 'java-library'
-    id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.116'
-    // Shadow 9.x supports Gradle 9; older 8.x throws MissingPropertyException on FileCopyDetails.mode
-    id 'com.gradleup.shadow' version '9.2.2'
-    id 'idea'
+    id 'base'
 }
 
 tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = mod_version
-group = mod_group_id
+def activeMc = (findProperty('active_mc') ?: '1.21.1').toString()
 
-repositories {
-    // Sinytra Maven repo for Forgified Fabric API
-    maven {
-        url "https://maven.su5ed.dev/releases"
-    }
-    mavenCentral()
-}
-
-base {
-    archivesName = mod_id
-}
-
-// Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-
-configurations {
-    shaded
-}
-
-neoForge {
-    version = project.neo_version
-
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
-
-    runs {
-        client {
-            client()
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        server {
-            server()
-            programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        gameTestServer {
-            type = "gameTestServer"
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        data {
-            data()
-            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
-        }
-
-        configureEach {
-            systemProperty 'forge.logging.markers', 'REGISTRIES'
-            logLevel = org.slf4j.event.Level.DEBUG
-        }
-    }
-
-    mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
+subprojects { subproj ->
+    if (subproj.name.startsWith('mc-') && subproj.name != "mc-${activeMc}") {
+        subproj.tasks.configureEach { task ->
+            task.enabled = false
         }
     }
 }
-
-sourceSets.main.resources { srcDir 'src/generated/resources' }
-
-dependencies {
-    implementation project(':core')
-    shaded project(':core')
-
-    // Add Forgified Fabric API
-    implementation "org.sinytra.forgified-fabric-api:forgified-fabric-api:${forgified_fabric_api_version}"
-
-    def jgltfVersion = '2.0.4'
-
-    compileOnly "org.apache.logging.log4j:log4j-api:2.20.0"
-    compileOnly "org.apache.logging.log4j:log4j-core:2.20.0"
-
-    implementation "de.javagl:jgltf-model:${jgltfVersion}"
-    implementation "de.javagl:jgltf-impl-v1:${jgltfVersion}"
-    implementation "de.javagl:jgltf-impl-v2:${jgltfVersion}"
-    implementation "ar.com.hjg:pngj:2.1.0"
-    implementation "net.sf.trove4j:trove4j:3.0.3"
-
-    shaded "de.javagl:jgltf-model:${jgltfVersion}"
-    shaded "de.javagl:jgltf-impl-v1:${jgltfVersion}"
-    shaded "de.javagl:jgltf-impl-v2:${jgltfVersion}"
-    shaded "ar.com.hjg:pngj:2.1.0"
-    shaded "net.sf.trove4j:trove4j:3.0.3"
-}
-
-var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
-    var replaceProperties = [
-            minecraft_version      : minecraft_version,
-            minecraft_version_range: minecraft_version_range,
-            neo_version            : neo_version,
-            loader_version_range   : loader_version_range,
-            mod_id                 : mod_id,
-            mod_name               : mod_name,
-            mod_license            : mod_license,
-            mod_version            : mod_version,
-            mod_authors            : mod_authors,
-            mod_description        : mod_description
-    ]
-    inputs.properties replaceProperties
-    expand replaceProperties
-    from "src/main/templates"
-    into "build/generated/sources/modMetadata"
-}
-
-sourceSets.main.resources.srcDir generateModMetadata
-neoForge.ideSyncTask generateModMetadata
-
-publishing {
-    publications {
-        register('mavenJava', MavenPublication) {
-            artifact tasks.shadowJar
-        }
-    }
-    repositories {
-        maven {
-            url "file://${project.projectDir}/repo"
-        }
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
-idea {
-    module {
-        downloadSources = true
-        downloadJavadoc = true
-    }
-}
-
-// Use Shadow to relocate jgltf to avoid mod conflicts
-tasks.named('shadowJar') {
-    archiveClassifier.set('')
-    configurations = [project.configurations.shaded]
-    relocate 'de.javagl.jgltf', 'com.voxelbridge.shadow.jgltf'
-    relocate 'ar.com.hjg.pngj', 'com.voxelbridge.shadow.pngj'
-    relocate 'gnu.trove', 'com.voxelbridge.shadow.trove'
-    mergeServiceFiles()
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
-// Make assemble/build use the shaded artifact
-tasks.named('assemble') { dependsOn tasks.shadowJar }
-
-// Disable plain jar to avoid filename clash with shadowJar
-tasks.named('jar') { enabled = false }

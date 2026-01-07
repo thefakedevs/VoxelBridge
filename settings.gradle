@@ -10,3 +10,6 @@ plugins {
 }
 
 include ':core'
+include ':mod'
+include ':mc-1.21.1'
+include ':mc-1.21.8'
