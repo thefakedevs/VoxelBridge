@@ -45,29 +45,53 @@ public final class VoxelBridgeCommands {
     public static void register(RegisterClientCommandsEvent event) {
         var root = Commands.literal("voxelbridge");
 
-        root.then(Commands.literal("pos1").executes(ctx -> {
-            var mc = ClientAccessHolder.get().getMinecraft();
-            BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
-            if (hit == null) {
-                ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No block targeted."));
-                return 0;
-            }
-            setPos1(hit);
-            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + getPos1()));
-            return 1;
-        }));
+        root.then(Commands.literal("pos1")
+            .executes(ctx -> {
+                var mc = ClientAccessHolder.get().getMinecraft();
+                BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
+                if (hit == null) {
+                    ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No block targeted."));
+                    return 0;
+                }
+                setPos1(hit);
+                ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + getPos1()));
+                return 1;
+            })
+            .then(Commands.argument("x", IntegerArgumentType.integer())
+                .then(Commands.argument("y", IntegerArgumentType.integer())
+                    .then(Commands.argument("z", IntegerArgumentType.integer())
+                        .executes(ctx -> {
+                            int x = IntegerArgumentType.getInteger(ctx, "x");
+                            int y = IntegerArgumentType.getInteger(ctx, "y");
+                            int z = IntegerArgumentType.getInteger(ctx, "z");
+                            setPos1(new BlockPos(x, y, z));
+                            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + getPos1()));
+                            return 1;
+                        })))));
 
-        root.then(Commands.literal("pos2").executes(ctx -> {
-            var mc = ClientAccessHolder.get().getMinecraft();
-            BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
-            if (hit == null) {
-                ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No block targeted."));
-                return 0;
-            }
-            setPos2(hit);
-            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + getPos2()));
-            return 1;
-        }));
+        root.then(Commands.literal("pos2")
+            .executes(ctx -> {
+                var mc = ClientAccessHolder.get().getMinecraft();
+                BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
+                if (hit == null) {
+                    ctx.getSource().sendSystemMessage(Component.literal("c[VoxelBridge] No block targeted."));
+                    return 0;
+                }
+                setPos2(hit);
+                ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + getPos2()));
+                return 1;
+            })
+            .then(Commands.argument("x", IntegerArgumentType.integer())
+                .then(Commands.argument("y", IntegerArgumentType.integer())
+                    .then(Commands.argument("z", IntegerArgumentType.integer())
+                        .executes(ctx -> {
+                            int x = IntegerArgumentType.getInteger(ctx, "x");
+                            int y = IntegerArgumentType.getInteger(ctx, "y");
+                            int z = IntegerArgumentType.getInteger(ctx, "z");
+                            setPos2(new BlockPos(x, y, z));
+                            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + getPos2()));
+                            return 1;
+                        })))));
 
         root.then(Commands.literal("info").executes(ctx -> {
             ctx.getSource().sendSystemMessage(Component.literal("6[VoxelBridge] Selection info:"));

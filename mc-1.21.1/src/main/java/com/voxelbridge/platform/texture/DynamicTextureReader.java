@@ -1,6 +1,7 @@
 package com.voxelbridge.platform.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
@@ -14,6 +15,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 /**
  * Attempts to read runtime textures from TextureManager when no resource exists.
@@ -24,7 +26,7 @@ final class DynamicTextureReader {
 
     static BufferedImage tryRead(ResourceLocation location) {
         try {
-            AbstractTexture texture = ClientAccessHolder.get().getTextureManager().getTexture(location, null);
+            AbstractTexture texture = ClientAccessHolder.get().getTextureManager().getTexture(location);
             if (texture == null) {
                 return null;
             }
@@ -36,13 +38,13 @@ final class DynamicTextureReader {
             if (fromNative != null) {
                 return fromNative;
             }
-            BufferedImage fromGpu = readGpuTexture(texture);
-            if (fromGpu != null) {
-                return fromGpu;
-            }
             BufferedImage fromHttp = readHttpTexture(texture);
             if (fromHttp != null) {
                 return fromHttp;
+            }
+            BufferedImage fromGpu = readGpuTexture(texture);
+            if (fromGpu != null) {
+                return fromGpu;
             }
         } catch (Throwable t) {
             VoxelBridgeLogger.warn(LogModule.TEXTURE_RESOLVE, String.format("[DynamicTextureReader][WARN] Failed to read %s: %s", location, t.getMessage()));
@@ -135,18 +137,24 @@ final class DynamicTextureReader {
     }
 
     private static BufferedImage readGpuTexture(AbstractTexture texture) {
+        if (!RenderSystem.isOnRenderThreadOrInit()) {
+            return null;
+        }
         try {
             int id = texture.getId();
             if (id <= 0) {
                 return null;
             }
             Method download = NativeImage.class.getDeclaredMethod("downloadTexture", int.class, boolean.class);
+            if (!Modifier.isStatic(download.getModifiers())) {
+                return null;
+            }
             download.setAccessible(true);
             Object value = download.invoke(null, id, false);
             if (value instanceof NativeImage nativeImg) {
                 return TextureLoader.fromNativeImage(nativeImg);
             }
-        } catch (ReflectiveOperationException ignored) {
+        } catch (Throwable ignored) {
             return null;
         }
         return null;

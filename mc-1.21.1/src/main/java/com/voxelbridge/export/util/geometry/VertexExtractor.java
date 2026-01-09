@@ -24,7 +24,7 @@ public final class VertexExtractor {
         float[] positions,  // 12 floats: 4 vertices * (x, y, z)
         float[] uvs,        // 8 floats: 4 vertices * (u, v)
         float[] normal,     // 3 floats: (nx, ny, nz)
-        int[] colors        // 4 ints: ABGR per vertex
+        int[] colors        // 4 ints: ARGB per vertex
     ) {}
 
     /**
@@ -76,7 +76,7 @@ public final class VertexExtractor {
             float vx = Float.intBitsToFloat(verts[base]);
             float vy = Float.intBitsToFloat(verts[base + 1]);
             float vz = Float.intBitsToFloat(verts[base + 2]);
-            int abgr = verts[base + 3];
+            int argb = verts[base + 3];
             float uu = Float.intBitsToFloat(verts[base + 4]);
             float vv = Float.intBitsToFloat(verts[base + 5]);
 
@@ -93,7 +93,7 @@ public final class VertexExtractor {
             uv[i * 2] = (uu - u0) / du;
             uv[i * 2 + 1] = (vv - v0) / dv;
 
-            colors[i] = abgr;
+            colors[i] = argb;
         }
 
         // Compute face normal

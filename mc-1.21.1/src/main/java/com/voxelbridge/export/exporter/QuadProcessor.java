@@ -112,7 +112,7 @@ public final class QuadProcessor {
                 colorData = ColorModeHandler.prepareColors(
                     ctx.getColorMode(), ctx.getColorMapAccess(), bakedTint, true);
             } else {
-                float[] linearColors = convertABGRtoLinearRGBA(vertexData.colors());
+                float[] linearColors = convertARGBtoLinearRGBA(vertexData.colors());
                 colorData = new ColorModeHandler.ColorData(null, linearColors);
             }
         } else {
@@ -157,20 +157,14 @@ public final class QuadProcessor {
         return false;
     }
 
-    private float[] convertABGRtoLinearRGBA(int[] abgrColors) {
+    private float[] convertARGBtoLinearRGBA(int[] argbColors) {
         float[] out = new float[16];
         for (int i = 0; i < 4; i++) {
-            int c = abgrColors[i];
-            // ABGR format: A=32-24, B=24-16, G=16-8, R=8-0
-            // BUT: VertexExtractor.extractFromQuad reads directly from int[] verts.
-            // If the raw format is ABGR (0xAABBGGRR), then:
-            // R = c & 0xFF
-            // G = (c >> 8) & 0xFF
-            // B = (c >> 16) & 0xFF
-            // A = (c >> 24) & 0xFF
-            float r = srgbToLinearComponent(c & 0xFF);
+            int c = argbColors[i];
+            // ARGB format: A=32-24, R=24-16, G=16-8, B=8-0
+            float r = srgbToLinearComponent((c >> 16) & 0xFF);
             float g = srgbToLinearComponent((c >> 8) & 0xFF);
-            float b = srgbToLinearComponent((c >> 16) & 0xFF);
+            float b = srgbToLinearComponent(c & 0xFF);
             float a = ((c >> 24) & 0xFF) / 255.0f;
             
             int base = i * 4;
@@ -182,14 +176,10 @@ public final class QuadProcessor {
         return out;
     }
 
-    private int extractBakedTintArgb(int[] abgrColors) {
-        for (int c : abgrColors) {
+    private int extractBakedTintArgb(int[] argbColors) {
+        for (int c : argbColors) {
             if (c != 0xFFFFFFFF && c != -1) {
-                int a = (c >>> 24) & 0xFF;
-                int b = (c >>> 16) & 0xFF;
-                int g = (c >>> 8) & 0xFF;
-                int r = c & 0xFF;
-                return (a << 24) | (r << 16) | (g << 8) | b;
+                return c;
             }
         }
         return 0xFFFFFFFF;

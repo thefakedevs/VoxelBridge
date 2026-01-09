@@ -222,11 +222,11 @@ public final class OverlayManager {
                 float vx = Float.intBitsToFloat(verts[base]);
                 float vy = Float.intBitsToFloat(verts[base + 1]);
                 float vz = Float.intBitsToFloat(verts[base + 2]);
-                int abgr = verts[base + 3];
+                int argb = verts[base + 3];
                 float uu = Float.intBitsToFloat(verts[base + 4]);
                 float vv = Float.intBitsToFloat(verts[base + 5]);
 
-                vertexColors[i] = abgr;
+                vertexColors[i] = argb;
                 localPos[i * 3] = vx;
                 localPos[i * 3 + 1] = vy;
                 localPos[i * 3 + 2] = vz;
@@ -374,15 +374,10 @@ public final class OverlayManager {
      */
     private int extractOverlayColor(BlockState state, BlockPos pos, BakedQuad quad, int[] vertexColors) {
         for (int i = 0; i < 4; i++) {
-            int abgr = vertexColors[i];
-            int rgb = abgr & 0x00FFFFFF;
+            int argb = vertexColors[i];
+            int rgb = argb & 0x00FFFFFF;
             if (rgb != 0x00FFFFFF) {
-                // Convert ABGR to ARGB (swap R/B) to match vanilla tint expectations.
-                int a = (abgr >>> 24) & 0xFF;
-                int b = (abgr >>> 16) & 0xFF;
-                int g = (abgr >>> 8) & 0xFF;
-                int r = abgr & 0xFF;
-                return (a << 24) | (r << 16) | (g << 8) | b;
+                return argb;
             }
         }
 

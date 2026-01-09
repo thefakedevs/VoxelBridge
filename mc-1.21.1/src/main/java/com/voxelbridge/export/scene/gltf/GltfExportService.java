@@ -109,7 +109,10 @@ public final class GltfExportService {
         ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
 
         // Texture export is handled before glTF assembly so the writer is MC-agnostic.
+        ExportProgressTracker.setStage(ExportProgressTracker.Stage.ATLAS, "Building atlases");
+        ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
         TextureExportPipeline.build(ctx, gltfDir, ctx.getAtlasBook().keySet());
+        ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
 
         // OPTIMIZATION: Removed forced GC calls to eliminate 1-5 second Full GC pauses
         // Let JVM manage GC automatically for better throughput

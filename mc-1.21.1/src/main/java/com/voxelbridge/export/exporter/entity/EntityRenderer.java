@@ -3,6 +3,7 @@ package com.voxelbridge.export.exporter.entity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
@@ -14,17 +15,28 @@ import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.platform.render.capture.CaptureBufferBase;
 import com.voxelbridge.platform.render.capture.RenderCapture;
 import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
+import com.voxelbridge.platform.texture.TextureLoader;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.MapItem;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 import java.awt.image.BufferedImage;
+import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Captures entity renderer output into an IR sink.
@@ -305,6 +317,19 @@ public final class EntityRenderer {
                     renderType != null ? renderType.toString() : "null"));
             }
             ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(entity, renderType);
+            ItemFrameMapDecision mapDecision = ItemFrameMapDecision.NONE;
+            if (entity instanceof ItemFrame itemFrame) {
+                mapDecision = classifyItemFrameMap(itemFrame, renderType, textureRes);
+                if (mapDecision == ItemFrameMapDecision.SKIP) {
+                    return;
+                }
+            }
+            if (entity instanceof AbstractClientPlayer player) {
+                ResolvedTexture playerFallback = resolvePlayerTextureFallback(player, textureRes, renderType);
+                if (playerFallback != null) {
+                    textureRes = playerFallback;
+                }
+            }
             String spriteKey;
             boolean isAtlasTexture = false;
             float u0 = 0f, u1 = 1f, v0 = 0f, v1 = 1f;
@@ -322,11 +347,25 @@ public final class EntityRenderer {
             String materialGroupKey = "entity:" + net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
 
             if (textureRes != null && textureRes.texture() != null) {
-                EntityTextureManager.TextureHandle handle = EntityTextureManager.register(ctx, textureRes.texture().toString());
+                EntityTextureManager.TextureHandle handle = null;
+                if (mapDecision == ItemFrameMapDecision.MAP && entity instanceof ItemFrame itemFrame) {
+                    handle = tryRegisterItemFrameMapTexture(ctx, itemFrame);
+                }
+                if (entity instanceof AbstractClientPlayer player) {
+                    handle = tryRegisterPlayerTexture(ctx, player, textureRes, renderType);
+                }
+                if (handle == null) {
+                    handle = EntityTextureManager.register(ctx, textureRes.texture().toString());
+                }
                 spriteKey = handle.spriteKey();
                 isAtlasTexture = textureRes.isAtlasTexture();
                 u0 = textureRes.u0(); u1 = textureRes.u1();
                 v0 = textureRes.v0(); v1 = textureRes.v1();
+                if (mapDecision == ItemFrameMapDecision.MAP) {
+                    isAtlasTexture = false;
+                    u0 = 0f; u1 = 1f;
+                    v0 = 0f; v1 = 1f;
+                }
 
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.ENTITY)) {
                     VoxelBridgeLogger.debug(LogModule.ENTITY, String.format(
@@ -347,6 +386,17 @@ public final class EntityRenderer {
                     if (spriteImg != null) {
                         ctx.cacheSpriteImage(spriteKey, spriteImg);
                     }
+                }
+            } else if (mapDecision == ItemFrameMapDecision.MAP && entity instanceof ItemFrame itemFrame) {
+                EntityTextureManager.TextureHandle handle = tryRegisterItemFrameMapTexture(ctx, itemFrame);
+                if (handle != null) {
+                    spriteKey = handle.spriteKey();
+                    isAtlasTexture = false;
+                    u0 = 0f; u1 = 1f;
+                    v0 = 0f; v1 = 1f;
+                } else {
+                    spriteKey = "entity:minecraft/white";
+                    VoxelBridgeLogger.debug(LogModule.ENTITY, "[Quad#" + quadCount + "] No map texture resolved, using white fallback");
                 }
             } else {
                 spriteKey = "entity:minecraft/white";
@@ -431,6 +481,328 @@ public final class EntityRenderer {
             }
         }
 
+    }
+
+    private enum ItemFrameMapDecision {
+        NONE,
+        MAP,
+        SKIP
+    }
+
+    private static ItemFrameMapDecision classifyItemFrameMap(
+        ItemFrame itemFrame,
+        RenderType renderType,
+        ResolvedTexture textureRes
+    ) {
+        ItemStack item = itemFrame.getItem();
+        if (item == null || item.isEmpty() || !(item.getItem() instanceof MapItem)) {
+            return ItemFrameMapDecision.NONE;
+        }
+        ResourceLocation texture = textureRes != null ? textureRes.texture() : null;
+        if (texture != null) {
+            String path = texture.getPath().toLowerCase(Locale.ROOT);
+            if (isMapDecorationTexture(path)) {
+                return ItemFrameMapDecision.SKIP;
+            }
+            if (isItemFrameTexture(path)) {
+                return ItemFrameMapDecision.NONE;
+            }
+            if (isDynamicMapTexture(path)) {
+                return ItemFrameMapDecision.MAP;
+            }
+        }
+        if (textureRes != null && textureRes.isAtlasTexture()) {
+            return ItemFrameMapDecision.NONE;
+        }
+        if (isLikelyMapRenderType(renderType)) {
+            return ItemFrameMapDecision.MAP;
+        }
+        return ItemFrameMapDecision.NONE;
+    }
+
+    private static boolean isMapDecorationTexture(String path) {
+        if (path == null) {
+            return false;
+        }
+        return path.contains("map_decorations")
+            || path.contains("map_icons")
+            || path.contains("map/decorations");
+    }
+
+    private static boolean isItemFrameTexture(String path) {
+        if (path == null) {
+            return false;
+        }
+        return path.contains("item_frame")
+            || path.contains("glow_item_frame");
+    }
+
+    private static boolean isDynamicMapTexture(String path) {
+        if (path == null) {
+            return false;
+        }
+        if (path.startsWith("map/") || path.startsWith("maps/")) {
+            return true;
+        }
+        if (!path.startsWith("textures/") && (path.startsWith("map_") || path.contains("map/"))) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean isLikelyMapRenderType(RenderType renderType) {
+        if (renderType == null) {
+            return false;
+        }
+        String name = renderType.toString().toLowerCase(Locale.ROOT);
+        if (name.contains("item_frame")) {
+            return false;
+        }
+        if (!name.contains("map")) {
+            return false;
+        }
+        return !(name.contains("decor") || name.contains("icon"));
+    }
+
+    private static EntityTextureManager.TextureHandle tryRegisterItemFrameMapTexture(
+        ExportContext ctx,
+        ItemFrame itemFrame
+    ) {
+        ItemStack item = itemFrame.getItem();
+        if (item == null || item.isEmpty() || !(item.getItem() instanceof MapItem)) {
+            return null;
+        }
+        MapItemSavedData data = MapItem.getSavedData(item, itemFrame.level());
+        if (data == null || data.colors == null) {
+            return null;
+        }
+        MapId mapId = item.get(DataComponents.MAP_ID);
+        String idText = mapId != null ? Integer.toString(mapId.id()) : Integer.toString(itemFrame.getId());
+        String key = "entity:map/" + idText;
+        BufferedImage image = ctx.getGeneratedEntityTextures().get(key);
+        if (image == null) {
+            image = renderMapTexture(data);
+            if (image == null) {
+                return null;
+            }
+        }
+        String relativePath = "textures/entity_textures/map/map_" + idText + ".png";
+        return EntityTextureManager.registerGenerated(ctx, key, relativePath, image);
+    }
+
+    private static BufferedImage renderMapTexture(MapItemSavedData data) {
+        int width = MapItem.IMAGE_WIDTH;
+        int height = MapItem.IMAGE_HEIGHT;
+        byte[] colors = data.colors;
+        if (colors == null || colors.length == 0) {
+            return null;
+        }
+        int total = Math.min(colors.length, width * height);
+        int[] pixels = new int[width * height];
+        for (int i = 0; i < total; i++) {
+            int packed = colors[i] & 0xFF;
+            int argb = MapColor.getColorFromPackedId(packed);
+            int a = (argb >>> 24) & 0xFF;
+            int r = (argb >>> 16) & 0xFF;
+            int g = (argb >>> 8) & 0xFF;
+            int b = argb & 0xFF;
+            pixels[i] = (a << 24) | (b << 16) | (g << 8) | r;
+        }
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(0, 0, width, height, pixels, 0, width);
+        return image;
+    }
+
+    private static EntityTextureManager.TextureHandle tryRegisterPlayerTexture(
+        ExportContext ctx,
+        AbstractClientPlayer player,
+        ResolvedTexture textureRes,
+        RenderType renderType
+    ) {
+        ResourceLocation texture = textureRes != null ? textureRes.texture() : null;
+        if (texture != null) {
+            EntityTextureManager.TextureHandle attachment = tryRegisterPlayerAttachmentTexture(ctx, player, texture);
+            if (attachment != null) {
+                return attachment;
+            }
+            EntityTextureManager.TextureHandle skin = tryRegisterPlayerSkinTexture(ctx, player, texture);
+            if (skin != null) {
+                return skin;
+            }
+        }
+        ResourceLocation fallback = selectPlayerTexture(player, renderType);
+        if (fallback == null) {
+            return null;
+        }
+        String type = detectPlayerAttachmentType(fallback);
+        if (type == null) {
+            type = "skin";
+        }
+        return registerPlayerGenerated(ctx, player, fallback, type);
+    }
+
+    private static EntityTextureManager.TextureHandle tryRegisterPlayerAttachmentTexture(
+        ExportContext ctx,
+        AbstractClientPlayer player,
+        ResourceLocation texture
+    ) {
+        String type = detectPlayerAttachmentType(texture);
+        if (type == null) {
+            return null;
+        }
+        return registerPlayerGenerated(ctx, player, texture, type);
+    }
+
+    private static EntityTextureManager.TextureHandle tryRegisterPlayerSkinTexture(
+        ExportContext ctx,
+        AbstractClientPlayer player,
+        ResourceLocation texture
+    ) {
+        if (!isLikelySkinTexture(texture)) {
+            return null;
+        }
+        return registerPlayerGenerated(ctx, player, texture, "skin");
+    }
+
+    private static String detectPlayerAttachmentType(ResourceLocation texture) {
+        if (texture == null) {
+            return null;
+        }
+        String path = texture.getPath().toLowerCase(Locale.ROOT);
+        if (path.contains("elytra")) {
+            return "elytra";
+        }
+        if (path.contains("cape") || path.contains("cloak")) {
+            return "cape";
+        }
+        return null;
+    }
+
+    private static boolean isLikelySkinTexture(ResourceLocation texture) {
+        if (texture == null) {
+            return false;
+        }
+        String path = texture.getPath().toLowerCase(Locale.ROOT);
+        if (path.contains("elytra") || path.contains("cape") || path.contains("cloak")) {
+            return false;
+        }
+        return path.startsWith("skins/")
+            || path.startsWith("skin/")
+            || path.contains("textures/entity/player");
+    }
+
+    private static EntityTextureManager.TextureHandle registerPlayerGenerated(
+        ExportContext ctx,
+        AbstractClientPlayer player,
+        ResourceLocation texture,
+        String type
+    ) {
+        if (texture == null || type == null) {
+            return null;
+        }
+        BufferedImage image = readTextureWithFallback(texture);
+        if (image == null) {
+            return null;
+        }
+        String playerName = sanitizePlayerName(player.getGameProfile().getName());
+        String key = "entity:player/" + type + "/" + playerName;
+        String relativePath = "textures/entity_textures/player/" + playerName + "_" + type + ".png";
+        return EntityTextureManager.registerGenerated(ctx, key, relativePath, image);
+    }
+
+    private static ResolvedTexture resolvePlayerTextureFallback(
+        AbstractClientPlayer player,
+        ResolvedTexture current,
+        RenderType renderType
+    ) {
+        if (current != null && current.texture() != null) {
+            return null;
+        }
+        ResourceLocation fallback = selectPlayerTexture(player, renderType);
+        if (fallback == null) {
+            return null;
+        }
+        return new ResolvedTexture(fallback, 0f, 1f, 0f, 1f, false, null, null);
+    }
+
+    private static ResourceLocation selectPlayerTexture(AbstractClientPlayer player, RenderType renderType) {
+        String renderName = renderType != null ? renderType.toString().toLowerCase(Locale.ROOT) : "";
+        if (renderName.contains("elytra")) {
+            ResourceLocation elytra = invokePlayerTexture(player,
+                "getElytraTextureLocation",
+                "getElytraTexture");
+            if (elytra != null) {
+                return elytra;
+            }
+        }
+        if (renderName.contains("cape") || renderName.contains("cloak")) {
+            ResourceLocation cape = invokePlayerTexture(player,
+                "getCloakTextureLocation",
+                "getCapeTextureLocation",
+                "getCloakTexture");
+            if (cape != null) {
+                return cape;
+            }
+        }
+        return invokePlayerTexture(player,
+            "getSkinTextureLocation",
+            "getSkinTexture");
+    }
+
+    private static ResourceLocation invokePlayerTexture(AbstractClientPlayer player, String... methodNames) {
+        for (String name : methodNames) {
+            try {
+                Method method = player.getClass().getMethod(name);
+                Object value = method.invoke(player);
+                if (value instanceof ResourceLocation loc) {
+                    return loc;
+                }
+            } catch (ReflectiveOperationException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static BufferedImage readTextureWithFallback(ResourceLocation texture) {
+        BufferedImage image = TextureLoader.readTexture(texture, ExportRuntimeConfig.isAnimationEnabled());
+        if (image != null) {
+            return image;
+        }
+        ResourceLocation fallback = resolveTexturePathFallback(texture);
+        if (!fallback.equals(texture)) {
+            return TextureLoader.readTexture(fallback, ExportRuntimeConfig.isAnimationEnabled());
+        }
+        return null;
+    }
+
+    private static ResourceLocation resolveTexturePathFallback(ResourceLocation texture) {
+        String path = texture.getPath();
+        if (path.startsWith("skins/") || path.startsWith("skin/")) {
+            return texture;
+        }
+        if (!path.startsWith("textures/")) {
+            path = "textures/" + path;
+        }
+        if (!path.endsWith(".png")) {
+            path = path + ".png";
+        }
+        return ResourceLocation.fromNamespaceAndPath(texture.getNamespace(), path);
+    }
+
+    private static String sanitizePlayerName(String name) {
+        if (name == null || name.isEmpty()) {
+            return "player";
+        }
+        String lower = name.toLowerCase(Locale.ROOT);
+        StringBuilder out = new StringBuilder(lower.length());
+        for (int i = 0; i < lower.length(); i++) {
+            char c = lower.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z')
+                || (c >= '0' && c <= '9')
+                || c == '.' || c == '-' || c == '_';
+            out.append(ok ? c : '_');
+        }
+        return out.toString();
     }
 }
 
