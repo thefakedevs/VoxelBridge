@@ -10,6 +10,7 @@ import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.export.texture.EntityTextureManager;
+import com.voxelbridge.export.exporter.PlaneOffsetTracker;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.platform.render.capture.CaptureBufferBase;
@@ -18,6 +19,7 @@ import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
 import com.voxelbridge.platform.texture.TextureLoader;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
+import com.voxelbridge.core.util.geometry.GeometryUtil;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
@@ -249,6 +251,7 @@ public final class EntityRenderer {
         private int quadCount = 0;
         private float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
         private float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
+        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker();
 
         CaptureBuffer(ExportContext ctx, IrSink sceneSink, double offsetX, double offsetY, double offsetZ, Entity entity) {
             super(ctx, sceneSink, null);
@@ -421,6 +424,8 @@ public final class EntityRenderer {
             ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
             RenderCaptureUtil.ColorModeResult colorResult =
                 RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
+            float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
+            planeOffset.applyOffset(positions, faceNormal);
             sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
                 RenderLayer.UNKNOWN, colorResult.tintMode(),
                 RENDER_TYPE_RESOLVER.isDoubleSided(renderType),

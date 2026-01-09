@@ -30,3 +30,6 @@ Thumbs.db
 /temp/
 /fabric/
 /mc-1.21.1-fabric/
+/mod/build/
+/mc-1.21.1/build/
+/mc-1.21.8/build/

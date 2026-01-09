@@ -43,6 +43,7 @@ public final class BlockExporter {
     private final ClientChunkCache chunkCache;
     private final boolean vanillaRandomTransformEnabled;
     private final BlockEntityRenderBatch blockEntityBatch;
+    private final PlaneOffsetTracker planeOffsetTracker = new PlaneOffsetTracker();
 
     private BlockPos regionMin;
     private BlockPos regionMax;
@@ -90,8 +91,8 @@ public final class BlockExporter {
         }
 
         // Initialize managers with current offsets
-        this.overlayManager = new OverlayManager(ctx, level, offsetX, offsetY, offsetZ);
-        this.quadProcessor = new QuadProcessor(ctx, level, sceneSink, offsetX, offsetY, offsetZ);
+        this.overlayManager = new OverlayManager(ctx, level, offsetX, offsetY, offsetZ, planeOffsetTracker);
+        this.quadProcessor = new QuadProcessor(ctx, level, sceneSink, offsetX, offsetY, offsetZ, planeOffsetTracker);
     }
 
     /**
@@ -108,6 +109,7 @@ public final class BlockExporter {
         // Clear per-block caches
         overlayManager.clear();
         quadProcessor.clear();
+        planeOffsetTracker.clear();
 
         if (state.isAir()) return;
 

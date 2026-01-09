@@ -30,6 +30,7 @@ public final class OverlayManager {
     private final ExportContext ctx;
     private final Level level;
     private final double offsetX, offsetY, offsetZ;
+    private final PlaneOffsetTracker planeOffset;
 
     // Cache overlays by their position hash
     private final Map<Long, List<OverlayQuadData>> overlayCacheByPosition = new HashMap<>();
@@ -54,12 +55,13 @@ public final class OverlayManager {
                                        Direction direction, String materialKey, String materialSuffix) {
     }
 
-    public OverlayManager(ExportContext ctx, Level level, double offsetX, double offsetY, double offsetZ) {
+    public OverlayManager(ExportContext ctx, Level level, double offsetX, double offsetY, double offsetZ, PlaneOffsetTracker planeOffset) {
         this.ctx = ctx;
         this.level = level;
         this.offsetX = offsetX;
         this.offsetY = offsetY;
         this.offsetZ = offsetZ;
+        this.planeOffset = planeOffset;
     }
 
     /**
@@ -246,16 +248,7 @@ public final class OverlayManager {
             float[] baseWorldPos = VertexExtractor.localToWorld(localPos, pos, offsetX, offsetY, offsetZ, randomOffset);
             long posHash = computePositionHash(baseWorldPos);
 
-            // Get current overlay count for this position to determine z-offset index
             List<OverlayQuadData> overlayList = overlayCacheByPosition.computeIfAbsent(posHash, k -> new ArrayList<>());
-            int overlayIndex = overlayList.size();
-
-            // Apply overlay offset in local coordinates to prevent z-fighting
-            // Hilight uses a larger offset (2x) to avoid coplanar overlap; keyed by sprite name.
-            boolean isHilight = isHilightSprite || "_hilight".equals(effectiveSuffix);
-            float offsetMultiplier = isHilight ? 2f : 1f;
-            int offsetIndex = isHilight ? 0 : overlayIndex;
-            VertexExtractor.applyOverlayOffset(localPos, offsetIndex, offsetMultiplier, dir);
 
             // Convert to world coordinates
             float[] worldPos = VertexExtractor.localToWorld(localPos, pos, offsetX, offsetY, offsetZ, randomOffset);
@@ -330,6 +323,10 @@ public final class OverlayManager {
                 // Apply occlusion culling
                 if (dir != null && cullChecker.shouldCull(dir)) {
                     continue;  // Skip occluded overlay face
+                }
+
+                if (planeOffset != null) {
+                    planeOffset.applyOffset(overlay.positions, overlay.normal, dir);
                 }
 
                 // Output visible overlay

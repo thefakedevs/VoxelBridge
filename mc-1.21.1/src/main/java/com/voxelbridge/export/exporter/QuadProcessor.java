@@ -30,6 +30,7 @@ public final class QuadProcessor {
     private final Level level;
     private final IrSink sceneSink;
     private final double offsetX, offsetY, offsetZ;
+    private final PlaneOffsetTracker planeOffset;
 
     // Placeholder to ensure tool reads the file first
     private final Set<String> pbrLoadedSprites = new HashSet<>();
@@ -38,13 +39,15 @@ public final class QuadProcessor {
     private final it.unimi.dsi.fastutil.longs.LongOpenHashSet quadKeys = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
 
     public QuadProcessor(ExportContext ctx, Level level, IrSink sceneSink,
-                         double offsetX, double offsetY, double offsetZ) {
+                         double offsetX, double offsetY, double offsetZ,
+                         PlaneOffsetTracker planeOffset) {
         this.ctx = ctx;
         this.level = level;
         this.sceneSink = sceneSink;
         this.offsetX = offsetX;
         this.offsetY = offsetY;
         this.offsetZ = offsetZ;
+        this.planeOffset = planeOffset;
     }
 
     /**
@@ -132,6 +135,10 @@ public final class QuadProcessor {
         String materialKey = ctx.resolveMaterialKey(spriteKey, blockKey);
         // Register sprite material (Intern strings)
         ctx.registerSpriteMaterial(spriteKey, materialKey);
+
+        if (planeOffset != null) {
+            planeOffset.applyOffset(vertexData.positions(), vertexData.normal(), quad.getDirection());
+        }
 
         // Output quad (Intern keys)
         TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP

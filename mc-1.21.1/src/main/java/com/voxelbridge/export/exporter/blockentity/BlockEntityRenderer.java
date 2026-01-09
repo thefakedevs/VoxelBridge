@@ -8,6 +8,7 @@ import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.export.exporter.PlaneOffsetTracker;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.platform.render.capture.CaptureBufferBase;
@@ -15,6 +16,7 @@ import com.voxelbridge.platform.render.capture.RenderCapture;
 import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
+import com.voxelbridge.core.util.geometry.GeometryUtil;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -249,6 +251,7 @@ public final class BlockEntityRenderer {
         private final double offsetX, offsetY, offsetZ;
         private final BlockEntity blockEntity;
         private final TextureOverrideMap overrides;
+        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker();
 
         CaptureBuffer(ExportContext ctx, IrSink sceneSink, double offsetX, double offsetY, double offsetZ, BlockEntity blockEntity) {
             super(ctx, sceneSink, (renderType, queuedVertices) -> {
@@ -364,6 +367,8 @@ public final class BlockEntityRenderer {
                     String resolvedMaterialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
                     RenderCaptureUtil.ColorModeResult colorResult =
                         RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
+                    float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
+                    planeOffset.applyOffset(positions, faceNormal);
                     ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
                     sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
                         RenderLayer.UNKNOWN, colorResult.tintMode(),
@@ -419,6 +424,8 @@ public final class BlockEntityRenderer {
             // Send quad to scene sink using the BlockEntity type as group key (block entities typically don't have overlays)
             String resolvedMaterialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
             ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
+            float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
+            planeOffset.applyOffset(positions, faceNormal);
             sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
                 RenderLayer.UNKNOWN, colorResult.tintMode(),
                 RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
