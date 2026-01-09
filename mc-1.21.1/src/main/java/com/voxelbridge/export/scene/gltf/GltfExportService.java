@@ -85,7 +85,7 @@ public final class GltfExportService {
 
         // Initialize reserved slots (must be done before any texture registration)
         TextureAtlasManager.initializeReservedSlots(ctx);
-        com.voxelbridge.export.texture.ColorMapManager.initializeReservedSlots(ctx);
+        com.voxelbridge.export.texture.ColorMapManager.initializeReservedSlots(ctx.state());
 
         VoxelBridgeLogger.info(LogModule.GLTF, "[GLTF] Starting glTF export with format-agnostic sampler");
 
@@ -101,7 +101,23 @@ public final class GltfExportService {
         // Single-pass sampling: collect geometry and texture usage together
         ctx.setDiscoveryMode(false);
         ExportProgressTracker.setStage(ExportProgressTracker.Stage.SAMPLING, "Sampling blocks");
-        GltfSceneBuilder sceneBuilder = new GltfSceneBuilder(ctx.state(), gltfDir);
+        GltfSceneBuilder.ProgressReporter reporter = new GltfSceneBuilder.ProgressReporter() {
+            @Override
+            public void setStage(GltfSceneBuilder.Stage stage, String detail) {
+                ExportProgressTracker.Stage mapped = switch (stage) {
+                    case SAMPLING -> ExportProgressTracker.Stage.SAMPLING;
+                    case ATLAS -> ExportProgressTracker.Stage.ATLAS;
+                    case FINALIZE -> ExportProgressTracker.Stage.FINALIZE;
+                };
+                ExportProgressTracker.setStage(mapped, detail);
+            }
+
+            @Override
+            public void setPhasePercent(Float percent) {
+                ExportProgressTracker.setPhasePercent(percent);
+            }
+        };
+        GltfSceneBuilder sceneBuilder = new GltfSceneBuilder(ctx.state(), gltfDir, reporter);
         IrSink irSink = sceneBuilder;
         long tSampling = VoxelBridgeLogger.now();
         StreamingRegionSampler.sampleRegion(level, pos1, pos2, irSink, ctx);
