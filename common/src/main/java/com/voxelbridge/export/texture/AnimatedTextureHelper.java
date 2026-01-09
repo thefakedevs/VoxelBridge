@@ -7,7 +7,6 @@ import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -220,8 +219,7 @@ public final class AnimatedTextureHelper {
 
         try {
             var contents = sprite.contents();
-            var metaOpt = contents.metadata().getSection(AnimationMetadataSection.SERIALIZER);
-            AnimationMetadataSection meta = metaOpt.orElse(null);
+            var meta = AnimationMetadataUtil.readSection(contents.metadata());
             if (meta == null) {
                 return null; // No animation metadata
             }
@@ -229,7 +227,7 @@ public final class AnimatedTextureHelper {
             // Read full texture from sprite
             BufferedImage full = ctx.getTextureAccess().readTexture(contents.name().toString(), true);
             if (full != null) {
-                AnimationMetadata anim = toCoreMetadata(meta);
+                AnimationMetadata anim = AnimationMetadataUtil.toCoreMetadata(meta);
                 com.voxelbridge.core.texture.AnimatedFrameSet frames = splitWithMetadata(spriteKey, full, anim, repo);
                 return frames;
             }
@@ -408,16 +406,6 @@ public final class AnimatedTextureHelper {
         return namespace + ":" + path;
     }
 
-    private static AnimationMetadata toCoreMetadata(AnimationMetadataSection meta) {
-        List<AnimationMetadata.FrameTiming> timings = new ArrayList<>();
-        meta.forEachFrame((idx, time) -> timings.add(new AnimationMetadata.FrameTiming(idx, time)));
-        boolean interpolate = false;
-        try {
-            interpolate = meta.isInterpolatedFrames();
-        } catch (NoSuchMethodError ignored) {
-        }
-        return new AnimationMetadata(meta.getDefaultFrameTime(), timings, interpolate, 0, 0);
-    }
 }
 
 

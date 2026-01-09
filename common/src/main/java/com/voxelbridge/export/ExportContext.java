@@ -6,7 +6,6 @@ import com.voxelbridge.core.texture.TextureAccess;
 import com.voxelbridge.core.texture.TextureRepository;
 import com.voxelbridge.core.util.color.ColorMapAccess;
 import com.voxelbridge.core.util.color.ColorMode;
-import com.voxelbridge.export.texture.MinecraftTextureAccess;
 import com.voxelbridge.export.texture.ExportColorMapAccess;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
@@ -32,10 +31,10 @@ public final class ExportContext {
     private final TextureAccess<TextureAtlasSprite> textureAccess;
     private final ColorMapAccess colorMapAccess;
 
-    public ExportContext(Minecraft mc) {
+    public ExportContext(Minecraft mc, TextureAccess<TextureAtlasSprite> textureAccess) {
         this.sampler = new SamplerContext(mc);
         this.state = new ExportState();
-        this.textureAccess = MinecraftTextureAccess.INSTANCE;
+        this.textureAccess = textureAccess;
         this.colorMapAccess = new ExportColorMapAccess(this);
     }
 

@@ -1,6 +1,6 @@
 package com.voxelbridge.export.texture;
 
-import com.voxelbridge.VoxelBridge;
+import com.voxelbridge.ModConstants;
 import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.texture.ExportOptions;
@@ -108,7 +108,7 @@ public final class EntityTextureManager {
     }
 
     private static String generatedLocation(String key) {
-        return VoxelBridge.MODID + ":generated/" + safe(key);
+        return ModConstants.MOD_ID + ":generated/" + safe(key);
     }
 
     private static String safe(String s) {

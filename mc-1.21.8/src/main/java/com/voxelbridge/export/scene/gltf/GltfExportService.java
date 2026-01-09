@@ -4,6 +4,7 @@ import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.scene.SceneWriteRequest;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.texture.MinecraftTextureAccess;
 import com.voxelbridge.export.ExportProgressTracker;
 import com.voxelbridge.export.StreamingRegionSampler;
 import com.voxelbridge.export.texture.TextureAtlasManager;
@@ -75,7 +76,7 @@ public final class GltfExportService {
 
         // Initialize export context
         var mc = ClientAccessHolder.get().getMinecraft();
-        ExportContext ctx = new ExportContext(mc);
+        ExportContext ctx = new ExportContext(mc, MinecraftTextureAccess.INSTANCE);
         ctx.resetConsumedBlocks();
         ctx.clearTextureState();
         ctx.setBlockEntityExportEnabled(true);

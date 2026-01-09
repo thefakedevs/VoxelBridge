@@ -15,7 +15,7 @@ import net.neoforged.fml.common.Mod;
 
 @Mod(VoxelBridge.MODID)
 public class VoxelBridge {
-    public static final String MODID = "voxelbridge";
+    public static final String MODID = ModConstants.MOD_ID;
 
     public VoxelBridge(IEventBus modBus, ModContainer container, Dist dist) {
         ClientAccessHolder.set(new MinecraftClientAccess());

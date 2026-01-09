@@ -5,16 +5,12 @@ import com.voxelbridge.core.texture.TextureAccess;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.texture.TextureLoader;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -52,7 +48,7 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
 
     @Override
     public String resolveSpriteKey(TextureAtlasSprite sprite) {
-        return sprite == null ? null : com.voxelbridge.adapter.Adapters.getRender().getSpriteName(sprite);
+        return sprite == null ? null : SpriteKeyResolver.resolve(sprite);
     }
 
     @Override
@@ -68,20 +64,8 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
                 return null;
             }
             var res = resOpt.get();
-            Optional<AnimationMetadataSection> metaOpt =
-                res.metadata().getSection(AnimationMetadataSection.SERIALIZER);
-            AnimationMetadataSection meta = metaOpt.orElse(null);
-            if (meta == null) {
-                return null;
-            }
-            List<AnimationMetadata.FrameTiming> timings = new ArrayList<>();
-            meta.forEachFrame((idx, time) -> timings.add(new AnimationMetadata.FrameTiming(idx, time)));
-            boolean interpolate = false;
-            try {
-                interpolate = meta.isInterpolatedFrames();
-            } catch (NoSuchMethodError ignored) {
-            }
-            return new AnimationMetadata(meta.getDefaultFrameTime(), timings, interpolate, 0, 0);
+            var meta = AnimationMetadataUtil.readSection(res.metadata());
+            return meta == null ? null : AnimationMetadataUtil.toCoreMetadata(meta);
         } catch (Exception ignored) {
             return null;
         }
