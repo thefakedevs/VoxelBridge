@@ -33,3 +33,5 @@ Thumbs.db
 /mod/build/
 /mc-1.21.1/build/
 /mc-1.21.8/build/
+/core/bin/
+/core/build/
