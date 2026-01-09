@@ -1,9 +1,7 @@
 package com.voxelbridge.adapter;
 
 import com.voxelbridge.export.texture.SpriteKeyResolver;
-import com.voxelbridge.modhandler.frapi.FabricApiHelper;
-import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
-import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
+import com.voxelbridge.modhandler.frapi.FrapiCompat;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -39,7 +37,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
     public List<BakedQuad> getQuads(BakedModel model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
         List<BakedQuad> quads = new ArrayList<>();
         RandomSource rand = RandomSource.create(seed);
-        SpriteFinder spriteFinder = getSpriteFinder();
+        Object spriteFinder = getSpriteFinder();
         
         // 1. Get ModelData (NeoForge specific)
         ModelData modelData = ModelData.EMPTY;
@@ -58,8 +56,8 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
         } catch (Throwable ignored) {}
 
         // 2. Try Fabric API (for CTM/Indium support on NeoForge)
-        if (spriteFinder != null && model instanceof FabricBakedModel fabricModel && !fabricModel.isVanillaAdapter()) {
-            List<BakedQuad> fabricQuads = FabricApiHelper.extractQuads(fabricModel, level, state, pos, rand, spriteFinder);
+        if (spriteFinder != null) {
+            List<BakedQuad> fabricQuads = FrapiCompat.extractQuads(model, level, state, pos, rand, spriteFinder);
             if (!fabricQuads.isEmpty()) {
                 return fabricQuads;
             }
@@ -84,12 +82,12 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
         return SpriteKeyResolver.resolve(sprite);
     }
 
-    private SpriteFinder getSpriteFinder() {
+    private Object getSpriteFinder() {
         var modelManager = ClientAccessHolder.get().getModelManager();
         if (modelManager == null) {
             return null;
         }
         var atlas = modelManager.getAtlas(TextureAtlas.LOCATION_BLOCKS);
-        return SpriteFinder.get(atlas);
+        return FrapiCompat.getSpriteFinder(atlas);
     }
 }
