@@ -43,7 +43,7 @@ Client-side NeoForge mod that exports Minecraft blocks, fluids, and block entiti
 - Prereqs: JDK 21, Gradle wrapper included.
 - Build: `./gradlew build`
 - Dev client: `./gradlew runClient`
-- Sources under `src/main/java`, resources under `src/main/resources` (including `assets/voxelbridge/logo.png` and lang files).
+- Sources under `src/main/java`, resources under `src/main/resources` (including `assets/voxelbridge/icon.png` and lang files).
 
 ## License
 MIT License. See `LICENSE` for details.

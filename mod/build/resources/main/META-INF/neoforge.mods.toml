@@ -12,7 +12,7 @@ modId = "voxelbridge"
 version = "1.0.0-alpha.3"
 displayName = "VoxelBridge"        
 authors = "Gluten King"    
-logoFile = "assets/voxelbridge/logo.png"
+logoFile = "assets/voxelbridge/icon.png"
 description = '''Exports Minecraft blocks, fluids, and block entities into glTF files.
 '''
 
@@ -27,6 +27,6 @@ side = "BOTH"
 [[dependencies.voxelbridge]]
 modId = "minecraft"
 type = "required"
-versionRange = "[1.21.1,1.22)"
+versionRange = "[1.21.1,1.21.1]"
 ordering = "NONE"
 side = "BOTH"
