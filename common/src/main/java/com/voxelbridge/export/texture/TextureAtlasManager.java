@@ -205,11 +205,25 @@ public final class TextureAtlasManager {
             baseImages.put(key, base);
             BufferedImage normal = ctx.getCachedSpriteImage(key + "_n");
             if (normal != null) {
-                normalImages.put(key, normal);
+                BufferedImage sanitized = PbrTextureHelper.sanitizeMissingNo(
+                    normal, PbrTextureHelper.DEFAULT_NORMAL_COLOR, key + "_n");
+                if (sanitized != null) {
+                    normalImages.put(key, sanitized);
+                    if (sanitized != normal) {
+                        ctx.cacheSpriteImage(key + "_n", sanitized);
+                    }
+                }
             }
             BufferedImage spec = ctx.getCachedSpriteImage(key + "_s");
             if (spec != null) {
-                specImages.put(key, spec);
+                BufferedImage sanitized = PbrTextureHelper.sanitizeMissingNo(
+                    spec, PbrTextureHelper.DEFAULT_SPECULAR_COLOR, key + "_s");
+                if (sanitized != null) {
+                    specImages.put(key, sanitized);
+                    if (sanitized != spec) {
+                        ctx.cacheSpriteImage(key + "_s", sanitized);
+                    }
+                }
             }
         }
 

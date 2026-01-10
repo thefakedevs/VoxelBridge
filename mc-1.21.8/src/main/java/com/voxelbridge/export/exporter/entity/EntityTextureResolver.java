@@ -67,24 +67,9 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
             PaintingVariant variant = variantHolder.value();
             ResourceLocation texture = variant.assetId();
 
-            // Paintings use the painting atlas; let the atlas locator choose the correct sprite per-quad
-            try {
-                var paintingAtlas = ClientAccessHolder.get().getPaintingTextures();
-                var backSprite = paintingAtlas.getBackSprite();
-                if (backSprite != null) {
-                    ResourceLocation atlas = backSprite.atlasLocation();
-                    VoxelBridgeLogger.debug(LogModule.ENTITY, "[Painting] Using atlas locator for painting atlas: " + atlas);
-                    return new ResolvedTexture(
-                        atlas,
-                        0f, 1f, 0f, 1f,
-                        true,
-                        null,
-                        atlas
-                    );
-                }
-            } catch (Exception e) {
-                // Fall back to direct texture resolution
-                VoxelBridgeLogger.debug(LogModule.ENTITY, "[Painting] Atlas lookup failed: " + e.getMessage());
+            ResolvedTexture atlasResolved = resolvePaintingAtlasSprite(texture);
+            if (atlasResolved != null) {
+                return atlasResolved;
             }
 
             VoxelBridgeLogger.debug(LogModule.ENTITY, String.format(
@@ -94,12 +79,15 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
                 "[EntityData] %s %s=%s",
                 painting.getType(), "painting_size", variant.width() + "x" + variant.height()));
 
-            // Paintings use textures from textures/painting/ directory
+            // Paintings use textures under textures/painting/<id>.png (variant assetId is usually "painting/<id>")
             if (!texture.getPath().startsWith("textures/")) {
-                texture = ResourceLocation.fromNamespaceAndPath(
-                    texture.getNamespace(),
-                    "textures/painting/" + texture.getPath() + ".png"
-                );
+                String path = texture.getPath();
+                if (path.startsWith("painting/")) {
+                    path = "textures/" + path + ".png";
+                } else {
+                    path = "textures/painting/" + path + ".png";
+                }
+                texture = ResourceLocation.fromNamespaceAndPath(texture.getNamespace(), path);
             }
 
             VoxelBridgeLogger.debug(LogModule.ENTITY, "[Painting] Resolved texture: " + texture);
@@ -108,6 +96,33 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
             VoxelBridgeLogger.warn(LogModule.ENTITY, "[EntityTextureResolver] Failed to resolve painting texture: " + e.getMessage());
             return null;
         }
+    }
+
+    private static ResolvedTexture resolvePaintingAtlasSprite(ResourceLocation texture) {
+        if (texture == null) {
+            return null;
+        }
+        try {
+            var paintingAtlas = ClientAccessHolder.get().getPaintingTextures();
+            var backSprite = paintingAtlas.getBackSprite();
+            if (backSprite == null) {
+                return null;
+            }
+            ResourceLocation atlas = backSprite.atlasLocation();
+            var atlasGetter = ClientAccessHolder.get().getTextureAtlas(atlas);
+            if (atlasGetter == null) {
+                return null;
+            }
+            var sprite = atlasGetter.apply(texture);
+            if (sprite != null && !isMissingSprite(sprite)) {
+                VoxelBridgeLogger.debug(LogModule.ENTITY, "[Painting] Resolved sprite in painting atlas: " + atlas);
+                return new ResolvedTexture(texture, sprite.getU0(), sprite.getU1(),
+                    sprite.getV0(), sprite.getV1(), true, sprite, atlas);
+            }
+        } catch (Exception e) {
+            VoxelBridgeLogger.debug(LogModule.ENTITY, "[Painting] Atlas sprite lookup failed: " + e.getMessage());
+        }
+        return null;
     }
 
     private static ResolvedTexture resolveItemFrameTexture(ItemFrame itemFrame, RenderType renderType) {

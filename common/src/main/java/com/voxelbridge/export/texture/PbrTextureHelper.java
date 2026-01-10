@@ -9,6 +9,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
+import java.util.Arrays;
 
 /**
  * Shared helper to locate and cache PBR companion textures (_n / _s) for a given sprite key.
@@ -44,8 +45,16 @@ public final class PbrTextureHelper {
         String normalKey = spriteKey + "_n";
         String specKey = spriteKey + "_s";
 
-        BufferedImage normalImg = ctx.getCachedSpriteImage(normalKey);
-        BufferedImage specImg = ctx.getCachedSpriteImage(specKey);
+        BufferedImage normalCached = ctx.getCachedSpriteImage(normalKey);
+        BufferedImage normalImg = sanitizeMissingNo(normalCached, DEFAULT_NORMAL_COLOR, normalKey);
+        if (normalImg != null && normalImg != normalCached) {
+            ctx.cacheSpriteImage(normalKey, normalImg);
+        }
+        BufferedImage specCached = ctx.getCachedSpriteImage(specKey);
+        BufferedImage specImg = sanitizeMissingNo(specCached, DEFAULT_SPECULAR_COLOR, specKey);
+        if (specImg != null && specImg != specCached) {
+            ctx.cacheSpriteImage(specKey, specImg);
+        }
 
         ResourceLocation normalLoc = null;
         ResourceLocation specLoc = null;
@@ -55,10 +64,12 @@ public final class PbrTextureHelper {
             ResourceLocation baseLoc = sprite.contents().name();
             PbrLoadResult normalResult = tryLoadPbrResourceRobustWithLocation(ctx, baseLoc, "_n");
             if (normalResult.image != null) {
-                normalImg = normalResult.image;
+                normalImg = sanitizeMissingNo(normalResult.image, DEFAULT_NORMAL_COLOR, normalKey);
                 normalLoc = normalResult.location;
-                ctx.cacheSpriteImage(normalKey, normalImg);
-                VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, "[PBR] Cached normal for " + spriteKey + " -> " + normalLoc);
+                if (normalImg != null) {
+                    ctx.cacheSpriteImage(normalKey, normalImg);
+                    VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, "[PBR] Cached normal for " + spriteKey + " -> " + normalLoc);
+                }
             }
         }
 
@@ -67,10 +78,12 @@ public final class PbrTextureHelper {
             ResourceLocation baseLoc = sprite.contents().name();
             PbrLoadResult specResult = tryLoadPbrResourceRobustWithLocation(ctx, baseLoc, "_s");
             if (specResult.image != null) {
-                specImg = specResult.image;
+                specImg = sanitizeMissingNo(specResult.image, DEFAULT_SPECULAR_COLOR, specKey);
                 specLoc = specResult.location;
-                ctx.cacheSpriteImage(specKey, specImg);
-                VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, "[PBR] Cached specular for " + spriteKey + " -> " + specLoc);
+                if (specImg != null) {
+                    ctx.cacheSpriteImage(specKey, specImg);
+                    VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, "[PBR] Cached specular for " + spriteKey + " -> " + specLoc);
+                }
             }
         }
 
@@ -161,6 +174,66 @@ public final class PbrTextureHelper {
         }
 
         return null;
+    }
+
+    public static BufferedImage sanitizeMissingNo(BufferedImage img, int defaultColor, String cacheKey) {
+        if (img == null) {
+            return null;
+        }
+        if (!isMissingNo(img)) {
+            return img;
+        }
+        BufferedImage filled = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        int[] row = new int[img.getWidth()];
+        Arrays.fill(row, defaultColor);
+        for (int y = 0; y < img.getHeight(); y++) {
+            filled.setRGB(0, y, img.getWidth(), 1, row, 0, img.getWidth());
+        }
+        VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[PBR] Detected missingno placeholder for %s, replaced with default color", cacheKey));
+        return filled;
+    }
+
+    private static boolean isMissingNo(BufferedImage img) {
+        final int tol = 16; // tolerate minor variance (e.g., 248 vs 255)
+        boolean hasMagenta = false;
+        boolean hasBlack = false;
+        boolean sawAny = false;
+
+        int w = img.getWidth();
+        int h = img.getHeight();
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int c = img.getRGB(x, y);
+                int a = (c >>> 24) & 0xFF;
+                int r = (c >>> 16) & 0xFF;
+                int g = (c >>> 8) & 0xFF;
+                int b = c & 0xFF;
+
+                // Ignore fully transparent pixels (shouldn't exist on missingno)
+                if (a < 8) {
+                    continue;
+                }
+                sawAny = true;
+
+                boolean magentaLike = Math.abs(r - 255) <= tol && g <= tol && Math.abs(b - 255) <= tol;
+                boolean blackLike = r <= tol && g <= tol && b <= tol;
+
+                if (magentaLike) {
+                    hasMagenta = true;
+                    continue;
+                }
+                if (blackLike) {
+                    hasBlack = true;
+                    continue;
+                }
+                return false; // third color found
+            }
+        }
+        if (!sawAny) {
+            return false;
+        }
+        // Accept full magenta, full black, or magenta+black
+        return hasMagenta || hasBlack;
     }
 }
 

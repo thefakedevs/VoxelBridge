@@ -258,6 +258,8 @@ public final class BlockEntityTextureManager {
         if (ctx.getCachedSpriteImage(normalKey(spriteKey)) == null) {
             BufferedImage atlasImg = ctx.getTextureAccess().readTexture(atlasNormalKey);
             BufferedImage cropped = crop(atlasImg, u0, u1, v0, v1);
+            cropped = com.voxelbridge.export.texture.PbrTextureHelper.sanitizeMissingNo(
+                cropped, DEFAULT_NORMAL, normalKey(spriteKey));
             if (cropped != null) {
                 String genKey = ctx.getTextureAccess().generatedKey("voxelbridge", "generated/" + safe(normalKey(spriteKey)) + ".png");
                 repo(ctx).put(genKey, normalKey(spriteKey), cropped);
@@ -272,6 +274,8 @@ public final class BlockEntityTextureManager {
         if (ctx.getCachedSpriteImage(specKey(spriteKey)) == null) {
             BufferedImage atlasImg = ctx.getTextureAccess().readTexture(atlasSpecKey);
             BufferedImage cropped = crop(atlasImg, u0, u1, v0, v1);
+            cropped = com.voxelbridge.export.texture.PbrTextureHelper.sanitizeMissingNo(
+                cropped, DEFAULT_SPEC, specKey(spriteKey));
             if (cropped != null) {
                 String genKey = ctx.getTextureAccess().generatedKey("voxelbridge", "generated/" + safe(specKey(spriteKey)) + ".png");
                 repo(ctx).put(genKey, specKey(spriteKey), cropped);
@@ -299,6 +303,8 @@ public final class BlockEntityTextureManager {
         if (needNormal) {
             String sibNormalKey = ctx.getTextureAccess().appendSuffixKey(pngBase, "_n");
             BufferedImage img = ctx.getTextureAccess().readTexture(sibNormalKey);
+            img = com.voxelbridge.export.texture.PbrTextureHelper.sanitizeMissingNo(
+                img, DEFAULT_NORMAL, normalKey(spriteKey));
             if (img != null) {
                 repo(ctx).put(sibNormalKey, normalKey(spriteKey), img);
                 ctx.getMaterialPaths().putIfAbsent(normalKey(spriteKey),
@@ -311,6 +317,8 @@ public final class BlockEntityTextureManager {
         if (needSpec) {
             String sibSpecKey = ctx.getTextureAccess().appendSuffixKey(pngBase, "_s");
             BufferedImage img = ctx.getTextureAccess().readTexture(sibSpecKey);
+            img = com.voxelbridge.export.texture.PbrTextureHelper.sanitizeMissingNo(
+                img, DEFAULT_SPEC, specKey(spriteKey));
             if (img != null) {
                 repo(ctx).put(sibSpecKey, specKey(spriteKey), img);
                 ctx.getMaterialPaths().putIfAbsent(specKey(spriteKey),
