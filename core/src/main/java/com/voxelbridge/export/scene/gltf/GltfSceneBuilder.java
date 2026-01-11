@@ -869,7 +869,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         int idxAcc = addAccessor(gltf, idxView, finalIndexCount, "SCALAR", 5125, null, null);
 
         // material
-        String sampleSprite = pickPrimarySprite(matChunk.usedSprites());
+        String sampleSprite = pickPrimarySprite(matKey, matChunk.usedSprites());
         VoxelBridgeLogger.info(LogModule.TEXTURE, String.format(
             "[TextureRegistry][MaterialSprites] matKey=%s sprites=%s picked=%s",
             matKey, matChunk.usedSprites(), sampleSprite));
@@ -923,9 +923,16 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
     /**
      * Pick a stable primary sprite for a material: prefer entity:* sprites, otherwise first sorted.
      */
-    private String pickPrimarySprite(Set<String> usedSprites) {
+    private String pickPrimarySprite(String matKey, Set<String> usedSprites) {
         if (usedSprites == null || usedSprites.isEmpty()) {
             return null;
+        }
+        if (matKey != null && matKey.endsWith("_animated")) {
+            for (String s : usedSprites) {
+                if (matKey.equals(com.voxelbridge.export.texture.TexturePathResolver.animationBaseName(s))) {
+                    return s;
+                }
+            }
         }
         List<String> list = new ArrayList<>(usedSprites);
         list.remove("voxelbridge:transparent");
@@ -1040,28 +1047,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         if (spriteKey == null) return null;
         var repo = state.getTextureRepository();
         if (!repo.hasAnimation(spriteKey)) return null;
-        return animationBaseName(spriteKey);
-    }
-
-    private String animationBaseName(String spriteKey) {
-        String base = safe(spriteKey);
-        boolean overlay = spriteKey.endsWith("_overlay") || spriteKey.contains("/overlay") || spriteKey.contains(":overlay");
-        if (overlay && !base.endsWith("_overlay")) {
-            base = base + "_overlay";
-        }
-        if (!base.endsWith("_animated")) {
-            base = base + "_animated";
-        }
-        return base;
-    }
-
-    private String safe(String spriteKey) {
-        if (spriteKey == null) return "unknown";
-        String s = spriteKey.replace(':', '_').replace('/', '_');
-        if (s.length() > 96) {
-            return s.substring(0, 80) + "__" + Integer.toHexString(s.hashCode());
-        }
-        return s;
+        return com.voxelbridge.export.texture.TexturePathResolver.animationBaseName(spriteKey);
     }
 
     private static final class PhaseProgress {

@@ -1,6 +1,9 @@
 package com.voxelbridge.export.texture;
 
 import com.voxelbridge.core.texture.AnimationMetadata;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
 
 import java.lang.reflect.Field;
@@ -46,6 +49,55 @@ public final class AnimationMetadataUtil {
         }
 
         return new AnimationMetadata(defaultFrameTime, timings, interpolate, 0, 0);
+    }
+
+    public static AnimationMetadata parseMcmetaJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            JsonElement rootEl = JsonParser.parseString(json);
+            if (!rootEl.isJsonObject()) {
+                return null;
+            }
+            JsonObject root = rootEl.getAsJsonObject();
+            JsonObject anim = root.getAsJsonObject("animation");
+            if (anim == null) {
+                return null;
+            }
+
+            int defaultFrameTime = getInt(anim, 1, "frametime");
+            boolean interpolate = getBoolean(anim, false, "interpolate");
+            int width = getInt(anim, 0, "width");
+            int height = getInt(anim, 0, "height");
+
+            List<AnimationMetadata.FrameTiming> timings = new ArrayList<>();
+            JsonElement framesEl = anim.get("frames");
+            if (framesEl != null && framesEl.isJsonArray()) {
+                for (JsonElement entry : framesEl.getAsJsonArray()) {
+                    if (entry == null || entry.isJsonNull()) {
+                        continue;
+                    }
+                    if (entry.isJsonPrimitive() && entry.getAsJsonPrimitive().isNumber()) {
+                        timings.add(new AnimationMetadata.FrameTiming(entry.getAsInt(), defaultFrameTime));
+                        continue;
+                    }
+                    if (entry.isJsonObject()) {
+                        JsonObject obj = entry.getAsJsonObject();
+                        Integer idx = getInt(obj, null, "index");
+                        Integer time = getInt(obj, null, "time");
+                        if (idx != null) {
+                            int frameTime = (time != null && time > 0) ? time : defaultFrameTime;
+                            timings.add(new AnimationMetadata.FrameTiming(idx, frameTime));
+                        }
+                    }
+                }
+            }
+
+            return new AnimationMetadata(defaultFrameTime, timings, interpolate, width, height);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static boolean collectForEachFrame(AnimationMetadataSection meta,
@@ -203,6 +255,13 @@ public final class AnimationMetadataUtil {
     private static Integer getInt(Object target, Integer fallback, String... names) {
         for (String name : names) {
             try {
+                if (target instanceof JsonObject obj) {
+                    JsonElement el = obj.get(name);
+                    if (el != null && el.isJsonPrimitive() && el.getAsJsonPrimitive().isNumber()) {
+                        return el.getAsInt();
+                    }
+                    continue;
+                }
                 Method method = target.getClass().getMethod(name);
                 Object value = method.invoke(target);
                 if (value instanceof Integer i) {
@@ -217,6 +276,13 @@ public final class AnimationMetadataUtil {
     private static boolean getBoolean(Object target, boolean fallback, String... names) {
         for (String name : names) {
             try {
+                if (target instanceof JsonObject obj) {
+                    JsonElement el = obj.get(name);
+                    if (el != null && el.isJsonPrimitive() && el.getAsJsonPrimitive().isBoolean()) {
+                        return el.getAsBoolean();
+                    }
+                    continue;
+                }
                 Method method = target.getClass().getMethod(name);
                 Object value = method.invoke(target);
                 if (value instanceof Boolean b) {

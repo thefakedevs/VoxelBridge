@@ -339,7 +339,7 @@ public final class TextureAtlasManager {
             }
 
             // Export animation frames
-            String baseName = primitiveBaseName(ctx, spriteKey);
+            String baseName = primitiveBaseName(spriteKey);
             Path spriteDir = animDir.resolve(baseName);
             Files.createDirectories(spriteDir);
 
@@ -348,6 +348,18 @@ public final class TextureAtlasManager {
             String mcmetaContent = readOriginalMcmeta(ctx, spriteKey);
             com.voxelbridge.export.texture.AnimationExporter.exportAnimation(
                 animDir, baseName, frames, normalFrames, specFrames, mcmetaContent);
+
+            // Register animated material paths (first frame) for glTF material binding.
+            String baseFrame = "textures/animated/" + baseName + "/" + baseName + "_000.png";
+            ctx.getMaterialPaths().put(spriteKey, baseFrame);
+            if (normalFrames != null && !normalFrames.isEmpty()) {
+                ctx.getMaterialPaths().put(spriteKey + "_n",
+                    "textures/animated/" + baseName + "/" + baseName + "_000_n.png");
+            }
+            if (specFrames != null && !specFrames.isEmpty()) {
+                ctx.getMaterialPaths().put(spriteKey + "_s",
+                    "textures/animated/" + baseName + "/" + baseName + "_000_s.png");
+            }
 
             exportCount++;
             com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, String.format(
@@ -430,22 +442,8 @@ public final class TextureAtlasManager {
         return diskImage;
     }
 
-    private static String primitiveBaseName(ExportContext ctx, String spriteKey) {
-        if (spriteKey == null) {
-            return "unknown";
-        }
-        // Align animation export folder/file naming with glTF animated primitive key
-        String base = safe(spriteKey);
-
-        // Overlay suffix if sprite itself is an overlay variant
-        boolean overlay = spriteKey.endsWith("_overlay") || spriteKey.contains("/overlay") || spriteKey.contains(":overlay");
-        if (overlay && !base.endsWith("_overlay")) {
-            base = base + "_overlay";
-        }
-        if (!base.endsWith("_animated")) {
-            base = base + "_animated";
-        }
-        return base;
+    private static String primitiveBaseName(String spriteKey) {
+        return TexturePathResolver.animationBaseName(spriteKey);
     }
 
     private static String readOriginalMcmeta(ExportContext ctx, String spriteKey) {

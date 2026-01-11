@@ -1,6 +1,7 @@
 package com.voxelbridge.platform.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
@@ -14,6 +15,9 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.ref.SoftReference;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Attempts to read runtime textures from TextureManager when no resource exists.
@@ -22,7 +26,43 @@ final class DynamicTextureReader {
 
     private DynamicTextureReader() {}
 
+    private static final ConcurrentHashMap<ResourceLocation, SoftReference<BufferedImage>> CACHE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<ResourceLocation, CompletableFuture<BufferedImage>> IN_FLIGHT = new ConcurrentHashMap<>();
+
     static BufferedImage tryRead(ResourceLocation location) {
+        SoftReference<BufferedImage> cachedRef = CACHE.get(location);
+        if (cachedRef != null) {
+            BufferedImage cached = cachedRef.get();
+            if (cached != null) {
+                return cached;
+            }
+        }
+        if (RenderSystem.isOnRenderThreadOrInit()) {
+            return readOnRenderThread(location);
+        }
+        CompletableFuture<BufferedImage> future = IN_FLIGHT.computeIfAbsent(location, loc -> {
+            CompletableFuture<BufferedImage> created = new CompletableFuture<>();
+            RenderSystem.recordRenderCall(() -> {
+                try {
+                    BufferedImage img = readOnRenderThread(loc);
+                    created.complete(img);
+                } catch (Throwable t) {
+                    created.completeExceptionally(t);
+                } finally {
+                    IN_FLIGHT.remove(loc);
+                }
+            });
+            return created;
+        });
+        try {
+            return future.get();
+        } catch (Exception e) {
+            VoxelBridgeLogger.warn(LogModule.TEXTURE_RESOLVE, String.format("[DynamicTextureReader][WARN] Failed to read %s: %s", location, e.getMessage()));
+            return null;
+        }
+    }
+
+    private static BufferedImage readOnRenderThread(ResourceLocation location) {
         try {
             AbstractTexture texture = ClientAccessHolder.get().getTextureManager().getTexture(location);
             if (texture == null) {
@@ -36,14 +76,17 @@ final class DynamicTextureReader {
             }
             BufferedImage fromDynamic = readDynamicTexture(texture);
             if (fromDynamic != null) {
+                CACHE.put(location, new SoftReference<>(fromDynamic));
                 return fromDynamic;
             }
             BufferedImage fromNative = readNativeImageTexture(texture);
             if (fromNative != null) {
+                CACHE.put(location, new SoftReference<>(fromNative));
                 return fromNative;
             }
             BufferedImage fromHttp = readHttpTexture(texture);
             if (fromHttp != null) {
+                CACHE.put(location, new SoftReference<>(fromHttp));
                 return fromHttp;
             }
         } catch (Throwable t) {

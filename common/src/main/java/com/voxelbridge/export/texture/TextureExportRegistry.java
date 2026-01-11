@@ -61,15 +61,13 @@ public final class TextureExportRegistry {
         }
 
         boolean isAnimated = ExportRuntimeConfig.isAnimationEnabled() && repo.hasAnimation(spriteKey);
-        if (!isAnimated) {
-            String path = ctx.getMaterialPaths().get(spriteKey);
-            if (path != null) {
-                VoxelBridgeLogger.info(LogModule.TEXTURE, String.format(
-                    "[TextureExport] spriteKey=%s using materialPath=%s (reuse)",
-                    spriteKey, path));
-                spriteRelativePaths.put(spriteKey, path);
-                return path;
-            }
+        String path = ctx.getMaterialPaths().get(spriteKey);
+        if (path != null && (!isAnimated || path.startsWith("textures/animated/"))) {
+            VoxelBridgeLogger.info(LogModule.TEXTURE, String.format(
+                "[TextureExport] spriteKey=%s using materialPath=%s (reuse)",
+                spriteKey, path));
+            spriteRelativePaths.put(spriteKey, path);
+            return path;
         }
 
         try {

@@ -11,6 +11,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -65,7 +66,22 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
             }
             var res = resOpt.get();
             var meta = AnimationMetadataUtil.readSection(res.metadata());
-            return meta == null ? null : AnimationMetadataUtil.toCoreMetadata(meta);
+            if (meta != null) {
+                return AnimationMetadataUtil.toCoreMetadata(meta);
+            }
+
+            ResourceLocation metaLoc = ResourceLocation.parse(resourceKey + ".mcmeta");
+            var metaResOpt = rm.getResource(metaLoc);
+            if (metaResOpt.isEmpty()) {
+                return null;
+            }
+            try (InputStream in = metaResOpt.get().open()) {
+                if (in == null) {
+                    return null;
+                }
+                String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                return AnimationMetadataUtil.parseMcmetaJson(json);
+            }
         } catch (Exception ignored) {
             return null;
         }

@@ -246,8 +246,8 @@ public final class AnimatedTextureHelper {
     public static void scanAllAnimations(ExportContext ctx, java.util.Set<String> whitelist) {
         TextureRepository repo = ctx.getTextureRepository();
 
-        // OPTIMIZATION: Skip expensive filesystem scan if cache is already warmed up
-        if (cacheWarmedUp) {
+        // OPTIMIZATION: Only skip scans when the repository already has animations.
+        if (cacheWarmedUp && !repo.getAnimatedCache().isEmpty()) {
             com.voxelbridge.util.debug.VoxelBridgeLogger.info(LogModule.ANIMATION, "[Animation][CACHE] Using cached scan results (skipping 0.5-2s filesystem scan)");
             return;
         }

@@ -7,6 +7,8 @@ import com.voxelbridge.core.texture.TextureRepository;
 import com.voxelbridge.core.util.color.ColorMapAccess;
 import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.export.texture.ExportColorMapAccess;
+import com.voxelbridge.export.texture.AnimatedTextureHelper;
+import com.voxelbridge.export.texture.TexturePathResolver;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -91,6 +93,16 @@ public final class ExportContext {
     }
 
     public String resolveMaterialKey(String spriteKey, String fallbackMaterialKey) {
+        if (spriteKey != null && ExportRuntimeConfig.isAnimationEnabled()) {
+            TextureRepository repo = state.getTextureRepository();
+            if (!repo.hasAnimation(spriteKey)) {
+                String resourceKey = textureAccess.spriteKeyToResourceKey(spriteKey);
+                AnimatedTextureHelper.detectFromMetadata(this, spriteKey, resourceKey, repo);
+            }
+            if (repo.hasAnimation(spriteKey)) {
+                return TexturePathResolver.animationBaseName(spriteKey);
+            }
+        }
         if (ExportRuntimeConfig.getAtlasMode() == ExportRuntimeConfig.AtlasMode.INDIVIDUAL && spriteKey != null) {
             return spriteKey;
         }

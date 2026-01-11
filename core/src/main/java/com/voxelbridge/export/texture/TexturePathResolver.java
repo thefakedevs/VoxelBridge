@@ -49,4 +49,19 @@ public final class TexturePathResolver {
         }
         return s;
     }
+
+    public static String animationBaseName(String spriteKey) {
+        if (spriteKey == null) {
+            return "unknown_animated";
+        }
+        String base = safe(spriteKey);
+        boolean overlay = spriteKey.endsWith("_overlay") || spriteKey.contains("/overlay") || spriteKey.contains(":overlay");
+        if (overlay && !base.endsWith("_overlay")) {
+            base = base + "_overlay";
+        }
+        if (!base.endsWith("_animated")) {
+            base = base + "_animated";
+        }
+        return base;
+    }
 }
