@@ -159,6 +159,16 @@ public final class BlockExporter {
 
         if (quads.isEmpty()) return;
 
+        boolean isCtmCompact = false;
+        for (BakedQuad quad : quads) {
+            if (quad == null || quad.getSprite() == null) continue;
+            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(quad.getSprite());
+            if (isContinuitySprite(spriteKey)) {
+                isCtmCompact = true;
+                break;
+            }
+        }
+
         // Generate material key
         String blockKey = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
         int lightLevel = state.getLightEmission();
@@ -210,6 +220,9 @@ public final class BlockExporter {
                 if (!isTransparent) {
                     // Opaque blocks: cull if neighbor is solid
                     if (isFaceOccluded(pos, dir)) continue;
+                } else if (isCtmCompact) {
+                    // CTM compact: cull internal faces against same block to keep outer shell
+                    if (isFaceOccludedBySameBlock(state, pos, dir)) continue;
                 }
                 // Transparent blocks: no face culling (internal faces must remain visible)
             }
@@ -219,10 +232,14 @@ public final class BlockExporter {
         }
 
         // PASS 3: Output overlays with culling
+        final boolean ctmCompact = isCtmCompact;
         overlayManager.outputOverlays(sceneSink, state, dir -> {
             if (dir == null) return false;
             if (!isTransparent) {
                 return isFaceOccluded(pos, dir);
+            }
+            if (ctmCompact) {
+                return isFaceOccludedBySameBlock(state, pos, dir);
             }
             // Transparent blocks: no face culling for overlays
             return false;
@@ -287,6 +304,11 @@ public final class BlockExporter {
             || lower.contains("/ctm/")
             || lower.contains("ctm/")
             || lower.contains("continuity");
+    }
+
+    private boolean isContinuitySprite(String spriteKey) {
+        if (spriteKey == null) return false;
+        return spriteKey.toLowerCase(Locale.ROOT).contains("continuity");
     }
 
     private boolean isHilightOverlay(String spriteKey) {
@@ -383,6 +405,12 @@ public final class BlockExporter {
         return isNeighborSolid(mutablePos);
     }
 
+    private boolean isFaceOccludedBySameBlock(BlockState state, BlockPos pos, Direction face) {
+        mutablePos.setWithOffset(pos, face);
+        if (isOutsideRegion(mutablePos)) return false;
+        return isNeighborSameBlock(state, mutablePos);
+    }
+
     private boolean isOutsideRegion(BlockPos pos) {
         if (regionMin == null || regionMax == null) return false;
         return pos.getX() < regionMin.getX() || pos.getX() > regionMax.getX()
@@ -410,6 +438,20 @@ public final class BlockExporter {
         }
 
         return state.isSolidRender(level, neighbor);
+    }
+
+    private boolean isNeighborSameBlock(BlockState state, BlockPos neighbor) {
+        BlockState neighborState;
+        if (chunkCache != null) {
+            int cx = neighbor.getX() >> 4;
+            int cz = neighbor.getZ() >> 4;
+            var chunk = chunkCache.getChunk(cx, cz, false);
+            if (chunk == null || chunk.isEmpty()) return false;
+            neighborState = chunk.getBlockState(neighbor);
+        } else {
+            neighborState = level.getBlockState(neighbor);
+        }
+        return neighborState.getBlock() == state.getBlock();
     }
 
     private long computeBushSeed(BlockPos pos) {

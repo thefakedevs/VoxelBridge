@@ -3,8 +3,10 @@ package com.voxelbridge.export.exporter.entity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.exporter.PlaneOffsetTracker;
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
@@ -240,6 +242,7 @@ public final class EntityRenderer {
     private static class CaptureBuffer extends CaptureBufferBase {
         private final double offsetX, offsetY, offsetZ;
         private final Entity entity;
+        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker();
         private int quadCount = 0;
         private float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
         private float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
@@ -389,11 +392,33 @@ public final class EntityRenderer {
             ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
             RenderCaptureUtil.ColorModeResult colorResult =
                 RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
+            float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
+            Direction dir = approximateDirection(faceNormal);
+            planeOffset.applyOffset(positions, faceNormal, dir);
             sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
                 RenderLayer.UNKNOWN, colorResult.tintMode(),
                 RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
                 false,
                 positions, uv0, colorResult.uv1(), NORMAL_UP, colors);
+        }
+
+        private Direction approximateDirection(float[] normal) {
+            if (normal == null || normal.length < 3) {
+                return null;
+            }
+            float nx = normal[0];
+            float ny = normal[1];
+            float nz = normal[2];
+            float ax = Math.abs(nx);
+            float ay = Math.abs(ny);
+            float az = Math.abs(nz);
+            if (ax >= ay && ax >= az) {
+                return nx >= 0f ? Direction.EAST : Direction.WEST;
+            }
+            if (ay >= ax && ay >= az) {
+                return ny >= 0f ? Direction.UP : Direction.DOWN;
+            }
+            return nz >= 0f ? Direction.SOUTH : Direction.NORTH;
         }
 
         private void fillUvs(List<RenderCapture.Vertex> verts, float[] uv0, boolean isAtlas,
