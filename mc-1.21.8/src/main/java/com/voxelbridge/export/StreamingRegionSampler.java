@@ -22,6 +22,7 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -131,11 +132,12 @@ public final class StreamingRegionSampler {
 
                     if (progress.isComplete()) break;
 
+                    Map<Long, ExportProgressTracker.ChunkState> snapshot = ExportProgressTracker.snapshot();
                     for (ChunkPos chunkPos : allChunks) {
                         if (processing.contains(chunkPos)) continue;
 
                         long key = chunkPos.toLong();
-                        ExportProgressTracker.ChunkState state = ExportProgressTracker.snapshot().get(key);
+                        ExportProgressTracker.ChunkState state = snapshot.get(key);
 
                     if (state != ExportProgressTracker.ChunkState.PENDING) {
                         continue;
@@ -206,9 +208,10 @@ public final class StreamingRegionSampler {
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.EXPORT)) {
                     VoxelBridgeLogger.info(LogModule.EXPORT, String.format("[StreamingRegionSampler] Force exporting %d pending chunks...", progress.pending()));
                 }
+                Map<Long, ExportProgressTracker.ChunkState> snapshot = ExportProgressTracker.snapshot();
                 for (ChunkPos chunkPos : allChunks) {
                     long key = chunkPos.toLong();
-                    ExportProgressTracker.ChunkState state = ExportProgressTracker.snapshot().get(key);
+                    ExportProgressTracker.ChunkState state = snapshot.get(key);
 
                     if (state == ExportProgressTracker.ChunkState.PENDING) {
                         LevelChunk chunk = chunkCache.getChunk(chunkPos.x, chunkPos.z, false);

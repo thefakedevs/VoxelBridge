@@ -103,6 +103,72 @@ public final class VertexExtractor {
     }
 
     /**
+     * Extracts world positions and normalized UVs into provided arrays (no allocation).
+     * Optional colors array may be provided to capture per-vertex color values.
+     */
+    public static void extractPositionsUv(
+        BakedQuad quad,
+        BlockPos pos,
+        TextureAtlasSprite sprite,
+        double offsetX,
+        double offsetY,
+        double offsetZ,
+        Vec3 randomOffset,
+        float[] positionsOut,
+        float[] uvOut,
+        int[] colorsOut
+    ) {
+        if (positionsOut == null || positionsOut.length < 12) return;
+        if (uvOut == null || uvOut.length < 8) return;
+
+        int[] verts = quad.getVertices();
+        float u0 = sprite.getU0(), u1 = sprite.getU1();
+        float v0 = sprite.getV0(), v1 = sprite.getV1();
+
+        // Detect animated texture (height > width) and adjust v1 to first frame
+        int spriteWidth = sprite.contents().width();
+        int spriteHeight = sprite.contents().height();
+        if (spriteHeight > spriteWidth) {
+            int frameCount = spriteHeight / spriteWidth;
+            float frameRatio = 1.0f / frameCount;
+            v1 = v0 + (v1 - v0) * frameRatio;
+        }
+
+        float du = u1 - u0;
+        if (du == 0) du = 1f;
+        float dv = v1 - v0;
+        if (dv == 0) dv = 1f;
+
+        // Extract vertices (4 vertices per quad)
+        for (int i = 0; i < 4; i++) {
+            int base = i * 8;  // DefaultVertexFormat.BLOCK stride
+            float vx = Float.intBitsToFloat(verts[base]);
+            float vy = Float.intBitsToFloat(verts[base + 1]);
+            float vz = Float.intBitsToFloat(verts[base + 2]);
+            int argb = verts[base + 3];
+            float uu = Float.intBitsToFloat(verts[base + 4]);
+            float vv = Float.intBitsToFloat(verts[base + 5]);
+
+            // Transform to world coordinates with double precision
+            double worldX = pos.getX() + vx + offsetX + (randomOffset != null ? randomOffset.x : 0);
+            double worldY = pos.getY() + vy + offsetY + (randomOffset != null ? randomOffset.y : 0);
+            double worldZ = pos.getZ() + vz + offsetZ + (randomOffset != null ? randomOffset.z : 0);
+
+            positionsOut[i * 3] = (float) worldX;
+            positionsOut[i * 3 + 1] = (float) worldY;
+            positionsOut[i * 3 + 2] = (float) worldZ;
+
+            // Normalize UVs to [0, 1] range
+            uvOut[i * 2] = (uu - u0) / du;
+            uvOut[i * 2 + 1] = (vv - v0) / dv;
+
+            if (colorsOut != null && colorsOut.length >= 4) {
+                colorsOut[i] = argb;
+            }
+        }
+    }
+
+    /**
      * Extracts local vertex positions (0-1 range) from a BakedQuad.
      * Used for overlay offset calculations to avoid float precision loss.
      *

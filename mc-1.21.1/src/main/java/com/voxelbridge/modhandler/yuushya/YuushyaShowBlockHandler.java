@@ -86,6 +86,11 @@ public final class YuushyaShowBlockHandler implements ModBlockHandler {
         }
     }
 
+    @Override
+    public boolean requiresBlockEntity() {
+        return true;
+    }
+
     private Object createModel(Direction facing, BakedModel backup) {
         for (String className : MODEL_CLASSES) {
             try {

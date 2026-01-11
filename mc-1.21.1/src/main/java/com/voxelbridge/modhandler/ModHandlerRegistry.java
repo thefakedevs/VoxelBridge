@@ -28,8 +28,14 @@ public final class ModHandlerRegistry {
     private static final List<ModBlockHandler> HANDLERS = List.of(
         new YuushyaShowBlockHandler()
     );
+    private static final boolean ALL_REQUIRE_BLOCK_ENTITY = HANDLERS.stream()
+        .allMatch(ModBlockHandler::requiresBlockEntity);
 
     private ModHandlerRegistry() {}
+
+    public static boolean shouldHandle(BlockEntity blockEntity) {
+        return !ALL_REQUIRE_BLOCK_ENTITY || blockEntity != null;
+    }
 
     public static ModHandledQuads handle(
         ExportContext ctx,

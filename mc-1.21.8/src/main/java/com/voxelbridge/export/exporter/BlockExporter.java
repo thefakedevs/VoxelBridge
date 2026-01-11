@@ -98,8 +98,10 @@ public final class BlockExporter {
      * Samples a single block and outputs its geometry.
      */
     public void sampleBlock(BlockState state, BlockPos pos) {
-        // Check neighbor chunks are loaded
-        if (!isNeighborChunksLoadedForBlock(pos)) {
+        // Check neighbor chunks are loaded only for chunk-edge blocks
+        int localX = pos.getX() & 15;
+        int localZ = pos.getZ() & 15;
+        if ((localX == 0 || localX == 15 || localZ == 0 || localZ == 15) && !isNeighborChunksLoadedForBlock(pos)) {
             VoxelBridgeLogger.debug(LogModule.SAMPLER_BLOCK, "[BlockExporter] Neighbor chunks missing for block at " + pos.toShortString());
             missingNeighborDetected = true;
             return;
@@ -143,10 +145,29 @@ public final class BlockExporter {
 
         // Occlusion culling for opaque blocks
         boolean isTransparent = !state.isSolidRender();
-        if (!isTransparent && isFullyOccluded(pos)) return;
+        byte[] faceOcclusionCache = null;
+        if (!isTransparent) {
+            faceOcclusionCache = new byte[Direction.values().length];
+            boolean fullyOccluded = true;
+            for (Direction dir : Direction.values()) {
+                int idx = dir.ordinal();
+                mutablePos.setWithOffset(pos, dir);
+                if (isOutsideRegion(mutablePos)) {
+                    faceOcclusionCache[idx] = 2;
+                    fullyOccluded = false;
+                    continue;
+                }
+                boolean occluded = isNeighborSolid(mutablePos);
+                faceOcclusionCache[idx] = (byte) (occluded ? 1 : 2);
+                if (!occluded) fullyOccluded = false;
+            }
+            if (fullyOccluded) return;
+        }
 
         // Get quads via Adapter (handles ModelData and Fabric API internally)
-        ModHandledQuads handledQuads = ModHandlerRegistry.handle(ctx, level, state, be, pos, model);
+        ModHandledQuads handledQuads = ModHandlerRegistry.shouldHandle(be)
+            ? ModHandlerRegistry.handle(ctx, level, state, be, pos, model)
+            : null;
         List<BakedQuad> quads;
         if (handledQuads != null) {
             quads = handledQuads.quads();
@@ -157,6 +178,19 @@ public final class BlockExporter {
 
         if (quads.isEmpty()) return;
 
+        int quadCount = quads.size();
+        String[] spriteKeys = new String[quadCount];
+        boolean hasCtmSprite = false;
+        for (int i = 0; i < quadCount; i++) {
+            BakedQuad quad = quads.get(i);
+            if (quad == null || quad.sprite() == null) continue;
+            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(quad.sprite());
+            spriteKeys[i] = spriteKey;
+            if (!hasCtmSprite && isCtmOverlaySprite(spriteKey)) {
+                hasCtmSprite = true;
+            }
+        }
+
         // Generate material key
         String blockKey = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
         int lightLevel = state.getLightEmission();
@@ -166,14 +200,16 @@ public final class BlockExporter {
 
         ctx.registerSpriteMaterial(blockKey, blockKey);
 
-        // PASS 1: Position-based CTM overlay detection
-        detectCtmOverlaysByPosition(quads, state, pos, blockKey, randomOffset);
+        // PASS 1: Position-based CTM overlay detection (skip if no CTM sprites)
+        if (hasCtmSprite && quadCount > 1) {
+            detectCtmOverlaysByPosition(quads, spriteKeys, state, pos, blockKey, randomOffset);
+        }
 
         // PASS 1b: Detect and cache overlays
-        for (BakedQuad quad : quads) {
-            if (quad == null || quad.sprite() == null) continue;
-
-            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(quad.sprite());
+        for (int i = 0; i < quadCount; i++) {
+            BakedQuad quad = quads.get(i);
+            String spriteKey = spriteKeys[i];
+            if (quad == null || spriteKey == null) continue;
 
             // Check vanilla overlay
             if (OverlayManager.isVanillaOverlay(spriteKey)) {
@@ -192,13 +228,14 @@ public final class BlockExporter {
         }
 
         // PASS 2: Process base quads
-        for (BakedQuad quad : quads) {
-            if (quad == null) continue;
+        for (int i = 0; i < quadCount; i++) {
+            BakedQuad quad = quads.get(i);
+            String spriteKey = spriteKeys[i];
+            if (quad == null || spriteKey == null) continue;
 
             Direction dir = quad.direction();
 
             // Skip if processed as overlay
-            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(quad.sprite());
             if (overlayManager.isProcessedOverlay(spriteKey)) {
                 continue;
             }
@@ -207,7 +244,8 @@ public final class BlockExporter {
             if (dir != null) {
                 if (!isTransparent) {
                     // Opaque blocks: cull if neighbor is solid
-                    if (isFaceOccluded(pos, dir)) continue;
+                    boolean occluded = isFaceOccludedCached(pos, dir, faceOcclusionCache);
+                    if (occluded) continue;
                 }
                 // Transparent blocks: no face culling (internal faces must remain visible)
             }
@@ -217,33 +255,34 @@ public final class BlockExporter {
         }
 
         // PASS 3: Output overlays with culling
+        final byte[] occlusionCacheFinal = faceOcclusionCache;
         overlayManager.outputOverlays(sceneSink, state, dir -> {
             if (dir == null) return false;
             if (!isTransparent) {
-                return isFaceOccluded(pos, dir);
+                return isFaceOccludedCached(pos, dir, occlusionCacheFinal);
             }
             // Transparent blocks: no face culling for overlays
             return false;
         });
     }
 
-    private void detectCtmOverlaysByPosition(List<BakedQuad> quads, BlockState state, BlockPos pos, String blockKey, Vec3 randomOffset) {
+    private void detectCtmOverlaysByPosition(List<BakedQuad> quads, String[] spriteKeys, BlockState state, BlockPos pos, String blockKey, Vec3 randomOffset) {
         record QuadEntry(int index, BakedQuad quad, String spriteKey, long posHash, boolean approxSquare,
                          float uMin, float uMax, float vMin, float vMax) {}
 
-        Map<Long, List<QuadEntry>> groups = new HashMap<>();
+        Map<Long, List<QuadEntry>> groups = new HashMap<>(quads.size());
+        float[] positions = new float[12];
+        float[] uv = new float[8];
 
         for (int i = 0; i < quads.size(); i++) {
             BakedQuad quad = quads.get(i);
-            if (quad == null || quad.sprite() == null) continue;
-
+            String spriteKey = spriteKeys[i];
+            if (quad == null || spriteKey == null) continue;
             var sprite = quad.sprite();
-            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(sprite);
-            var vertexData = VertexExtractor.extractFromQuad(quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset);
-            long posHash = computePositionHash(vertexData.positions());
-            boolean approxSquare = isApprox1x1Square(vertexData.positions());
+            VertexExtractor.extractPositionsUv(quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset, positions, uv, null);
+            long posHash = computePositionHash(positions);
+            boolean approxSquare = isApprox1x1Square(positions);
 
-            float[] uv = vertexData.uvs();
             float uMin = Math.min(Math.min(uv[0], uv[2]), Math.min(uv[4], uv[6]));
             float uMax = Math.max(Math.max(uv[0], uv[2]), Math.max(uv[4], uv[6]));
             float vMin = Math.min(Math.min(uv[1], uv[3]), Math.min(uv[5], uv[7]));
@@ -379,6 +418,19 @@ public final class BlockExporter {
         mutablePos.setWithOffset(pos, face);
         if (isOutsideRegion(mutablePos)) return false;
         return isNeighborSolid(mutablePos);
+    }
+
+    private boolean isFaceOccludedCached(BlockPos pos, Direction face, byte[] cache) {
+        if (cache == null) {
+            return isFaceOccluded(pos, face);
+        }
+        int idx = face.ordinal();
+        byte cached = cache[idx];
+        if (cached == 1) return true;
+        if (cached == 2) return false;
+        boolean occluded = isFaceOccluded(pos, face);
+        cache[idx] = (byte) (occluded ? 1 : 2);
+        return occluded;
     }
 
     private boolean isOutsideRegion(BlockPos pos) {

@@ -27,5 +27,12 @@ public interface ModBlockHandler {
         BlockPos pos,
         BakedModel bakedModel
     );
+
+    /**
+     * Quick predicate for handlers that only apply to blocks with BlockEntities.
+     */
+    default boolean requiresBlockEntity() {
+        return false;
+    }
 }
 
