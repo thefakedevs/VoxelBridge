@@ -25,18 +25,12 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.decoration.ItemFrame;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.MapItem;
-import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Captures entity renderer output into an IR sink.
@@ -54,7 +48,6 @@ public final class EntityRenderer {
     private static AtlasLocator ATLAS_LOCATOR = new EntityAtlasLocator(ClientAccessHolder.get());
     private static TextureResolver<Entity> TEXTURE_RESOLVER = EntityTextureResolver.INSTANCE;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
-    private static final Set<String> LOGGED_MAP_RENDERERS = ConcurrentHashMap.newKeySet();
 
     private EntityRenderer() {}
 
@@ -176,7 +169,6 @@ public final class EntityRenderer {
 
             Runnable renderCall = () -> {
                 try {
-                    warmMapTexture(ctx, entity);
                     var renderOffset = renderer.getRenderOffset(entity, partial);
                     poseStack.translate(renderOffset.x(), renderOffset.y(), renderOffset.z());
 
@@ -240,287 +232,6 @@ public final class EntityRenderer {
 
     private static boolean isHangingEntity(Entity entity) {
         return entity instanceof net.minecraft.world.entity.decoration.HangingEntity;
-    }
-
-    private static void warmMapTexture(ExportContext ctx, Entity entity) {
-        if (!(entity instanceof ItemFrame itemFrame)) {
-            return;
-        }
-        ItemStack item = itemFrame.getItem();
-        if (item == null || item.isEmpty()) {
-            return;
-        }
-        if (!(item.getItem() instanceof MapItem)) {
-            return;
-        }
-        MapItemSavedData data = MapItem.getSavedData(item, itemFrame.level());
-        if (data == null) {
-            VoxelBridgeLogger.warn(LogModule.DYNAMIC_MAP, "[DynamicMap] No MapItemSavedData for item frame");
-            return;
-        }
-        Object mapRenderer = ctx.getMc().gameRenderer.getMapRenderer();
-        if (mapRenderer == null) {
-            VoxelBridgeLogger.warn(LogModule.DYNAMIC_MAP, "[DynamicMap] MapRenderer unavailable");
-            return;
-        }
-        boolean updated = tryUpdateMapRenderer(mapRenderer, data, item);
-        if (!updated) {
-            VoxelBridgeLogger.warn(LogModule.DYNAMIC_MAP, "[DynamicMap] MapRenderer update() not found or failed");
-        }
-    }
-
-    private static boolean tryUpdateMapRenderer(Object mapRenderer, MapItemSavedData data, ItemStack item) {
-        Class<?> dataClass = data.getClass();
-        for (var method : mapRenderer.getClass().getMethods()) {
-            String name = method.getName();
-            if (!isMapUpdateMethod(name)) {
-                continue;
-            }
-            Class<?>[] params = method.getParameterTypes();
-            if (params.length == 1) {
-                if (params[0].isAssignableFrom(dataClass)) {
-                    if (invokeMapUpdate(mapRenderer, method, data)) {
-                        VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP, "[DynamicMap] MapRenderer updated: " + name + "(data)");
-                        return true;
-                    }
-                }
-                continue;
-            }
-            if (params.length != 2) {
-                continue;
-            }
-            if (params[0].isAssignableFrom(dataClass) && params[1].isAssignableFrom(ItemStack.class)) {
-                if (invokeMapUpdate(mapRenderer, method, data, item)) {
-                    VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP, "[DynamicMap] MapRenderer updated: " + name + "(data,item)");
-                    return true;
-                }
-                continue;
-            }
-            if (params[1].isAssignableFrom(dataClass) && params[0].isAssignableFrom(ItemStack.class)) {
-                if (invokeMapUpdate(mapRenderer, method, item, data)) {
-                    VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP, "[DynamicMap] MapRenderer updated: " + name + "(item,data)");
-                    return true;
-                }
-                continue;
-            }
-            if (params[1].isAssignableFrom(dataClass)) {
-                Object idArg = resolveMapIdArg(params[0], data, item);
-                if (idArg != null && invokeMapUpdate(mapRenderer, method, idArg, data)) {
-                    VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP, "[DynamicMap] MapRenderer updated: " + name + "(" + idArg + ",data)");
-                    return true;
-                }
-            }
-            if (params[0].isAssignableFrom(dataClass)) {
-                Object idArg = resolveMapIdArg(params[1], data, item);
-                if (idArg != null && invokeMapUpdate(mapRenderer, method, data, idArg)) {
-                    VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP, "[DynamicMap] MapRenderer updated: " + name + "(data," + idArg + ")");
-                    return true;
-                }
-            }
-        }
-        logMapRendererMethods(mapRenderer);
-        return false;
-    }
-
-    private static boolean isMapUpdateMethod(String name) {
-        if (name == null) {
-            return false;
-        }
-        String lower = name.toLowerCase(java.util.Locale.ROOT);
-        return lower.equals("update")
-            || lower.contains("update")
-            || lower.contains("refresh")
-            || lower.contains("render");
-    }
-
-    private static boolean invokeMapUpdate(Object mapRenderer, java.lang.reflect.Method method, Object... args) {
-        try {
-            method.invoke(mapRenderer, args);
-            return true;
-        } catch (ReflectiveOperationException ignored) {
-            return false;
-        }
-    }
-
-    private static void logMapRendererMethods(Object mapRenderer) {
-        if (mapRenderer == null) {
-            return;
-        }
-        String key = mapRenderer.getClass().getName();
-        if (!LOGGED_MAP_RENDERERS.add(key)) {
-            return;
-        }
-        StringBuilder sb = new StringBuilder("[DynamicMap] MapRenderer methods:");
-        for (var method : mapRenderer.getClass().getMethods()) {
-            sb.append(" ").append(method.getName()).append("(");
-            Class<?>[] params = method.getParameterTypes();
-            for (int i = 0; i < params.length; i++) {
-                if (i > 0) sb.append(",");
-                sb.append(params[i].getSimpleName());
-            }
-            sb.append(")");
-        }
-        VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP, sb.toString());
-    }
-
-    private static Object resolveMapIdArg(Class<?> expectedType, MapItemSavedData data, ItemStack item) {
-        if (expectedType == int.class || expectedType == Integer.class) {
-            Integer id = extractMapIdInt(data, item);
-            return id != null ? id : null;
-        }
-        Object idFromStack = extractMapIdFromStack(expectedType, item);
-        if (idFromStack != null) {
-            return idFromStack;
-        }
-        Object idFromData = extractMapIdFromData(expectedType, data);
-        if (idFromData != null) {
-            return idFromData;
-        }
-        if (isMapIdType(expectedType)) {
-            Integer rawId = extractMapIdInt(data, item);
-            if (rawId != null) {
-                return createMapId(expectedType, rawId);
-            }
-        }
-        return null;
-    }
-
-    private static Integer extractMapIdInt(MapItemSavedData data, ItemStack item) {
-        Integer fromData = extractIntFromData(data);
-        if (fromData != null) {
-            return fromData;
-        }
-        Object fromStack = extractMapIdFromStack(Integer.class, item);
-        if (fromStack instanceof Integer id) {
-            return id;
-        }
-        return null;
-    }
-
-    private static Integer extractIntFromData(MapItemSavedData data) {
-        for (var method : data.getClass().getMethods()) {
-            if (method.getParameterCount() != 0) {
-                continue;
-            }
-            if (method.getReturnType() != int.class && method.getReturnType() != Integer.class) {
-                continue;
-            }
-            String name = method.getName().toLowerCase(java.util.Locale.ROOT);
-            if (!name.contains("id")) {
-                continue;
-            }
-            try {
-                Object value = method.invoke(data);
-                if (value instanceof Integer id) {
-                    return id;
-                }
-            } catch (ReflectiveOperationException ignored) {
-            }
-        }
-        Class<?> type = data.getClass();
-        while (type != null && type != Object.class) {
-            try {
-                var field = type.getDeclaredField("id");
-                field.setAccessible(true);
-                Object value = field.get(data);
-                if (value instanceof Integer id) {
-                    return id;
-                }
-            } catch (ReflectiveOperationException ignored) {
-            }
-            type = type.getSuperclass();
-        }
-        return null;
-    }
-
-    private static Object extractMapIdFromStack(Class<?> expectedType, ItemStack item) {
-        try {
-            var method = MapItem.class.getMethod("getMapId", ItemStack.class);
-            Object value = method.invoke(null, item);
-            if (expectedType.isInstance(value)) {
-                return value;
-            }
-            if (value instanceof Integer id && isMapIdType(expectedType)) {
-                return createMapId(expectedType, id);
-            }
-            return null;
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
-
-    private static Object extractMapIdFromData(Class<?> expectedType, MapItemSavedData data) {
-        for (var method : data.getClass().getMethods()) {
-            if (method.getParameterCount() != 0) {
-                continue;
-            }
-            if (!expectedType.isAssignableFrom(method.getReturnType())) {
-                continue;
-            }
-            String name = method.getName().toLowerCase(java.util.Locale.ROOT);
-            if (!name.contains("id")) {
-                continue;
-            }
-            try {
-                Object value = method.invoke(data);
-                return expectedType.isInstance(value) ? value : null;
-            } catch (ReflectiveOperationException ignored) {
-            }
-        }
-        Class<?> type = data.getClass();
-        while (type != null && type != Object.class) {
-            for (var field : type.getDeclaredFields()) {
-                if (!expectedType.isAssignableFrom(field.getType())) {
-                    continue;
-                }
-                String name = field.getName().toLowerCase(java.util.Locale.ROOT);
-                if (!name.contains("id")) {
-                    continue;
-                }
-                try {
-                    field.setAccessible(true);
-                    Object value = field.get(data);
-                    return expectedType.isInstance(value) ? value : null;
-                } catch (ReflectiveOperationException ignored) {
-                }
-            }
-            type = type.getSuperclass();
-        }
-        return null;
-    }
-
-    private static boolean isMapIdType(Class<?> type) {
-        if (type == null) {
-            return false;
-        }
-        String name = type.getSimpleName();
-        return "MapId".equals(name) || name.endsWith(".MapId");
-    }
-
-    private static Object createMapId(Class<?> mapIdType, int id) {
-        if (mapIdType == null) {
-            return null;
-        }
-        for (String name : new String[] {"of", "fromId", "valueOf"}) {
-            try {
-                var method = mapIdType.getMethod(name, int.class);
-                Object value = method.invoke(null, id);
-                if (mapIdType.isInstance(value)) {
-                    return value;
-                }
-            } catch (ReflectiveOperationException ignored) {
-            }
-        }
-        try {
-            var ctor = mapIdType.getDeclaredConstructor(int.class);
-            ctor.setAccessible(true);
-            Object value = ctor.newInstance(id);
-            if (mapIdType.isInstance(value)) {
-                return value;
-            }
-        } catch (ReflectiveOperationException ignored) {
-        }
-        return null;
     }
 
     /**
