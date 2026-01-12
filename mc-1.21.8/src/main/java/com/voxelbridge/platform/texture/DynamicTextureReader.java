@@ -1,4 +1,4 @@
-package com.voxelbridge.platform.texture;
+﻿package com.voxelbridge.platform.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -213,6 +213,3 @@ final class DynamicTextureReader {
         return null;
     }
 }
-
-
-

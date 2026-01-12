@@ -297,6 +297,50 @@ public final class TextureAtlasManager {
         return spriteKey != null && (spriteKey.startsWith("blockentity:") || spriteKey.startsWith("entity:"));
     }
 
+    private static com.voxelbridge.core.texture.AnimatedFrameSet ensurePbrFrames(
+            com.voxelbridge.core.texture.AnimatedFrameSet candidate,
+            com.voxelbridge.core.texture.AnimatedFrameSet baseFrames,
+            String spriteKey,
+            int defaultColor,
+            String suffix) {
+        if (baseFrames == null || baseFrames.isEmpty()) {
+            return candidate;
+        }
+        if (candidate == null || candidate.isEmpty()) {
+            return buildSolidFrames(baseFrames, defaultColor);
+        }
+        BufferedImage first = candidate.frames().get(0);
+        if (first == null) {
+            return buildSolidFrames(baseFrames, defaultColor);
+        }
+        BufferedImage sanitized = PbrTextureHelper.sanitizeMissingNo(first, defaultColor, spriteKey + suffix);
+        if (sanitized != first) {
+            return buildSolidFrames(baseFrames, defaultColor);
+        }
+        return candidate;
+    }
+
+    private static com.voxelbridge.core.texture.AnimatedFrameSet buildSolidFrames(
+            com.voxelbridge.core.texture.AnimatedFrameSet baseFrames,
+            int argb) {
+        if (baseFrames == null || baseFrames.isEmpty()) {
+            return null;
+        }
+        BufferedImage base = baseFrames.frames().get(0);
+        if (base == null) {
+            return null;
+        }
+        int w = base.getWidth();
+        int h = base.getHeight();
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        int[] row = new int[w];
+        Arrays.fill(row, argb);
+        for (int y = 0; y < h; y++) {
+            img.setRGB(0, y, w, 1, row, 0, w);
+        }
+        return new com.voxelbridge.core.texture.AnimatedFrameSet(java.util.List.of(img), 1);
+    }
+
     /** Public wrapper to export detected animations to a target directory. */
     public static void exportDetectedAnimations(ExportContext ctx, Path outDir, java.util.Set<String> whitelist) throws IOException {
         exportAllDetectedAnimations(ctx, outDir, whitelist);
@@ -343,8 +387,18 @@ public final class TextureAtlasManager {
             Path spriteDir = animDir.resolve(baseName);
             Files.createDirectories(spriteDir);
 
-            com.voxelbridge.core.texture.AnimatedFrameSet normalFrames = repo.getAnimation(spriteKey + "_n");
-            com.voxelbridge.core.texture.AnimatedFrameSet specFrames = repo.getAnimation(spriteKey + "_s");
+            com.voxelbridge.core.texture.AnimatedFrameSet normalFrames = ensurePbrFrames(
+                repo.getAnimation(spriteKey + "_n"),
+                frames,
+                spriteKey,
+                PbrTextureHelper.DEFAULT_NORMAL_COLOR,
+                "_n");
+            com.voxelbridge.core.texture.AnimatedFrameSet specFrames = ensurePbrFrames(
+                repo.getAnimation(spriteKey + "_s"),
+                frames,
+                spriteKey,
+                PbrTextureHelper.DEFAULT_SPECULAR_COLOR,
+                "_s");
             String mcmetaContent = readOriginalMcmeta(ctx, spriteKey);
             com.voxelbridge.export.texture.AnimationExporter.exportAnimation(
                 animDir, baseName, frames, normalFrames, specFrames, mcmetaContent);

@@ -46,16 +46,13 @@ public final class AtlasBuilder {
         }
 
         long tIndividual = VoxelBridgeLogger.now();
-        String subDir = "textures/individual/";
+        String subDir = "textures/";
         for (Map.Entry<String, ExportState.TintAtlas> entry : entries.entrySet()) {
             String spriteKey = entry.getKey();
             ExportState.TintAtlas atlas = entry.getValue();
             atlas.placements.clear();
 
             ensureDefaultTint(atlas);
-
-            int tintSlots = Math.max(1, Math.min(MAX_TINT_SLOTS, atlas.nextIndex.get()));
-            int[] tintBySlot = resolveTintSlots(atlas, tintSlots);
 
             BufferedImage base = baseImages.get(spriteKey);
             if (base == null) {
@@ -64,7 +61,7 @@ public final class AtlasBuilder {
                 base = createMissingTexture();
             }
 
-            BufferedImage outputImage = tintTile(base, tintBySlot[0]);
+            BufferedImage outputImage = base;
             String relativePath = subDir + TexturePathResolver.safe(spriteKey) + ".png";
             Path target = outDir.resolve(relativePath);
             Files.createDirectories(target.getParent());
@@ -80,27 +77,6 @@ public final class AtlasBuilder {
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format(
                     "[AtlasGen] sprite=%s mode=individual path=%s", spriteKey, relativePath));
-            }
-
-            BufferedImage normal = normalImages.get(spriteKey);
-            if (normal != null) {
-                String normalRel = subDir + TexturePathResolver.safe(spriteKey) + "_n.png";
-                Path normalTarget = outDir.resolve(normalRel);
-                Files.createDirectories(normalTarget.getParent());
-                com.voxelbridge.core.texture.PngjWriter.write(normal, normalTarget);
-                VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format(
-                    "[AtlasGen] sprite=%s normal exported: %s", spriteKey, normalRel));
-                materialPaths.put(spriteKey + "_n", normalRel);
-            }
-            BufferedImage spec = specImages.get(spriteKey);
-            if (spec != null) {
-                String specRel = subDir + TexturePathResolver.safe(spriteKey) + "_s.png";
-                Path specTarget = outDir.resolve(specRel);
-                Files.createDirectories(specTarget.getParent());
-                com.voxelbridge.core.texture.PngjWriter.write(spec, specTarget);
-                VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format(
-                    "[AtlasGen] sprite=%s specular exported: %s", spriteKey, specRel));
-                materialPaths.put(spriteKey + "_s", specRel);
             }
         }
         VoxelBridgeLogger.duration("individual_texture_write", VoxelBridgeLogger.elapsedSince(tIndividual));
