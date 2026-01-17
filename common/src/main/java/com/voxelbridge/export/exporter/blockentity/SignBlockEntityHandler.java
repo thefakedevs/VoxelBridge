@@ -1,10 +1,10 @@
 package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.core.ir.IrSink;
+import com.voxelbridge.core.util.color.ColorUtil;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.texture.BlockEntityTextureManager;
 import com.voxelbridge.export.texture.EntityTextureManager;
-import com.voxelbridge.platform.texture.TextureLoader;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.core.BlockPos;
@@ -187,7 +187,7 @@ public final class SignBlockEntityHandler implements BlockEntityHandler {
     }
     
     private Color getColor(net.minecraft.world.item.DyeColor dye) {
-        float[] c = TextureLoader.rgbMul(dye.getTextureDiffuseColor());
+        float[] c = ColorUtil.rgbMul(dye.getTextureDiffuseColor());
         return new Color(c[0], c[1], c[2]);
     }
 

@@ -5,6 +5,7 @@ import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
@@ -24,7 +25,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
     }
 
     @Override
-    public BlockStateModel getBlockModel(BlockState state) {
+    public BakedModel getBlockModel(BlockState state) {
         var modelManager = ClientAccessHolder.get().getModelManager();
         if (modelManager == null) {
             return null;
@@ -33,16 +34,19 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
     }
 
     @Override
-    public List<BakedQuad> getQuads(BlockStateModel model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
+    public List<BakedQuad> getQuads(BakedModel model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
         List<BakedQuad> quads = new ArrayList<>();
         RandomSource rand = RandomSource.create(seed);
         // Collect parts -> quads
         try {
+            if (!(model instanceof BlockStateModel stateModel)) {
+                return quads;
+            }
             List<BlockModelPart> parts = new ArrayList<>();
-            if (model instanceof BlockStateModelExtension extension) {
+            if (stateModel instanceof BlockStateModelExtension extension) {
                 extension.collectParts(level, pos, state, rand, parts);
             } else {
-                model.collectParts(rand, parts);
+                stateModel.collectParts(rand, parts);
             }
             for (BlockModelPart part : parts) {
                 for (Direction dir : Direction.values()) {

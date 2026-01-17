@@ -1,87 +1,27 @@
 package com.voxelbridge.export.exporter;
 
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import net.minecraft.core.Direction;
 
 /**
  * Tracks per-plane quad order and applies a tiny offset to later quads to reduce z-fighting.
  */
 public final class PlaneOffsetTracker {
-    private static final float NORMAL_QUANT = 1000f;
-    private static final float DIST_QUANT = 1000f;
-    private static final float OFFSET_STEP = 2e-4f;
-
-    private final Long2IntOpenHashMap counts = new Long2IntOpenHashMap();
-
-    public PlaneOffsetTracker() {
-        counts.defaultReturnValue(0);
-    }
+    private final com.voxelbridge.core.util.geometry.PlaneOffsetTrackerCore core =
+        new com.voxelbridge.core.util.geometry.PlaneOffsetTrackerCore();
 
     public void clear() {
-        counts.clear();
+        core.clear();
     }
 
     public void applyOffset(float[] positions, float[] normal) {
-        applyOffset(positions, normal, null);
+        core.applyOffset(positions, normal);
     }
 
     public void applyOffset(float[] positions, float[] normal, Direction dir) {
-        if (positions == null || positions.length < 3 || normal == null || normal.length < 3) {
+        if (dir == null) {
+            core.applyOffset(positions, normal);
             return;
         }
-
-        float nx = normal[0];
-        float ny = normal[1];
-        float nz = normal[2];
-        float lenSq = nx * nx + ny * ny + nz * nz;
-        if (lenSq < 1e-6f) {
-            return;
-        }
-
-        float invLen = 1f / (float) Math.sqrt(lenSq);
-        nx *= invLen;
-        ny *= invLen;
-        nz *= invLen;
-
-        if (dir != null) {
-            float dx = dir.getStepX();
-            float dy = dir.getStepY();
-            float dz = dir.getStepZ();
-            float dot = nx * dx + ny * dy + nz * dz;
-            if (dot < 0f) {
-                nx = -nx;
-                ny = -ny;
-                nz = -nz;
-            }
-        }
-
-        float d = nx * positions[0] + ny * positions[1] + nz * positions[2];
-        int qnx = Math.round(nx * NORMAL_QUANT);
-        int qny = Math.round(ny * NORMAL_QUANT);
-        int qnz = Math.round(nz * NORMAL_QUANT);
-        int qd = Math.round(d * DIST_QUANT);
-
-        long key = hash(qnx, qny, qnz, qd);
-        int index = counts.get(key);
-        counts.put(key, index + 1);
-        if (index == 0) {
-            return;
-        }
-
-        float offset = OFFSET_STEP * index;
-        for (int i = 0; i < 4; i++) {
-            positions[i * 3] += nx * offset;
-            positions[i * 3 + 1] += ny * offset;
-            positions[i * 3 + 2] += nz * offset;
-        }
-    }
-
-    private static long hash(int a, int b, int c, int d) {
-        long h = 1469598103934665603L;
-        h = (h ^ a) * 1099511628211L;
-        h = (h ^ b) * 1099511628211L;
-        h = (h ^ c) * 1099511628211L;
-        h = (h ^ d) * 1099511628211L;
-        return h;
+        core.applyOffset(positions, normal, dir.getStepX(), dir.getStepY(), dir.getStepZ(), true);
     }
 }

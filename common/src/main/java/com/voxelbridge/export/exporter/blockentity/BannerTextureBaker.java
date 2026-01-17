@@ -2,7 +2,8 @@ package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.texture.EntityTextureManager;
-import com.voxelbridge.platform.texture.TextureLoader;
+import com.voxelbridge.core.util.color.ColorUtil;
+import com.voxelbridge.core.util.image.ImageUtil;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.resources.ResourceKey;
@@ -13,7 +14,6 @@ import net.minecraft.world.level.block.entity.BannerPatternLayers;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -64,8 +64,8 @@ final class BannerTextureBaker {
     }
 
     private static BufferedImage composeTexture(ExportContext ctx, BannerBlockEntity banner) {
-        BufferedImage base = BannerTextureBaker.copy(BannerTextureBaker.loadSprite(ctx, BASE_WITH_POLE_TEXTURE));
-        BufferedImage result = BannerTextureBaker.copy(base);
+        BufferedImage base = ImageUtil.copyOrBlank(BannerTextureBaker.loadSprite(ctx, BASE_WITH_POLE_TEXTURE), 64, 64);
+        BufferedImage result = ImageUtil.copy(base);
         BannerTextureBaker.applyTinted(ctx, result, FLAG_ONLY_TEXTURE, banner.getBaseColor());
         for (BannerPatternLayers.Layer layer : banner.getPatterns().layers()) {
             BannerTextureBaker.applyTinted(ctx, result, Sheets.getBannerMaterial(layer.pattern()).texture(), layer.color());
@@ -83,10 +83,10 @@ final class BannerTextureBaker {
         int targetW = target.getWidth();
         int targetH = target.getHeight();
         if (texture.getWidth() != targetW || texture.getHeight() != targetH) {
-            texture = BannerTextureBaker.scaleTo(texture, targetW, targetH);
+            texture = ImageUtil.scaleNearest(texture, targetW, targetH);
         }
 
-        float[] mul = color != null ? TextureLoader.rgbMul(color.getTextureDiffuseColor()) : NO_TINT;
+        float[] mul = color != null ? ColorUtil.rgbMul(color.getTextureDiffuseColor()) : NO_TINT;
         int w = targetW;
         int h = targetH;
         for (int y = 0; y < h; ++y) {
@@ -97,63 +97,16 @@ final class BannerTextureBaker {
                 int r = (int)((float)(argb >>> 16 & 0xFF) * mul[0]);
                 int g = (int)((float)(argb >>> 8 & 0xFF) * mul[1]);
                 int b = (int)((float)(argb & 0xFF) * mul[2]);
-                int tinted = a << 24 | BannerTextureBaker.clampColor(r) << 16 | BannerTextureBaker.clampColor(g) << 8 | BannerTextureBaker.clampColor(b);
-                int out = BannerTextureBaker.alphaBlend(target.getRGB(x, y), tinted);
+                int tinted = a << 24 | ImageUtil.clampChannel(r) << 16 | ImageUtil.clampChannel(g) << 8 | ImageUtil.clampChannel(b);
+                int out = ImageUtil.alphaBlend(target.getRGB(x, y), tinted);
                 target.setRGB(x, y, out);
             }
         }
     }
 
-    private static int clampColor(int c) {
-        return Math.max(0, Math.min(255, c));
-    }
-
-    private static int alphaBlend(int dst, int src) {
-        int srcA = src >>> 24 & 0xFF;
-        int dstA = dst >>> 24 & 0xFF;
-        int outA = srcA + dstA * (255 - srcA) / 255;
-        if (outA == 0) {
-            return 0;
-        }
-        int srcR = src >>> 16 & 0xFF;
-        int srcG = src >>> 8 & 0xFF;
-        int srcB = src & 0xFF;
-        int dstR = dst >>> 16 & 0xFF;
-        int dstG = dst >>> 8 & 0xFF;
-        int dstB = dst & 0xFF;
-        int outR = (srcR * srcA + dstR * dstA * (255 - srcA) / 255) / outA;
-        int outG = (srcG * srcA + dstG * dstA * (255 - srcA) / 255) / outA;
-        int outB = (srcB * srcA + dstB * dstA * (255 - srcA) / 255) / outA;
-        return outA << 24 | outR << 16 | outG << 8 | outB;
-    }
-
     private static BufferedImage loadSprite(ExportContext ctx, ResourceLocation sprite) {
         String resourceKey = ctx.getTextureAccess().spriteKeyToResourceKey(sprite.toString());
         return ctx.getTextureAccess().readTexture(resourceKey);
-    }
-
-    private static BufferedImage copy(BufferedImage src) {
-        if (src == null) {
-            return new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
-        }
-        BufferedImage copy = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = copy.createGraphics();
-        g.drawImage(src, 0, 0, null);
-        g.dispose();
-        return copy;
-    }
-
-    private static BufferedImage scaleTo(BufferedImage src, int w, int h) {
-        if (src.getWidth() == w && src.getHeight() == h) {
-            return src;
-        }
-        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = out.createGraphics();
-        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
-            java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-        g.drawImage(src, 0, 0, w, h, null);
-        g.dispose();
-        return out;
     }
 
     private static String buildKey(BannerBlockEntity banner) {
