@@ -32,7 +32,7 @@ public final class NeoForgePlatformBootstrap implements PlatformBootstrap {
         NeoForgeEventBusBridge.addListener(modBus, KeyBindings::onRegisterKeyMappings);
         NeoForgeEventBusBridge.addListener(gameBus, VoxelBridgeCommands::register);
         NeoForgeEventBusBridge.addListener(gameBus, KeyInputHandler::onClientTick);
-        NeoForgeEventBusBridge.addListener(gameBus, Adapters.getSelectionRender()::onRenderLevel);
+        Adapters.getSelectionRender().register(gameBus);
         NeoForgeEventBusBridge.addListener(gameBus, HudOverlayRenderer::onRenderGui);
     }
 }

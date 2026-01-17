@@ -1,6 +1,8 @@
 package com.voxelbridge.adapter;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.voxelbridge.export.exporter.entity.EntityTextureResolverCompat;
+import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.world.entity.Entity;
@@ -14,6 +16,11 @@ public final class NeoForgeEntityRenderBridge implements EntityRenderBridge {
     @Override
     public boolean shouldApplyHangingOffset() {
         return false;
+    }
+
+    @Override
+    public TextureResolver<Entity> getTextureResolver() {
+        return EntityTextureResolverCompat.INSTANCE;
     }
 
     @Override

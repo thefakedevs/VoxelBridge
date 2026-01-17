@@ -44,7 +44,7 @@ import java.util.Locale;
 public final class EntityRenderer {
 
     private static AtlasLocator ATLAS_LOCATOR = new DefaultAtlasLocator(ClientAccessHolder.get());
-    private static TextureResolver<Entity> TEXTURE_RESOLVER = EntityTextureResolver.INSTANCE;
+    private static volatile TextureResolver<Entity> OVERRIDE_RESOLVER;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
 
     private EntityRenderer() {}
@@ -56,9 +56,7 @@ public final class EntityRenderer {
     }
 
     public static void setTextureResolver(TextureResolver<Entity> resolver) {
-        if (resolver != null) {
-            TEXTURE_RESOLVER = resolver;
-        }
+        OVERRIDE_RESOLVER = resolver;
     }
 
     public static void setRenderTypeResolver(RenderTypeResolver resolver) {
@@ -329,7 +327,8 @@ public final class EntityRenderer {
             RenderCaptureUtil.UvStats uvStats,
             float[] positions
         ) {
-            ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(source, renderType);
+            TextureResolver<Entity> resolver = resolveTextureResolver();
+            ResolvedTexture textureRes = resolver != null ? resolver.resolve(source, renderType) : null;
 
             if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
                 textureRes = RenderCaptureUtil.resolveAtlasSprite(textureRes, ATLAS_LOCATOR, uvStats, textureRes.atlasLocation());
@@ -392,6 +391,15 @@ public final class EntityRenderer {
                 v1,
                 false
             );
+        }
+
+        private TextureResolver<Entity> resolveTextureResolver() {
+            TextureResolver<Entity> override = OVERRIDE_RESOLVER;
+            if (override != null) {
+                return override;
+            }
+            TextureResolver<Entity> adapterResolver = Adapters.getEntityRender().getTextureResolver();
+            return adapterResolver != null ? adapterResolver : EntityTextureResolver.INSTANCE;
         }
 
         private Direction approximateDirection(float[] normal) {

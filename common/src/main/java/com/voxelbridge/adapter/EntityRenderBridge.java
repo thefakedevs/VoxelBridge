@@ -1,6 +1,8 @@
 package com.voxelbridge.adapter;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.voxelbridge.export.exporter.entity.EntityTextureResolver;
+import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.HangingEntity;
@@ -23,6 +25,13 @@ public interface EntityRenderBridge {
      */
     default Vec3 getHangingOffsetBase(HangingEntity entity) {
         return null;
+    }
+
+    /**
+     * Provides the entity texture resolver for the current platform.
+     */
+    default TextureResolver<Entity> getTextureResolver() {
+        return EntityTextureResolver.INSTANCE;
     }
     /**
      * Creates a render-state object for the given entity.
