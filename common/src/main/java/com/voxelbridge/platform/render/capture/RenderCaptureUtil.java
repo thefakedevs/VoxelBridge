@@ -25,6 +25,14 @@ public final class RenderCaptureUtil {
 
     public record ColorModeResult(float[] uv1, TintMode tintMode) {}
 
+    public enum UvFillMode {
+        NORMALIZED,
+        DEGENERATE,
+        CLAMPED
+    }
+
+    public record UvFillResult(UvFillMode mode, float minU, float maxU, float minV, float maxV) {}
+
     public static UvStats computeUvStats(List<RenderCapture.Vertex> verts) {
         int count = Math.min(4, verts.size());
         float[] rawU = new float[count];
@@ -97,6 +105,66 @@ public final class RenderCaptureUtil {
             RenderCapture.Vertex v = verts.get(i);
             float su = Math.max(0f, Math.min(1f, v.u));
             float sv = Math.max(0f, Math.min(1f, v.v));
+            uv0[i * 2] = su;
+            uv0[i * 2 + 1] = sv;
+        }
+    }
+
+    public static UvFillResult fillUvsNormalize(List<RenderCapture.Vertex> verts, float[] uv0, UvStats uvStats) {
+        int count = Math.min(4, verts.size());
+        UvStats stats = uvStats != null ? uvStats : computeUvStats(verts);
+
+        float minU = stats.minU();
+        float maxU = stats.maxU();
+        float minV = stats.minV();
+        float maxV = stats.maxV();
+
+        float rangeU = maxU - minU;
+        float rangeV = maxV - minV;
+
+        boolean needsNormalization =
+            maxU > 1.1f || minU < -0.1f || maxV > 1.1f || minV < -0.1f ||
+            rangeU < 1e-6f || rangeV < 1e-6f;
+
+        if (needsNormalization && rangeU > 1e-6f && rangeV > 1e-6f) {
+            for (int i = 0; i < count; i++) {
+                RenderCapture.Vertex v = verts.get(i);
+                float su = (v.u - minU) / rangeU;
+                float sv = (v.v - minV) / rangeV;
+                uv0[i * 2] = Math.max(0f, Math.min(1f, su));
+                uv0[i * 2 + 1] = Math.max(0f, Math.min(1f, sv));
+            }
+            return new UvFillResult(UvFillMode.NORMALIZED, minU, maxU, minV, maxV);
+        }
+
+        if (rangeU < 1e-6f || rangeV < 1e-6f) {
+            for (int i = 0; i < count; i++) {
+                uv0[i * 2] = 0f;
+                uv0[i * 2 + 1] = 0f;
+            }
+            return new UvFillResult(UvFillMode.DEGENERATE, minU, maxU, minV, maxV);
+        }
+
+        for (int i = 0; i < count; i++) {
+            RenderCapture.Vertex v = verts.get(i);
+            float su = Math.max(0f, Math.min(1f, v.u));
+            float sv = Math.max(0f, Math.min(1f, v.v));
+            uv0[i * 2] = su;
+            uv0[i * 2 + 1] = sv;
+        }
+        return new UvFillResult(UvFillMode.CLAMPED, minU, maxU, minV, maxV);
+    }
+
+    public static void fillUvsPixels(List<RenderCapture.Vertex> verts, float[] uv0, int width, int height) {
+        int count = Math.min(4, verts.size());
+        float invW = width <= 0 ? 1f : 1f / width;
+        float invH = height <= 0 ? 1f : 1f / height;
+        for (int i = 0; i < count; i++) {
+            RenderCapture.Vertex v = verts.get(i);
+            float su = v.u * invW;
+            float sv = v.v * invH;
+            su = Math.max(0f, Math.min(1f, su));
+            sv = Math.max(0f, Math.min(1f, sv));
             uv0[i * 2] = su;
             uv0[i * 2 + 1] = sv;
         }

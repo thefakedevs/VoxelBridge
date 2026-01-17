@@ -2,13 +2,15 @@ package com.voxelbridge.export.exporter.blockentity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.voxelbridge.core.ir.IrSink;
-import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.exporter.MaterialGroupKey;
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
+import com.voxelbridge.export.exporter.resolve.DefaultAtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.export.exporter.PlaneOffsetTracker;
+import com.voxelbridge.export.exporter.capture.CapturedQuadProcessor;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.platform.render.capture.CaptureBufferBase;
@@ -16,12 +18,10 @@ import com.voxelbridge.platform.render.capture.RenderCapture;
 import com.voxelbridge.platform.render.capture.RenderCaptureUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import com.voxelbridge.core.util.geometry.GeometryUtil;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -38,14 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @OnlyIn(Dist.CLIENT)
 public final class BlockEntityRenderer {
 
-    private static final float[] EMPTY_UV = new float[8];
-    private static final float[] NORMAL_UP = new float[] {
-        0f, 1f, 0f,
-        0f, 1f, 0f,
-        0f, 1f, 0f,
-        0f, 1f, 0f
-    };
-    private static AtlasLocator ATLAS_LOCATOR = new BlockEntityAtlasLocator(ClientAccessHolder.get());
+    private static AtlasLocator ATLAS_LOCATOR = new DefaultAtlasLocator(ClientAccessHolder.get());
     private static final ThreadLocal<TextureOverrideMap> OVERRIDES = new ThreadLocal<>();
     private static TextureResolver<BlockEntity> TEXTURE_RESOLVER = BlockEntityTextureResolver.INSTANCE;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
@@ -159,7 +152,7 @@ public final class BlockEntityRenderer {
             PoseStack poseStack = new PoseStack();
             poseStack.translate(offsetX, offsetY, offsetZ);
 
-            CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, offsetX, offsetY, offsetZ, blockEntity);
+            CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, blockEntity);
 
             com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderer][renderDirect] Calling renderer.render()...");
             renderer.render(
@@ -248,20 +241,16 @@ public final class BlockEntityRenderer {
      */
     private static class CaptureBuffer extends CaptureBufferBase {
         private static final Set<String> LOGGED_TEXT_TYPES = ConcurrentHashMap.newKeySet();
-        private final double offsetX, offsetY, offsetZ;
         private final BlockEntity blockEntity;
         private final TextureOverrideMap overrides;
         private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker();
 
-        CaptureBuffer(ExportContext ctx, IrSink sceneSink, double offsetX, double offsetY, double offsetZ, BlockEntity blockEntity) {
+        CaptureBuffer(ExportContext ctx, IrSink sceneSink, BlockEntity blockEntity) {
             super(ctx, sceneSink, (renderType, queuedVertices) -> {
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.BLOCKENTITY)) {
                     VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[VertexCollector] setNormal called, vertices.size=" + queuedVertices);
                 }
             });
-            this.offsetX = offsetX;
-            this.offsetY = offsetY;
-            this.offsetZ = offsetZ;
             this.blockEntity = blockEntity;
             this.overrides = OVERRIDES.get();
         }
@@ -305,79 +294,76 @@ public final class BlockEntityRenderer {
             float[] positions = new float[12];
             float[] uv0 = new float[8];
             float[] colors = new float[16];
+            CapturedQuadProcessor.fillPositionsAndColors(verts, positions, colors);
 
-            for (int i = 0; i < Math.min(4, verts.size()); i++) {
-                RenderCapture.Vertex v = verts.get(i);
-                positions[i * 3] = v.x;
-                positions[i * 3 + 1] = v.y;
-                positions[i * 3 + 2] = v.z;
-
-                // Extract RGBA from packed color
-                colors[i * 4] = ((v.color >> 16) & 0xFF) / 255.0f;  // R
-                colors[i * 4 + 1] = ((v.color >> 8) & 0xFF) / 255.0f;   // G
-                colors[i * 4 + 2] = (v.color & 0xFF) / 255.0f;          // B
-                colors[i * 4 + 3] = ((v.color >> 24) & 0xFF) / 255.0f;  // A
-            }
-
-            // Extract texture from RenderType and register it
-            ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(blockEntity, renderType);
-            TextureOverrideMap overrides = overrides();
-            String spriteKey;
-            boolean isAtlasTexture = false;
-            float u0 = 0f, u1 = 1f, v0 = 0f, v1 = 1f;
-            ResourceLocation atlasLocation = textureRes != null ? textureRes.atlasLocation() : null;
-
-            int vertCount = Math.min(4, verts.size());
             RenderCaptureUtil.UvStats uvStats = RenderCaptureUtil.computeUvStats(verts);
             logTextUvOnce(renderType, uvStats);
 
-            // Handle atlas texture resolution via locator if needed
-            if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
-                textureRes = RenderCaptureUtil.resolveAtlasSprite(textureRes, ATLAS_LOCATOR, uvStats, atlasLocation);
-                if (textureRes != null) {
-                    atlasLocation = textureRes.atlasLocation();
-                }
-            }
-
             // Generate Material Group Key
             // Format: "blockentity:minecraft:chest"
-            String materialGroupKey = "blockentity:" + net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE
-                .getKey(blockEntity.getType()).toString();
+            String materialGroupKey = MaterialGroupKey.blockEntity(blockEntity);
 
+            CapturedQuadProcessor.process(
+                ctx,
+                sceneSink,
+                planeOffset,
+                renderType,
+                verts,
+                uvStats,
+                positions,
+                colors,
+                uv0,
+                blockEntity,
+                materialGroupKey,
+                this::resolveTexture,
+                this::writeUvs,
+                (tracker, quadPositions, faceNormal) -> tracker.applyOffset(quadPositions, faceNormal),
+                RENDER_TYPE_RESOLVER
+            );
+        }
+
+        private CapturedQuadProcessor.TextureResult resolveTexture(
+            ExportContext ctx,
+            BlockEntity source,
+            RenderType renderType,
+            RenderCaptureUtil.UvStats uvStats,
+            float[] positions
+        ) {
+            ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(source, renderType);
+            if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
+                textureRes = RenderCaptureUtil.resolveAtlasSprite(
+                    textureRes,
+                    ATLAS_LOCATOR,
+                    uvStats,
+                    textureRes.atlasLocation()
+                );
+            }
+
+            TextureOverrideMap overrides = overrides();
             if (textureRes != null && overrides != null) {
-                if (overrides.skipQuad(textureRes.texture(), uvStats.rawU(), uvStats.rawV())) return;
-
+                if (overrides.skipQuad(textureRes.texture(), uvStats.rawU(), uvStats.rawV())) {
+                    return new CapturedQuadProcessor.TextureResult(
+                        null, textureRes, false, 0f, 1f, 0f, 1f, true
+                    );
+                }
                 var mappedHandle = overrides.resolve(textureRes.texture());
                 if (mappedHandle != null) {
-                    spriteKey = mappedHandle.spriteKey();
-
-                    // Use the resolved atlas bounds so fillUvs() can denormalize atlas-space UVs correctly
-                    isAtlasTexture = textureRes.isAtlasTexture();
-                    u0 = textureRes.u0(); u1 = textureRes.u1();
-                    v0 = textureRes.v0(); v1 = textureRes.v1();
-
-                    // IMPORTANT: Keep original isAtlasTexture and bounds to allow fillUvs()
-                    // to correctly denormalize atlas-space UVs to sprite-space.
-                    // Do NOT force isAtlasTexture=false here, as some overrides (e.g., Banner)
-                    // may still have UVs in atlas-space that need denormalization.
-                    // (keep original isAtlasTexture, u0, u1, v0, v1 values from textureRes)
-
-                    fillUvs(verts, uv0, isAtlasTexture, u0, u1, v0, v1);
-
-                    String resolvedMaterialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
-                    RenderCaptureUtil.ColorModeResult colorResult =
-                        RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
-                    float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
-                    planeOffset.applyOffset(positions, faceNormal);
-                    ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
-                    sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
-                        RenderLayer.UNKNOWN, colorResult.tintMode(),
-                        RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
-                        false,
-                        positions, uv0, colorResult.uv1(), NORMAL_UP, colors);
-                    return;
+                    return new CapturedQuadProcessor.TextureResult(
+                        mappedHandle.spriteKey(),
+                        textureRes,
+                        textureRes.isAtlasTexture(),
+                        textureRes.u0(),
+                        textureRes.u1(),
+                        textureRes.v0(),
+                        textureRes.v1(),
+                        false
+                    );
                 }
             }
+
+            String spriteKey;
+            boolean isAtlasTexture = false;
+            float u0 = 0f, u1 = 1f, v0 = 0f, v1 = 1f;
 
             if (textureRes != null && textureRes.texture() != null) {
                 spriteKey = com.voxelbridge.export.texture.BlockEntityTextureManager.registerTexture(ctx, textureRes);
@@ -388,49 +374,9 @@ public final class BlockEntityRenderer {
                 spriteKey = "blockentity:minecraft/block/white";
             }
 
-            // Heuristic: if renderer passed sprite-space UVs (0..1) but texture came from an atlas,
-            // switch to sprite-space normalization to avoid sampling the whole atlas.
-            if (isAtlasTexture && textureRes != null && textureRes.sprite() != null) {
-                float eps = 1e-4f;
-                boolean outsideSpriteBounds =
-                    uvStats.minU() < textureRes.u0() - eps || uvStats.maxU() > textureRes.u1() + eps ||
-                    uvStats.minV() < textureRes.v0() - eps || uvStats.maxV() > textureRes.v1() + eps;
-                if (outsideSpriteBounds) {
-                    isAtlasTexture = false;
-                    u0 = 0f; u1 = 1f;
-                    v0 = 0f; v1 = 1f;
-                }
-            }
-
-            fillUvs(verts, uv0, isAtlasTexture, u0, u1, v0, v1);
-
-            if (!isAtlasTexture && textureRes != null && (uvStats.maxU() > 1f || uvStats.maxV() > 1f)) {
-                BufferedImage img = ctx.getCachedSpriteImage(spriteKey);
-                if (img != null) {
-                    fillUvsPixels(verts, uv0, img.getWidth(), img.getHeight());
-                }
-            }
-
-            // NOTE: UV remapping to atlas space is handled by GltfSceneBuilder.remapUV()
-            // to avoid double transformation. Do NOT remap UVs here.
-            // Keep UVs in sprite space (0-1) for now, consistent with BlockExporter and FluidExporter.
-
-            // Color/colormap handling to mirror BlockExporter behavior:
-            // - ColorMap mode: always provide TEXCOORD_1; no tint -> white slot.
-            // - VertexColor mode: keep per-vertex colors (already in 'colors').
-            RenderCaptureUtil.ColorModeResult colorResult =
-                RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
-
-            // Send quad to scene sink using the BlockEntity type as group key (block entities typically don't have overlays)
-            String resolvedMaterialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
-            ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
-            float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
-            planeOffset.applyOffset(positions, faceNormal);
-            sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
-                RenderLayer.UNKNOWN, colorResult.tintMode(),
-                RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
-                false,
-                positions, uv0, colorResult.uv1(), NORMAL_UP, colors);
+            return new CapturedQuadProcessor.TextureResult(
+                spriteKey, textureRes, isAtlasTexture, u0, u1, v0, v1, false
+            );
         }
 
         private boolean shouldSkipTextQuad(RenderType renderType) {
@@ -444,27 +390,28 @@ public final class BlockEntityRenderer {
                 || name.contains("glyph");
         }
 
-        private void fillUvs(List<RenderCapture.Vertex> verts, float[] uv0, boolean isAtlas, float u0, float u1, float v0, float v1) {
-            int count = Math.min(4, verts.size());
-            if (isAtlas) {
+        private void writeUvs(ExportContext ctx,
+                              List<RenderCapture.Vertex> verts,
+                              RenderCaptureUtil.UvStats uvStats,
+                              boolean useAtlasUv,
+                              float u0,
+                              float u1,
+                              float v0,
+                              float v1,
+                              String spriteKey,
+                              ResolvedTexture textureRes,
+                              float[] uv0) {
+            if (useAtlasUv) {
                 RenderCaptureUtil.fillUvsAtlas(verts, uv0, u0, u1, v0, v1);
             } else {
                 RenderCaptureUtil.fillUvsClamp(verts, uv0);
             }
-        }
 
-        private void fillUvsPixels(List<RenderCapture.Vertex> verts, float[] uv0, int width, int height) {
-            int count = Math.min(4, verts.size());
-            float invW = width <= 0 ? 1f : 1f / width;
-            float invH = height <= 0 ? 1f : 1f / height;
-            for (int i = 0; i < count; i++) {
-                RenderCapture.Vertex v = verts.get(i);
-                float su = v.u * invW;
-                float sv = v.v * invH;
-                su = Math.max(0f, Math.min(1f, su));
-                sv = Math.max(0f, Math.min(1f, sv));
-                uv0[i * 2] = su;
-                uv0[i * 2 + 1] = sv;
+            if (!useAtlasUv && textureRes != null && (uvStats.maxU() > 1f || uvStats.maxV() > 1f)) {
+                BufferedImage img = ctx.getCachedSpriteImage(spriteKey);
+                if (img != null) {
+                    RenderCaptureUtil.fillUvsPixels(verts, uv0, img.getWidth(), img.getHeight());
+                }
             }
         }
 

@@ -1,6 +1,5 @@
-package com.voxelbridge.export.exporter.entity;
+package com.voxelbridge.export.exporter.resolve;
 
-import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.platform.client.ClientAccess;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -12,10 +11,10 @@ import net.neoforged.api.distmarker.OnlyIn;
  * Finds the sprite inside an atlas that contains a given UV coordinate.
  */
 @OnlyIn(Dist.CLIENT)
-final class EntityAtlasLocator implements AtlasLocator {
+public final class DefaultAtlasLocator implements AtlasLocator {
     private final ClientAccess clientAccess;
 
-    EntityAtlasLocator(ClientAccess clientAccess) {
+    public DefaultAtlasLocator(ClientAccess clientAccess) {
         this.clientAccess = clientAccess;
     }
 

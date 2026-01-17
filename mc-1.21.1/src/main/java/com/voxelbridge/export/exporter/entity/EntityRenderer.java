@@ -2,12 +2,13 @@ package com.voxelbridge.export.exporter.entity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.voxelbridge.core.ir.IrSink;
-import com.voxelbridge.core.ir.RenderLayer;
-import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.exporter.MaterialGroupKey;
 import com.voxelbridge.export.exporter.PlaneOffsetTracker;
+import com.voxelbridge.export.exporter.capture.CapturedQuadProcessor;
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
+import com.voxelbridge.export.exporter.resolve.DefaultAtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
@@ -40,14 +41,7 @@ import java.util.Locale;
 @OnlyIn(Dist.CLIENT)
 public final class EntityRenderer {
 
-    private static final float[] EMPTY_UV = new float[8];
-    private static final float[] NORMAL_UP = new float[] {
-        0f, 1f, 0f,
-        0f, 1f, 0f,
-        0f, 1f, 0f,
-        0f, 1f, 0f
-    };
-    private static AtlasLocator ATLAS_LOCATOR = new EntityAtlasLocator(ClientAccessHolder.get());
+    private static AtlasLocator ATLAS_LOCATOR = new DefaultAtlasLocator(ClientAccessHolder.get());
     private static TextureResolver<Entity> TEXTURE_RESOLVER = EntityTextureResolver.INSTANCE;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
 
@@ -166,7 +160,6 @@ public final class EntityRenderer {
             // Use max light level for better visibility
             int packedLight = 0xF000F0;
 
-            boolean[] renderCompleted = new boolean[1];
             Exception[] renderException = new Exception[1];
 
             Runnable renderCall = () -> {
@@ -182,7 +175,6 @@ public final class EntityRenderer {
                         captureBuffer,
                         packedLight
                     );
-                    renderCompleted[0] = true;
                 } catch (Exception e) {
                     renderException[0] = e;
                 }
@@ -232,10 +224,6 @@ public final class EntityRenderer {
         }
     }
 
-    private static boolean isHangingEntity(Entity entity) {
-        return entity instanceof net.minecraft.world.entity.decoration.HangingEntity;
-    }
-
     /**
      * Capture buffer for entity renders.
      */
@@ -280,23 +268,17 @@ public final class EntityRenderer {
             float[] uv0 = new float[8];
             float[] colors = new float[16];
 
+            CapturedQuadProcessor.fillPositionsAndColors(verts, positions, colors);
             for (int i = 0; i < Math.min(4, verts.size()); i++) {
-                RenderCapture.Vertex v = verts.get(i);
-                positions[i * 3] = v.x;
-                positions[i * 3 + 1] = v.y;
-                positions[i * 3 + 2] = v.z;
-
-                minX = Math.min(minX, v.x);
-                minY = Math.min(minY, v.y);
-                minZ = Math.min(minZ, v.z);
-                maxX = Math.max(maxX, v.x);
-                maxY = Math.max(maxY, v.y);
-                maxZ = Math.max(maxZ, v.z);
-
-                colors[i * 4] = ((v.color >> 16) & 0xFF) / 255.0f;
-                colors[i * 4 + 1] = ((v.color >> 8) & 0xFF) / 255.0f;
-                colors[i * 4 + 2] = (v.color & 0xFF) / 255.0f;
-                colors[i * 4 + 3] = ((v.color >> 24) & 0xFF) / 255.0f;
+                float x = positions[i * 3];
+                float y = positions[i * 3 + 1];
+                float z = positions[i * 3 + 2];
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                minZ = Math.min(minZ, z);
+                maxX = Math.max(maxX, x);
+                maxY = Math.max(maxY, y);
+                maxZ = Math.max(maxZ, z);
             }
 
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.ENTITY)) {
@@ -313,32 +295,53 @@ public final class EntityRenderer {
                     entity.getType(),
                     renderType != null ? renderType.toString() : "null"));
             }
-            ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(entity, renderType);
+            RenderCaptureUtil.UvStats uvStats = RenderCaptureUtil.computeUvStats(verts);
+            String materialGroupKey = MaterialGroupKey.entity(entity);
+            CapturedQuadProcessor.process(
+                ctx,
+                sceneSink,
+                planeOffset,
+                renderType,
+                verts,
+                uvStats,
+                positions,
+                colors,
+                uv0,
+                entity,
+                materialGroupKey,
+                this::resolveTexture,
+                this::writeUvs,
+                (tracker, quadPositions, faceNormal) ->
+                    tracker.applyOffset(quadPositions, faceNormal, approximateDirection(faceNormal)),
+                RENDER_TYPE_RESOLVER
+            );
+        }
+
+        private CapturedQuadProcessor.TextureResult resolveTexture(
+            ExportContext ctx,
+            Entity source,
+            RenderType renderType,
+            RenderCaptureUtil.UvStats uvStats,
+            float[] positions
+        ) {
+            ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(source, renderType);
+
+            if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
+                textureRes = RenderCaptureUtil.resolveAtlasSprite(textureRes, ATLAS_LOCATOR, uvStats, textureRes.atlasLocation());
+            }
+
+            if (source instanceof net.minecraft.world.entity.decoration.Painting painting
+                && textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() != null) {
+                textureRes = selectPaintingTexture(painting, textureRes, positions);
+            }
+
             String spriteKey;
             boolean isAtlasTexture = false;
             float u0 = 0f, u1 = 1f, v0 = 0f, v1 = 1f;
-            ResourceLocation atlasLocation = textureRes != null ? textureRes.atlasLocation() : null;
-
-            RenderCaptureUtil.UvStats uvStats = RenderCaptureUtil.computeUvStats(verts);
-
-            if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
-                textureRes = RenderCaptureUtil.resolveAtlasSprite(textureRes, ATLAS_LOCATOR, uvStats, atlasLocation);
-                if (textureRes != null) {
-                    atlasLocation = textureRes.atlasLocation();
-                }
-            }
-
-            if (entity instanceof net.minecraft.world.entity.decoration.Painting painting
-                && textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() != null) {
-                textureRes = selectPaintingTexture(painting, textureRes, positions);
-                atlasLocation = textureRes.atlasLocation();
-            }
-
-            String materialGroupKey = "entity:" + net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
 
             if (textureRes != null && textureRes.texture() != null) {
                 EntityTextureManager.TextureHandle handle = null;
-                if (entity instanceof AbstractClientPlayer player) {
+                if (source instanceof AbstractClientPlayer player) {
                     handle = tryRegisterPlayerAttachmentTexture(ctx, player, textureRes.texture());
                 }
                 if (handle == null) {
@@ -352,14 +355,14 @@ public final class EntityRenderer {
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.ENTITY)) {
                     VoxelBridgeLogger.debug(LogModule.ENTITY, String.format(
                         "[Texture] %s texture=%s isAtlas=%s",
-                        entity.getType(),
+                        source.getType(),
                         textureRes.texture() != null ? textureRes.texture() : "null",
                         isAtlasTexture));
                 }
                 if (VoxelBridgeLogger.isTraceEnabled(LogModule.ENTITY)) {
                     VoxelBridgeLogger.trace(LogModule.ENTITY, String.format(
                         "[UV] %s u=[%.4f, %.4f] v=[%.4f, %.4f]",
-                        entity.getType(), u0, u1, v0, v1));
+                        source.getType(), u0, u1, v0, v1));
                 }
 
                 // Cache atlas sprite pixels for export.
@@ -374,32 +377,16 @@ public final class EntityRenderer {
                 VoxelBridgeLogger.debug(LogModule.ENTITY, "[Quad#" + quadCount + "] No texture resolved, using white fallback");
             }
 
-            if (isAtlasTexture && textureRes != null && textureRes.sprite() != null) {
-                float eps = 1e-4f;
-                boolean outsideSpriteBounds =
-                    uvStats.minU() < textureRes.u0() - eps || uvStats.maxU() > textureRes.u1() + eps ||
-                    uvStats.minV() < textureRes.v0() - eps || uvStats.maxV() > textureRes.v1() + eps;
-                if (outsideSpriteBounds) {
-                    isAtlasTexture = false;
-                    u0 = 0f; u1 = 1f;
-                    v0 = 0f; v1 = 1f;
-                }
-            }
-
-            fillUvs(verts, uv0, isAtlasTexture, u0, u1, v0, v1);
-
-            String resolvedMaterialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
-            ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
-            RenderCaptureUtil.ColorModeResult colorResult =
-                RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
-            float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
-            Direction dir = approximateDirection(faceNormal);
-            planeOffset.applyOffset(positions, faceNormal, dir);
-            sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
-                RenderLayer.UNKNOWN, colorResult.tintMode(),
-                RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
-                false,
-                positions, uv0, colorResult.uv1(), NORMAL_UP, colors);
+            return new CapturedQuadProcessor.TextureResult(
+                spriteKey,
+                textureRes,
+                isAtlasTexture,
+                u0,
+                u1,
+                v0,
+                v1,
+                false
+            );
         }
 
         private Direction approximateDirection(float[] normal) {
@@ -421,55 +408,30 @@ public final class EntityRenderer {
             return nz >= 0f ? Direction.SOUTH : Direction.NORTH;
         }
 
-        private void fillUvs(List<RenderCapture.Vertex> verts, float[] uv0, boolean isAtlas,
-                             float u0, float u1, float v0, float v1) {
-            int count = Math.min(4, verts.size());
-            if (isAtlas) {
+        private void writeUvs(ExportContext ctx,
+                              List<RenderCapture.Vertex> verts,
+                              RenderCaptureUtil.UvStats uvStats,
+                              boolean useAtlasUv,
+                              float u0,
+                              float u1,
+                              float v0,
+                              float v1,
+                              String spriteKey,
+                              ResolvedTexture textureRes,
+                              float[] uv0) {
+            if (useAtlasUv) {
                 // Atlas texture: normalize UV within sprite bounds
                 RenderCaptureUtil.fillUvsAtlas(verts, uv0, u0, u1, v0, v1);
             } else {
                 // Non-atlas texture: find actual UV bounds and normalize
                 // This is important for entities like paintings where UV may not be in [0,1]
-                float minU = Float.POSITIVE_INFINITY, maxU = Float.NEGATIVE_INFINITY;
-                float minV = Float.POSITIVE_INFINITY, maxV = Float.NEGATIVE_INFINITY;
-                for (int i = 0; i < count; i++) {
-                    RenderCapture.Vertex v = verts.get(i);
-                    minU = Math.min(minU, v.u);
-                    maxU = Math.max(maxU, v.u);
-                    minV = Math.min(minV, v.v);
-                    maxV = Math.max(maxV, v.v);
-                }
-
-                float rangeU = maxU - minU;
-                float rangeV = maxV - minV;
-
-                // If UV extends significantly beyond [0,1] OR has zero range, normalize
-                boolean needsNormalization =
-                    maxU > 1.1f || minU < -0.1f || maxV > 1.1f || minV < -0.1f ||
-                    rangeU < 1e-6f || rangeV < 1e-6f;
-                if (needsNormalization && rangeU > 1e-6f && rangeV > 1e-6f) {
+                RenderCaptureUtil.UvFillResult result = RenderCaptureUtil.fillUvsNormalize(verts, uv0, uvStats);
+                if (result.mode() == RenderCaptureUtil.UvFillMode.NORMALIZED) {
                     VoxelBridgeLogger.debug(LogModule.ENTITY, String.format(
                         "[UV Normalization] Painting/Entity UV remapped: U[%.3f, %.3f] V[%.3f, %.3f] -> [0,1]x[0,1]",
-                        minU, maxU, minV, maxV));
-                    for (int i = 0; i < count; i++) {
-                        RenderCapture.Vertex v = verts.get(i);
-                        float su = (v.u - minU) / rangeU;
-                        float sv = (v.v - minV) / rangeV;
-                        uv0[i * 2] = Math.max(0f, Math.min(1f, su));
-                        uv0[i * 2 + 1] = Math.max(0f, Math.min(1f, sv));
-                    }
-                } else if (rangeU < 1e-6f || rangeV < 1e-6f) {
+                        result.minU(), result.maxU(), result.minV(), result.maxV()));
+                } else if (result.mode() == RenderCaptureUtil.UvFillMode.DEGENERATE) {
                     VoxelBridgeLogger.debug(LogModule.ENTITY, "[UV Normalization] Degenerate UV detected, using [0,0] for all vertices");
-                    for (int i = 0; i < count; i++) {
-                        uv0[i * 2] = 0f;
-                        uv0[i * 2 + 1] = 0f;
-                    }
-                } else {
-                    for (int i = 0; i < count; i++) {
-                        RenderCapture.Vertex v = verts.get(i);
-                        uv0[i * 2] = Math.max(0f, Math.min(1f, v.u));
-                        uv0[i * 2 + 1] = Math.max(0f, Math.min(1f, v.v));
-                    }
                 }
             }
         }
