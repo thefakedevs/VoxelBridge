@@ -7,6 +7,8 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
+import java.util.Objects;
+
 /**
  * Client-side progress notifications: action bar text + HUD progress bar.
  */
@@ -86,8 +88,26 @@ public final class ProgressNotifier {
     }
 
     public static void renderOverlay(Minecraft mc, GuiGraphics gfx) {
-        if (lastProgress == null || mc == null) {
+        if (mc == null) {
             return;
+        }
+        ExportProgressTracker.Progress current = ExportProgressTracker.progress();
+        if (lastProgress == null) {
+            if (current.stage() != ExportProgressTracker.Stage.IDLE
+                && current.stage() != ExportProgressTracker.Stage.COMPLETE) {
+                lastProgress = current;
+                lastProgressNanos = System.nanoTime();
+            } else {
+                return;
+            }
+        } else {
+            boolean stageChanged = current.stage() != lastProgress.stage()
+                || !Objects.equals(current.stageDetail(), lastProgress.stageDetail())
+                || !Objects.equals(current.phasePercent(), lastProgress.phasePercent());
+            if (stageChanged) {
+                lastProgress = current;
+                lastProgressNanos = System.nanoTime();
+            }
         }
         if (lastProgress.stage() == ExportProgressTracker.Stage.COMPLETE) {
             long elapsedNs = System.nanoTime() - lastProgressNanos;

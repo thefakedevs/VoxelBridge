@@ -3,8 +3,10 @@ package com.voxelbridge.export.exporter.entity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
+import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.exporter.PlaneOffsetTracker;
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
@@ -21,6 +23,8 @@ import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
@@ -237,6 +241,7 @@ public final class EntityRenderer {
     private static class CaptureBuffer extends CaptureBufferBase {
         private final double offsetX, offsetY, offsetZ;
         private final Entity entity;
+        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker();
         private int quadCount = 0;
         private float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
         private float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
@@ -322,6 +327,12 @@ public final class EntityRenderer {
                 }
             }
 
+            if (entity instanceof net.minecraft.world.entity.decoration.Painting
+                && textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() != null) {
+                textureRes = selectPaintingTexture((net.minecraft.world.entity.decoration.Painting) entity, textureRes, positions);
+                atlasLocation = textureRes.atlasLocation();
+            }
+
             String materialGroupKey = "entity:" + net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
 
             if (textureRes != null && textureRes.texture() != null) {
@@ -362,29 +373,52 @@ public final class EntityRenderer {
                 VoxelBridgeLogger.debug(LogModule.ENTITY, "[Quad#" + quadCount + "] No texture resolved, using white fallback");
             }
 
-            if (isAtlasTexture && textureRes != null && textureRes.sprite() != null) {
+            boolean useAtlasUv = isAtlasTexture;
+            if (useAtlasUv && textureRes != null && textureRes.sprite() != null) {
                 float eps = 1e-4f;
                 boolean outsideSpriteBounds =
                     uvStats.minU() < textureRes.u0() - eps || uvStats.maxU() > textureRes.u1() + eps ||
                     uvStats.minV() < textureRes.v0() - eps || uvStats.maxV() > textureRes.v1() + eps;
                 if (outsideSpriteBounds) {
-                    isAtlasTexture = false;
+                    useAtlasUv = false;
                     u0 = 0f; u1 = 1f;
                     v0 = 0f; v1 = 1f;
                 }
             }
 
-            fillUvs(verts, uv0, isAtlasTexture, u0, u1, v0, v1);
+            fillUvs(verts, uv0, useAtlasUv, u0, u1, v0, v1);
 
             String resolvedMaterialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
             ctx.registerSpriteMaterial(spriteKey, resolvedMaterialKey);
             RenderCaptureUtil.ColorModeResult colorResult =
                 RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
+            float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
+            Direction dir = approximateDirection(faceNormal);
+            planeOffset.applyOffset(positions, faceNormal, dir);
             sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
                 RenderLayer.UNKNOWN, colorResult.tintMode(),
                 RENDER_TYPE_RESOLVER.isDoubleSided(renderType),
                 false,
                 positions, uv0, colorResult.uv1(), NORMAL_UP, colors);
+        }
+
+        private Direction approximateDirection(float[] normal) {
+            if (normal == null || normal.length < 3) {
+                return null;
+            }
+            float nx = normal[0];
+            float ny = normal[1];
+            float nz = normal[2];
+            float ax = Math.abs(nx);
+            float ay = Math.abs(ny);
+            float az = Math.abs(nz);
+            if (ax >= ay && ax >= az) {
+                return nx >= 0f ? Direction.EAST : Direction.WEST;
+            }
+            if (ay >= ax && ay >= az) {
+                return ny >= 0f ? Direction.UP : Direction.DOWN;
+            }
+            return nz >= 0f ? Direction.SOUTH : Direction.NORTH;
         }
 
         private void fillUvs(List<RenderCapture.Vertex> verts, float[] uv0, boolean isAtlas, float u0, float u1, float v0, float v1) {
@@ -438,6 +472,94 @@ public final class EntityRenderer {
                     }
                 }
             }
+        }
+
+        private ResolvedTexture selectPaintingTexture(
+            net.minecraft.world.entity.decoration.Painting painting,
+            ResolvedTexture current,
+            float[] positions
+        ) {
+            ResolvedTexture normalized = normalizePaintingTexture(current);
+            if (isPaintingFrontQuad(painting, positions)) {
+                return normalized;
+            }
+
+            TextureAtlasSprite backSprite = ClientAccessHolder.get().getPaintingTextures().getBackSprite();
+            if (backSprite == null || isMissingSprite(backSprite)) {
+                return normalized;
+            }
+
+            ResourceLocation spriteName = backSprite.contents() != null ? backSprite.contents().name() : normalized.texture();
+            spriteName = normalizePaintingSpriteName(spriteName);
+            ResourceLocation atlas = backSprite.atlasLocation();
+            return new ResolvedTexture(spriteName, backSprite.getU0(), backSprite.getU1(),
+                backSprite.getV0(), backSprite.getV1(), true, backSprite, atlas);
+        }
+
+        private ResolvedTexture normalizePaintingTexture(ResolvedTexture current) {
+            if (current == null || current.texture() == null) {
+                return current;
+            }
+            ResourceLocation normalized = normalizePaintingSpriteName(current.texture());
+            if (normalized.equals(current.texture())) {
+                return current;
+            }
+            return new ResolvedTexture(normalized, current.u0(), current.u1(),
+                current.v0(), current.v1(), current.isAtlasTexture(), current.sprite(), current.atlasLocation());
+        }
+
+        private boolean isPaintingFrontQuad(net.minecraft.world.entity.decoration.Painting painting, float[] positions) {
+            Direction direction = painting.getDirection();
+            if (direction == null) {
+                return true;
+            }
+
+            int axisIndex;
+            double frontCoord;
+            var bounds = painting.getBoundingBox().move(offsetX, offsetY, offsetZ);
+            switch (direction) {
+                case NORTH -> {
+                    axisIndex = 2;
+                    frontCoord = bounds.minZ;
+                }
+                case SOUTH -> {
+                    axisIndex = 2;
+                    frontCoord = bounds.maxZ;
+                }
+                case WEST -> {
+                    axisIndex = 0;
+                    frontCoord = bounds.minX;
+                }
+                case EAST -> {
+                    axisIndex = 0;
+                    frontCoord = bounds.maxX;
+                }
+                default -> {
+                    return true;
+                }
+            }
+
+            float center = 0f;
+            for (int i = 0; i < 4; i++) {
+                center += positions[i * 3 + axisIndex];
+            }
+            center /= 4f;
+            return Math.abs(center - frontCoord) <= 1e-3f;
+        }
+
+        private ResourceLocation normalizePaintingSpriteName(ResourceLocation spriteName) {
+            if (spriteName == null) {
+                return null;
+            }
+            String path = spriteName.getPath();
+            if (path.startsWith("textures/painting/") || path.startsWith("painting/")) {
+                return spriteName;
+            }
+            return ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), "painting/" + path);
+        }
+
+        private boolean isMissingSprite(TextureAtlasSprite sprite) {
+            return sprite.contents().name().toString().contains("missingno");
         }
 
     }

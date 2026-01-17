@@ -100,7 +100,11 @@ public final class ExportContext {
                 AnimatedTextureHelper.detectFromMetadata(this, spriteKey, resourceKey, repo);
             }
             if (repo.hasAnimation(spriteKey)) {
-                return TexturePathResolver.animationBaseName(spriteKey);
+                String base = TexturePathResolver.animationBaseName(spriteKey);
+                if (fallbackMaterialKey != null && fallbackMaterialKey.endsWith("_emissive") && !base.endsWith("_emissive")) {
+                    base = base + "_emissive";
+                }
+                return base;
             }
         }
         if (ExportRuntimeConfig.getAtlasMode() == ExportRuntimeConfig.AtlasMode.INDIVIDUAL && spriteKey != null) {

@@ -8,6 +8,7 @@ import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -17,6 +18,10 @@ import net.minecraft.world.entity.decoration.PaintingVariant;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Map;
 
 /**
  * Resolves textures for entity renderers with entity-specific overrides.
@@ -104,25 +109,127 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
         }
         try {
             var paintingAtlas = ClientAccessHolder.get().getPaintingTextures();
-            var backSprite = paintingAtlas.getBackSprite();
-            if (backSprite == null) {
-                return null;
-            }
-            ResourceLocation atlas = backSprite.atlasLocation();
-            var atlasGetter = ClientAccessHolder.get().getTextureAtlas(atlas);
-            if (atlasGetter == null) {
-                return null;
-            }
-            var sprite = atlasGetter.apply(texture);
-            if (sprite != null && !isMissingSprite(sprite)) {
+            TextureAtlasSprite directSprite = tryFindPaintingSprite(paintingAtlas, texture);
+            if (directSprite != null && !isMissingSprite(directSprite)) {
+                ResourceLocation atlas = directSprite.atlasLocation();
+                ResourceLocation spriteName = directSprite.contents() != null ? directSprite.contents().name() : texture;
+                spriteName = normalizePaintingSpriteName(spriteName);
                 VoxelBridgeLogger.debug(LogModule.ENTITY, "[Painting] Resolved sprite in painting atlas: " + atlas);
-                return new ResolvedTexture(texture, sprite.getU0(), sprite.getU1(),
-                    sprite.getV0(), sprite.getV1(), true, sprite, atlas);
+                return new ResolvedTexture(spriteName, directSprite.getU0(), directSprite.getU1(),
+                    directSprite.getV0(), directSprite.getV1(), true, directSprite, atlas);
+            }
+
+            ResourceLocation atlas = resolvePaintingAtlasLocation(paintingAtlas);
+            if (atlas != null) {
+                var atlasGetter = ClientAccessHolder.get().getTextureAtlas(atlas);
+                if (atlasGetter != null) {
+                    var sprite = atlasGetter.apply(texture);
+                    if (sprite != null && !isMissingSprite(sprite)) {
+                        ResourceLocation spriteName = sprite.contents() != null ? sprite.contents().name() : texture;
+                        spriteName = normalizePaintingSpriteName(spriteName);
+                        VoxelBridgeLogger.debug(LogModule.ENTITY, "[Painting] Resolved sprite in painting atlas: " + atlas);
+                        return new ResolvedTexture(spriteName, sprite.getU0(), sprite.getU1(),
+                            sprite.getV0(), sprite.getV1(), true, sprite, atlas);
+                    }
+                }
             }
         } catch (Exception e) {
             VoxelBridgeLogger.debug(LogModule.ENTITY, "[Painting] Atlas sprite lookup failed: " + e.getMessage());
         }
         return null;
+    }
+
+    private static TextureAtlasSprite tryFindPaintingSprite(Object paintingAtlas, ResourceLocation texture) {
+        if (paintingAtlas == null || texture == null) {
+            return null;
+        }
+        Class<?> type = paintingAtlas.getClass();
+        for (Method method : type.getMethods()) {
+            if (method.getParameterCount() != 1) {
+                continue;
+            }
+            if (!TextureAtlasSprite.class.isAssignableFrom(method.getReturnType())) {
+                continue;
+            }
+            Class<?> param = method.getParameterTypes()[0];
+            if (!param.isAssignableFrom(ResourceLocation.class)) {
+                continue;
+            }
+            try {
+                method.setAccessible(true);
+                Object value = method.invoke(paintingAtlas, texture);
+                if (value instanceof TextureAtlasSprite sprite) {
+                    return sprite;
+                }
+            } catch (ReflectiveOperationException ignored) {
+            }
+        }
+
+        for (Field field : type.getDeclaredFields()) {
+            if (!Map.class.isAssignableFrom(field.getType())) {
+                continue;
+            }
+            try {
+                field.setAccessible(true);
+                Object value = field.get(paintingAtlas);
+                if (value instanceof Map<?, ?> map) {
+                    Object sprite = map.get(texture);
+                    if (sprite instanceof TextureAtlasSprite atlasSprite) {
+                        return atlasSprite;
+                    }
+                }
+            } catch (ReflectiveOperationException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static ResourceLocation resolvePaintingAtlasLocation(Object paintingAtlas) {
+        if (paintingAtlas == null) {
+            return null;
+        }
+        try {
+            Method backSpriteMethod = paintingAtlas.getClass().getMethod("getBackSprite");
+            Object value = backSpriteMethod.invoke(paintingAtlas);
+            if (value instanceof TextureAtlasSprite sprite) {
+                return sprite.atlasLocation();
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+
+        for (Method method : paintingAtlas.getClass().getMethods()) {
+            if (method.getParameterCount() != 0) {
+                continue;
+            }
+            if (!ResourceLocation.class.isAssignableFrom(method.getReturnType())) {
+                continue;
+            }
+            String name = method.getName().toLowerCase(java.util.Locale.ROOT);
+            if (!name.contains("atlas")) {
+                continue;
+            }
+            try {
+                Object value = method.invoke(paintingAtlas);
+                if (value instanceof ResourceLocation loc) {
+                    return loc;
+                }
+            } catch (ReflectiveOperationException ignored) {
+            }
+        }
+
+        // Fallback: vanilla painting atlas path used by recent versions.
+        return ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/paintings.png");
+    }
+
+    private static ResourceLocation normalizePaintingSpriteName(ResourceLocation spriteName) {
+        if (spriteName == null) {
+            return null;
+        }
+        String path = spriteName.getPath();
+        if (path.startsWith("textures/painting/") || path.startsWith("painting/")) {
+            return spriteName;
+        }
+        return ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), "painting/" + path);
     }
 
     private static ResolvedTexture resolveItemFrameTexture(ItemFrame itemFrame, RenderType renderType) {

@@ -1,4 +1,4 @@
-﻿package com.voxelbridge.platform.texture;
+package com.voxelbridge.platform.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -36,12 +36,12 @@ final class DynamicTextureReader {
                 return cached;
             }
         }
-        if (RenderSystem.isOnRenderThreadOrInit()) {
+        if (isOnRenderThreadOrInit()) {
             return readOnRenderThread(location);
         }
         CompletableFuture<BufferedImage> future = IN_FLIGHT.computeIfAbsent(location, loc -> {
             CompletableFuture<BufferedImage> created = new CompletableFuture<>();
-            RenderSystem.recordRenderCall(() -> {
+            recordRenderCall(() -> {
                 try {
                     BufferedImage img = readOnRenderThread(loc);
                     created.complete(img);
@@ -211,5 +211,76 @@ final class DynamicTextureReader {
             return null;
         }
         return null;
+    }
+
+    private static boolean isOnRenderThreadOrInit() {
+        Boolean result = invokeRenderSystemBoolean("isOnRenderThreadOrInit");
+        if (result != null) {
+            return result;
+        }
+        result = invokeRenderSystemBoolean("isOnRenderThread");
+        if (result != null) {
+            return result;
+        }
+        Object mc = ClientAccessHolder.get().getMinecraft();
+        Boolean sameThread = invokeBooleanMethod(mc, "isSameThread");
+        return sameThread != null && sameThread;
+    }
+
+    private static void recordRenderCall(Runnable runnable) {
+        if (invokeRenderSystemRunnable("recordRenderCall", runnable)) {
+            return;
+        }
+        Object mc = ClientAccessHolder.get().getMinecraft();
+        if (invokeRunnableMethod(mc, "execute", runnable)) {
+            return;
+        }
+        runnable.run();
+    }
+
+    private static Boolean invokeRenderSystemBoolean(String name) {
+        try {
+            Method method = RenderSystem.class.getMethod(name);
+            Object value = method.invoke(null);
+            return (value instanceof Boolean) ? (Boolean) value : null;
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean invokeRenderSystemRunnable(String name, Runnable runnable) {
+        try {
+            Method method = RenderSystem.class.getMethod(name, Runnable.class);
+            method.invoke(null, runnable);
+            return true;
+        } catch (ReflectiveOperationException ignored) {
+            return false;
+        }
+    }
+
+    private static Boolean invokeBooleanMethod(Object target, String name) {
+        if (target == null) {
+            return null;
+        }
+        try {
+            Method method = target.getClass().getMethod(name);
+            Object value = method.invoke(target);
+            return (value instanceof Boolean) ? (Boolean) value : null;
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean invokeRunnableMethod(Object target, String name, Runnable runnable) {
+        if (target == null) {
+            return false;
+        }
+        try {
+            Method method = target.getClass().getMethod(name, Runnable.class);
+            method.invoke(target, runnable);
+            return true;
+        } catch (ReflectiveOperationException ignored) {
+            return false;
+        }
     }
 }
