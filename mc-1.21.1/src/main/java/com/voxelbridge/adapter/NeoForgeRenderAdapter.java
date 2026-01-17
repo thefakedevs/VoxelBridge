@@ -25,7 +25,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
     }
 
     @Override
-    public BakedModel getBlockModel(BlockState state) {
+    public Object getBlockModel(BlockState state) {
         var modelManager = ClientAccessHolder.get().getModelManager();
         if (modelManager == null) {
             return null;
@@ -34,8 +34,11 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
     }
 
     @Override
-    public List<BakedQuad> getQuads(BakedModel model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
+    public List<BakedQuad> getQuads(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
         List<BakedQuad> quads = new ArrayList<>();
+        if (!(model instanceof BakedModel bakedModel)) {
+            return quads;
+        }
         RandomSource rand = RandomSource.create(seed);
         Object spriteFinder = getSpriteFinder();
         
@@ -48,7 +51,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
         }
         
         try {
-            if (model instanceof IBakedModelExtension extension) {
+            if (bakedModel instanceof IBakedModelExtension extension) {
                 if (level instanceof Level l) {
                     modelData = extension.getModelData(l, pos, state, modelData);
                 }
@@ -57,7 +60,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
 
         // 2. Try Fabric API (for CTM/Indium support on NeoForge)
         if (spriteFinder != null) {
-            List<BakedQuad> fabricQuads = FrapiCompat.extractQuads(model, level, state, pos, rand, spriteFinder);
+            List<BakedQuad> fabricQuads = FrapiCompat.extractQuads(bakedModel, level, state, pos, rand, spriteFinder);
             if (!fabricQuads.isEmpty()) {
                 return fabricQuads;
             }
@@ -66,11 +69,11 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
         // 3. Fallback to Vanilla/NeoForge Standard API
         try {
             for (Direction dir : Direction.values()) {
-                List<BakedQuad> q = model.getQuads(state, dir, rand, modelData, null);
+                List<BakedQuad> q = bakedModel.getQuads(state, dir, rand, modelData, null);
                 if (q != null) quads.addAll(q);
             }
             // Null direction (general quads)
-            List<BakedQuad> q2 = model.getQuads(state, null, rand, modelData, null);
+            List<BakedQuad> q2 = bakedModel.getQuads(state, null, rand, modelData, null);
             if (q2 != null) quads.addAll(q2);
         } catch (Throwable ignored) {}
 

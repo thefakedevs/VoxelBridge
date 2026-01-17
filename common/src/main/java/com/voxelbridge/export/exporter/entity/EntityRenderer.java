@@ -1,6 +1,7 @@
 package com.voxelbridge.export.exporter.entity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.config.ExportRuntimeConfig;
@@ -110,7 +111,7 @@ public final class EntityRenderer {
             }
 
             EntityRenderDispatcher dispatcher = ctx.getMc().getEntityRenderDispatcher();
-            net.minecraft.client.renderer.entity.EntityRenderer<? super Entity> renderer =
+            net.minecraft.client.renderer.entity.EntityRenderer renderer =
                     dispatcher.getRenderer(entity);
             if (renderer == null) {
                 VoxelBridgeLogger.error(LogModule.ENTITY, String.format(
@@ -133,7 +134,14 @@ public final class EntityRenderer {
             double finalZ = entity.getZ() + offsetZ;
 
             // Apply direction-based offset for hanging entities (paintings, item frames)
-            if (entity instanceof net.minecraft.world.entity.decoration.HangingEntity hangingEntity) {
+            if (entity instanceof net.minecraft.world.entity.decoration.HangingEntity hangingEntity
+                && Adapters.getEntityRender().shouldApplyHangingOffset()) {
+                net.minecraft.world.phys.Vec3 base = Adapters.getEntityRender().getHangingOffsetBase(hangingEntity);
+                if (base != null) {
+                    finalX = base.x + offsetX;
+                    finalY = base.y + offsetY;
+                    finalZ = base.z + offsetZ;
+                }
                 double[] hangingOffset = HangingEntityPositionUtil.calculateRenderOffset(hangingEntity);
                 finalX += hangingOffset[0];
                 finalY += hangingOffset[1];
@@ -165,17 +173,13 @@ public final class EntityRenderer {
 
             Runnable renderCall = () -> {
                 try {
-                    var renderOffset = renderer.getRenderOffset(entity, partial);
-                    poseStack.translate(renderOffset.x(), renderOffset.y(), renderOffset.z());
-
-                    renderer.render(
-                        entity,
-                        yaw,
-                        partial,
-                        poseStack,
-                        captureBuffer,
-                        packedLight
-                    );
+                    Object renderState = Adapters.getEntityRender().createRenderState(renderer, entity, yaw, partial);
+                    net.minecraft.world.phys.Vec3 renderOffset =
+                        Adapters.getEntityRender().getRenderOffset(renderer, entity, partial, renderState);
+                    if (renderOffset != null) {
+                        poseStack.translate(renderOffset.x(), renderOffset.y(), renderOffset.z());
+                    }
+                    Adapters.getEntityRender().render(renderer, renderState, entity, yaw, partial, poseStack, captureBuffer, packedLight);
                 } catch (Exception e) {
                     renderException[0] = e;
                 }

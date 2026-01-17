@@ -3,7 +3,7 @@ package com.voxelbridge.platform;
 import com.voxelbridge.client.HudOverlayRenderer;
 import com.voxelbridge.client.KeyBindings;
 import com.voxelbridge.client.KeyInputHandler;
-import com.voxelbridge.client.SelectionRenderer;
+import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.command.VoxelBridgeCommands;
 import com.voxelbridge.platform.neoforge.NeoForgeEventBusBridge;
 import net.neoforged.api.distmarker.Dist;
@@ -32,7 +32,7 @@ public final class NeoForgePlatformBootstrap implements PlatformBootstrap {
         NeoForgeEventBusBridge.addListener(modBus, KeyBindings::onRegisterKeyMappings);
         NeoForgeEventBusBridge.addListener(gameBus, VoxelBridgeCommands::register);
         NeoForgeEventBusBridge.addListener(gameBus, KeyInputHandler::onClientTick);
-        NeoForgeEventBusBridge.addListener(gameBus, SelectionRenderer::onRenderLevel);
+        NeoForgeEventBusBridge.addListener(gameBus, Adapters.getSelectionRender()::onRenderLevel);
         NeoForgeEventBusBridge.addListener(gameBus, HudOverlayRenderer::onRenderGui);
     }
 }

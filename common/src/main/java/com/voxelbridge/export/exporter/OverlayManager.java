@@ -7,6 +7,7 @@ import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.core.util.color.ColorModeHandler;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.core.util.image.ImageSampling;
+import com.voxelbridge.compat.QuadCompat;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.util.pool.ObjectPool;
@@ -163,10 +164,10 @@ public final class OverlayManager {
         // Mark sprite as processed (all overlays skip PASS 2)
         processedOverlaySprites.add(spriteKey);
 
-        var sprite = quad.getSprite();
+        var sprite = QuadCompat.getSprite(quad);
         if (sprite == null) return;
 
-        Direction dir = quad.getDirection();
+        Direction dir = QuadCompat.getDirection(quad);
 
         // Register dynamic overlay texture
         boolean isDynamicTexture = spriteKey.contains("_overlay")
@@ -196,7 +197,7 @@ public final class OverlayManager {
         float[] localPos = positions12Pool.acquire();
 
         try {
-            int[] verts = quad.getVertices();
+            int[] verts = QuadCompat.getVertices(quad);
             if (verts.length < 32) return;
 
             float u0 = sprite.getU0();
@@ -335,8 +336,9 @@ public final class OverlayManager {
             }
         }
 
-        if (quad.getTintIndex() >= 0) {
-            int argb = ClientAccessHolder.get().getMinecraft().getBlockColors().getColor(state, level, pos, quad.getTintIndex());
+        int tintIndex = QuadCompat.getTintIndex(quad);
+        if (tintIndex >= 0) {
+            int argb = ClientAccessHolder.get().getMinecraft().getBlockColors().getColor(state, level, pos, tintIndex);
             return (argb == -1) ? 0xFFFFFFFF : argb;
         }
 

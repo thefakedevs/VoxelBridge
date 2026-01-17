@@ -21,7 +21,10 @@ public class VoxelBridge {
         ClientAccessHolder.set(new MinecraftClientAccess());
         com.voxelbridge.adapter.Adapters.init(
             new com.voxelbridge.adapter.NeoForgeWorldAdapter(),
-            new com.voxelbridge.adapter.NeoForgeRenderAdapter()
+            new com.voxelbridge.adapter.NeoForgeRenderAdapter(),
+            new com.voxelbridge.adapter.NeoForgeEntityRenderBridge(),
+            new com.voxelbridge.adapter.NeoForgeBlockEntityRenderBridge(),
+            new com.voxelbridge.adapter.NeoForgeSelectionRenderBridge()
         );
         PlatformBootstrap platform = new NeoForgePlatformBootstrap(dist, modBus);
         platform.init();

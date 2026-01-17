@@ -1,5 +1,7 @@
 package com.voxelbridge.export.exporter;
 
+import com.voxelbridge.compat.BlockStateCompat;
+import com.voxelbridge.compat.QuadCompat;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
@@ -16,7 +18,6 @@ import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -117,7 +118,9 @@ public final class BlockExporter {
         if (state.isAir()) return;
 
         // Vanilla random offset (grass, fern, etc.)
-        Vec3 randomOffset = vanillaRandomTransformEnabled ? state.getOffset(level, pos) : Vec3.ZERO;
+        Vec3 randomOffset = vanillaRandomTransformEnabled
+            ? BlockStateCompat.getOffset(state, level, pos)
+            : Vec3.ZERO;
 
         // Export fluid
         FluidState fluidState = state.getFluidState();
@@ -143,11 +146,11 @@ public final class BlockExporter {
         if (state.getRenderShape() == RenderShape.INVISIBLE) return;
 
         // Get block model via Adapter
-        BakedModel model = com.voxelbridge.adapter.Adapters.getRender().getBlockModel(state);
+        Object model = com.voxelbridge.adapter.Adapters.getRender().getBlockModel(state);
         if (model == null) return;
 
         // Occlusion culling for opaque blocks
-        boolean isTransparent = !state.isSolidRender(level, pos);
+        boolean isTransparent = !BlockStateCompat.isSolidRender(state, level, pos);
         byte[] faceOcclusionCache = null;
         if (!isTransparent) {
             faceOcclusionCache = new byte[Direction.values().length];
@@ -189,8 +192,9 @@ public final class BlockExporter {
         boolean isCtmCompact = false;
         for (int i = 0; i < quadCount; i++) {
             BakedQuad quad = quads.get(i);
-            if (quad == null || quad.getSprite() == null) continue;
-            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(quad.getSprite());
+            var sprite = QuadCompat.getSprite(quad);
+            if (quad == null || sprite == null) continue;
+            String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(sprite);
             spriteKeys[i] = spriteKey;
             if (!hasCtmSprite && isCtmOverlaySprite(spriteKey)) {
                 hasCtmSprite = true;
@@ -243,7 +247,7 @@ public final class BlockExporter {
             String spriteKey = spriteKeys[i];
             if (quad == null || spriteKey == null) continue;
 
-            Direction dir = quad.getDirection();
+            Direction dir = QuadCompat.getDirection(quad);
 
             // Skip if processed as overlay
             if (overlayManager.isProcessedOverlay(spriteKey)) {
@@ -318,7 +322,7 @@ public final class BlockExporter {
             BakedQuad quad = quads.get(i);
             String spriteKey = spriteKeys[i];
             if (quad == null || spriteKey == null) continue;
-            var sprite = quad.getSprite();
+            var sprite = QuadCompat.getSprite(quad);
             VertexExtractor.extractPositionsUv(quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset, positions, uv, null);
             long posHash = GeometryUtil.computePositionHash(positions);
             boolean approxSquare = GeometryUtil.isApproxAxisAlignedSquare(positions, 0.01f);
@@ -460,7 +464,7 @@ public final class BlockExporter {
             }
         }
 
-        return state.isSolidRender(level, neighbor);
+        return BlockStateCompat.isSolidRender(state, level, neighbor);
     }
 
     private boolean isNeighborSameBlock(BlockState state, BlockPos neighbor) {

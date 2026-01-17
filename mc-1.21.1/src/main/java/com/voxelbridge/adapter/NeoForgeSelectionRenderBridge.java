@@ -1,14 +1,13 @@
-package com.voxelbridge.client;
+package com.voxelbridge.adapter;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.voxelbridge.compat.LevelRendererCompat;
-import com.voxelbridge.compat.RenderStageCompat;
 import com.voxelbridge.export.ExportControl;
 import com.voxelbridge.export.ExportProgressTracker;
 import com.voxelbridge.export.ExportProgressTracker.ChunkState;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
@@ -19,20 +18,27 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import java.util.Map;
 
-public class SelectionRenderer {
-    public static void onRenderLevel(RenderLevelStageEvent event) {
-        if (!RenderStageCompat.isAfterTranslucent(event)) {
+/**
+ * 1.21.1 selection renderer using legacy API (no reflection).
+ */
+public final class NeoForgeSelectionRenderBridge implements SelectionRenderBridge {
+
+    @Override
+    public void onRenderLevel(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
 
         BlockPos pos1 = ExportControl.getPos1();
         BlockPos pos2 = ExportControl.getPos2();
 
-        if (pos1 == null && pos2 == null) return;
+        if (pos1 == null && pos2 == null) {
+            return;
+        }
 
-        var mc = ClientAccessHolder.get().getMinecraft();
+        Minecraft mc = ClientAccessHolder.get().getMinecraft();
         Vec3 camPos = event.getCamera().getPosition();
-        PoseStack poseStack = new PoseStack();
+        PoseStack poseStack = event.getPoseStack();
         MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
         VertexConsumer consumer = bufferSource.getBuffer(RenderType.lines());
 
@@ -55,13 +61,12 @@ public class SelectionRenderer {
 
         poseStack.popPose();
         bufferSource.endBatch(RenderType.lines());
-        bufferSource.endBatch();
     }
 
     private static void renderBox(PoseStack poseStack, VertexConsumer consumer,
                                   BlockPos pos, float r, float g, float b, float a) {
         AABB box = new AABB(pos).inflate(0.002);
-        LevelRendererCompat.renderLineBox(poseStack, consumer, box, r, g, b, a);
+        LevelRenderer.renderLineBox(poseStack, consumer, box, r, g, b, a);
     }
 
     private static void renderSelectionBox(PoseStack poseStack, VertexConsumer consumer,
@@ -75,7 +80,7 @@ public class SelectionRenderer {
         int maxZ = Math.max(pos1.getZ(), pos2.getZ()) + 1;
 
         AABB box = new AABB(minX, minY, minZ, maxX, maxY, maxZ);
-        LevelRendererCompat.renderLineBox(poseStack, consumer, box, r, g, b, a);
+        LevelRenderer.renderLineBox(poseStack, consumer, box, r, g, b, a);
     }
 
     private static void renderChunkStatus(PoseStack poseStack, VertexConsumer consumer,
@@ -101,7 +106,6 @@ public class SelectionRenderer {
             int maxX = minX + 16;
             int maxZ = minZ + 16;
 
-            // Clip the chunk box to the selection so only the overlapping portion is rendered.
             int boxMinX = Math.max(minX, selMinX);
             int boxMinY = selMinY;
             int boxMinZ = Math.max(minZ, selMinZ);
@@ -110,7 +114,7 @@ public class SelectionRenderer {
             int boxMaxZ = Math.min(maxZ, selMaxZ);
 
             if (boxMinX >= boxMaxX || boxMinY >= boxMaxY || boxMinZ >= boxMaxZ) {
-                continue; // fully outside selection
+                continue;
             }
 
             float r, g, b;
@@ -118,19 +122,19 @@ public class SelectionRenderer {
             if (state == ChunkState.DONE) {
                 r = 0.1f;
                 g = 1.0f;
-                b = 0.1f; // green
+                b = 0.1f;
             } else if (state == ChunkState.RUNNING) {
                 r = 1.0f;
                 g = 0.8f;
-                b = 0.1f; // yellow
+                b = 0.1f;
             } else {
                 r = 1.0f;
                 g = 0.2f;
-                b = 0.2f; // red
+                b = 0.2f;
             }
 
             AABB chunkBox = new AABB(boxMinX, boxMinY, boxMinZ, boxMaxX, boxMaxY, boxMaxZ);
-            LevelRendererCompat.renderLineBox(poseStack, consumer, chunkBox, r, g, b, 0.35f);
+            LevelRenderer.renderLineBox(poseStack, consumer, chunkBox, r, g, b, 0.35f);
         }
     }
 
@@ -153,16 +157,16 @@ public class SelectionRenderer {
         poseStack.scale(-0.02f, -0.02f, 0.02f);
         float x = -mc.font.width(text) / 2.0f;
         mc.font.drawInBatch(
-                text,
-                x,
-                0,
-                0xFFFFFFFF,
-                false,
-                poseStack.last().pose(),
-                bufferSource,
-                net.minecraft.client.gui.Font.DisplayMode.NORMAL,
-                0,
-                0x00F000F0);
+            text,
+            x,
+            0,
+            0xFFFFFFFF,
+            false,
+            poseStack.last().pose(),
+            bufferSource,
+            net.minecraft.client.gui.Font.DisplayMode.NORMAL,
+            0,
+            0x00F000F0);
         poseStack.popPose();
     }
 }

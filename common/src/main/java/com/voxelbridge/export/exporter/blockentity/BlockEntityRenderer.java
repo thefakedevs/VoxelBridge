@@ -1,6 +1,7 @@
 package com.voxelbridge.export.exporter.blockentity;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.export.ExportContext;
@@ -24,6 +25,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
@@ -156,14 +158,13 @@ public final class BlockEntityRenderer {
             CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, blockEntity);
 
             com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderer][renderDirect] Calling renderer.render()...");
-            renderer.render(
-                blockEntity,
-                0.0f,
-                poseStack,
-                captureBuffer,
-                0xF000F0,
-                OverlayTexture.NO_OVERLAY
-            );
+            Vec3 camera = Vec3.ZERO;
+            try {
+                camera = ctx.getMc().gameRenderer.getMainCamera().getPosition();
+            } catch (Throwable ignored) {
+                // Fallback to zero if camera is unavailable.
+            }
+            Adapters.getBlockEntityRender().render(renderer, blockEntity, 0.0f, poseStack, captureBuffer, 0xF000F0, OverlayTexture.NO_OVERLAY, camera);
 
             com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderer][renderDirect] renderer.render() returned, flushing buffer...");
             captureBuffer.flush();

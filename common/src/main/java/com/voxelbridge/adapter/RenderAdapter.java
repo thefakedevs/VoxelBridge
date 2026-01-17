@@ -1,7 +1,6 @@
 package com.voxelbridge.adapter;
 
 import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
@@ -14,9 +13,9 @@ import java.util.List;
  */
 public interface RenderAdapter {
     /**
-     * Gets the baked model for a block state.
+     * Gets the baked model handle for a block state.
      */
-    BakedModel getBlockModel(BlockState state);
+    Object getBlockModel(BlockState state);
 
     /**
      * Extracts quads from a model.
@@ -25,7 +24,7 @@ public interface RenderAdapter {
      * 2. Fabric/NeoForge API extensions (CTM, Indigo, etc.)
      * 3. ModelData handling
      */
-    List<BakedQuad> getQuads(BakedModel model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed);
+    List<BakedQuad> getQuads(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed);
 
     /**
      * Resolves the unique resource location string for a texture sprite.

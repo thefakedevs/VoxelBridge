@@ -2,7 +2,6 @@ package com.voxelbridge.modhandler;
 
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.modhandler.yuushya.YuushyaShowBlockHandler;
-import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -43,7 +42,7 @@ public final class ModHandlerRegistry {
         BlockState state,
         BlockEntity blockEntity,
         BlockPos pos,
-        BakedModel bakedModel
+        Object bakedModel
     ) {
         for (ModBlockHandler handler : HANDLERS) {
             Optional<ModHandledQuads> result = handler.handle(ctx, level, state, blockEntity, pos, bakedModel);

@@ -19,7 +19,7 @@ public final class HangingEntityPositionUtil {
      */
     public static double[] calculateRenderOffset(HangingEntity entity) {
         Direction direction = entity.getDirection();
-        Vec3 offset = Vec3.atLowerCornerOf(direction.getNormal());
+        Vec3 offset = new Vec3(direction.getStepX(), direction.getStepY(), direction.getStepZ());
         double halfWidth = entity.getBbWidth() / 2.0;
         double halfHeight = entity.getBbHeight() / 2.0;
 

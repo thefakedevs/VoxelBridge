@@ -1,13 +1,12 @@
 package com.voxelbridge.platform.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.voxelbridge.compat.RenderSystemCompat;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.client.renderer.texture.HttpTexture;
 import net.minecraft.resources.ResourceLocation;
 
 import javax.imageio.ImageIO;
@@ -37,12 +36,12 @@ final class DynamicTextureReader {
                 return cached;
             }
         }
-        if (RenderSystem.isOnRenderThreadOrInit()) {
+        if (RenderSystemCompat.isOnRenderThread()) {
             return readOnRenderThread(location);
         }
         CompletableFuture<BufferedImage> future = IN_FLIGHT.computeIfAbsent(location, loc -> {
             CompletableFuture<BufferedImage> created = new CompletableFuture<>();
-            RenderSystem.recordRenderCall(() -> {
+            RenderSystemCompat.recordRenderCall(() -> {
                 try {
                     BufferedImage img = readOnRenderThread(loc);
                     created.complete(img);
@@ -127,7 +126,7 @@ final class DynamicTextureReader {
     }
 
     private static BufferedImage readHttpTexture(AbstractTexture texture) {
-        if (!(texture instanceof HttpTexture)) {
+        if (!isHttpTexture(texture)) {
             return null;
         }
         File file = findFileField(texture);
@@ -151,6 +150,22 @@ final class DynamicTextureReader {
             return null;
         }
         return TextureLoader.fromNativeImage(nativeImg);
+    }
+
+    private static boolean isHttpTexture(AbstractTexture texture) {
+        if (texture == null) {
+            return false;
+        }
+        String name = texture.getClass().getName();
+        if (name.endsWith(".HttpTexture")) {
+            return true;
+        }
+        for (Class<?> type = texture.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+            if (type.getName().endsWith(".HttpTexture")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static NativeImage findNativeImage(AbstractTexture texture) {

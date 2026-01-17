@@ -1,5 +1,6 @@
 package com.voxelbridge.util.client;
 
+import com.voxelbridge.compat.GuiPoseCompat;
 import com.voxelbridge.export.ExportProgressTracker;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -128,8 +129,8 @@ public final class ProgressNotifier {
         int filled = Math.round(barWidth * dispPct);
 
         // Raise Z-level to render above everything
-        gfx.pose().pushPose();
-        gfx.pose().translate(0, 0, 1000.0f);
+        GuiPoseCompat.push(gfx);
+        GuiPoseCompat.translate(gfx, 0, 0, 1000.0f);
 
         // Outline (Black border)
         gfx.fill(x - 1, y - 1, x + barWidth + 1, y + barHeight + 1, 0xFF000000);
@@ -172,7 +173,7 @@ public final class ProgressNotifier {
         int detailWidth = mc.font.width(details);
         gfx.drawString(mc.font, details, (screenW - detailWidth) / 2, y + 18, 0xFFFFFFFF, true);
 
-        gfx.pose().popPose();
+        GuiPoseCompat.pop(gfx);
     }
 
     private static String stageBase(ExportProgressTracker.Stage stage) {
