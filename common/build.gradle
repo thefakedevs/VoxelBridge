@@ -11,7 +11,7 @@ repositories {
 }
 
 dependencies {
-    api project(':core')
+    api project(':shared:core')
     compileOnly "net.neoforged:neoforge:${neo_version}"
 
     compileOnly "org.apache.logging.log4j:log4j-api:2.20.0"
@@ -36,4 +36,9 @@ neoForge {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+def projectTaskGroup = "voxelbridge/shared"
+tasks.configureEach { task ->
+    task.group = projectTaskGroup
 }

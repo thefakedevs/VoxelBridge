@@ -6,11 +6,29 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.116'
     // Shadow 9.x supports Gradle 9; older 8.x throws MissingPropertyException on FileCopyDetails.mode
     id 'com.gradleup.shadow' version '9.2.2'
-    id 'idea'
 }
 
+ext {
+    active_mc = "1.21.1"
+    minecraft_version = "1.21.1"
+    minecraft_version_range = "[1.21.1]"
+    parchment_minecraft_version = "1.21.1"
+    parchment_mappings_version = "2024.11.17"
+    neo_version = "21.1.216"
+    forgified_fabric_api_version = "0.115.6+2.1.4+1.21.1"
+}
+
+evaluationDependsOn(':shared:common')
+evaluationDependsOn(':shared:core')
+
 def activeMc = (project.findProperty('active_mc') ?: '1.21.1').toString()
-def mcProject = project(":mc-${activeMc}")
+def platform = "neoforge"
+def mcProjectDir = file("${rootProject.projectDir}/neoforge/${activeMc}")
+if (!mcProjectDir.exists()) {
+    throw new GradleException("Missing NeoForge sources at ${mcProjectDir}.")
+}
+
+buildDir = rootProject.file("build/${platform}/${activeMc}")
 
 version = mod_version
 group = mod_group_id
@@ -29,6 +47,14 @@ base {
 
 // Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+def jgltfVersion = '2.0.4'
+def pngjVersion = '2.1.0'
+def troveVersion = '3.0.3'
+def jacksonDatabindVersion = '2.13.4.2'
+def jacksonCoreVersion = '2.13.4'
+def jacksonAnnotationsVersion = '2.13.4'
+def forgifiedFabricApiVersion = (project.findProperty('forgified_fabric_api_version') ?: '').toString().trim()
 
 configurations {
     shaded
@@ -62,11 +88,12 @@ neoForge {
         data {
             data()
             programArguments.addAll '--mod', project.mod_id, '--all',
-                '--output', file("${mcProject.projectDir}/src/generated/resources/").getAbsolutePath(),
-                '--existing', file("${mcProject.projectDir}/src/main/resources/").getAbsolutePath()
+                '--output', file("${mcProjectDir}/src/generated/resources/").getAbsolutePath(),
+                '--existing', file("${mcProjectDir}/src/main/resources/").getAbsolutePath()
         }
 
         configureEach {
+            gameDirectory.set(rootProject.layout.projectDirectory.dir("run/${platform}/${activeMc}"))
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
         }
@@ -75,33 +102,52 @@ neoForge {
     mods {
         "${mod_id}" {
             sourceSet(sourceSets.main)
+            sourceSet(project(":shared:common").sourceSets.main)
+            sourceSet(project(":shared:core").sourceSets.main)
         }
     }
 }
 
+def runtimeLibs = [
+    "de.javagl:jgltf-model:${jgltfVersion}",
+    "de.javagl:jgltf-impl-v1:${jgltfVersion}",
+    "de.javagl:jgltf-impl-v2:${jgltfVersion}",
+    "ar.com.hjg:pngj:${pngjVersion}",
+    "net.sf.trove4j:trove4j:${troveVersion}",
+    "com.fasterxml.jackson.core:jackson-annotations:${jacksonAnnotationsVersion}",
+    "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}",
+    "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
+]
+
+def addRunRuntimeLibs = { String runName ->
+    def cfgName = "${runName}AdditionalRuntimeClasspath"
+    configurations.named(cfgName).configure {
+        runtimeLibs.each { dep -> project.dependencies.add(cfgName, dep) }
+    }
+}
+
+["client", "server", "data", "gameTestServer"].each { runName -> addRunRuntimeLibs(runName) }
+
 sourceSets {
     main {
-        java.srcDirs = [ "${mcProject.projectDir}/src/main/java" ]
+        java.srcDirs = [ "${mcProjectDir}/src/main/java" ]
         resources.srcDirs = [
-            "${mcProject.projectDir}/src/main/resources",
-            "${mcProject.projectDir}/src/generated/resources"
+            "${mcProjectDir}/src/main/resources",
+            "${mcProjectDir}/src/generated/resources"
         ]
     }
 }
 
 dependencies {
-    implementation project(':common')
-    shaded project(':common')
-    implementation project(':core')
-    shaded project(':core')
+    implementation project(':shared:common')
+    shaded project(':shared:common')
+    implementation project(':shared:core')
+    shaded project(':shared:core')
 
-    // Add Forgified Fabric API
-    implementation "org.sinytra.forgified-fabric-api:forgified-fabric-api:${forgified_fabric_api_version}"
-
-    def jgltfVersion = '2.0.4'
-    def jacksonDatabindVersion = '2.13.4.2'
-    def jacksonCoreVersion = '2.13.4'
-    def jacksonAnnotationsVersion = '2.13.4'
+    if (forgifiedFabricApiVersion) {
+        // Add Forgified Fabric API when a compatible version is configured.
+        implementation "org.sinytra.forgified-fabric-api:forgified-fabric-api:${forgifiedFabricApiVersion}"
+    }
 
     compileOnly "org.apache.logging.log4j:log4j-api:2.20.0"
     compileOnly "org.apache.logging.log4j:log4j-core:2.20.0"
@@ -109,8 +155,8 @@ dependencies {
     implementation "de.javagl:jgltf-model:${jgltfVersion}"
     implementation "de.javagl:jgltf-impl-v1:${jgltfVersion}"
     implementation "de.javagl:jgltf-impl-v2:${jgltfVersion}"
-    implementation "ar.com.hjg:pngj:2.1.0"
-    implementation "net.sf.trove4j:trove4j:3.0.3"
+    implementation "ar.com.hjg:pngj:${pngjVersion}"
+    implementation "net.sf.trove4j:trove4j:${troveVersion}"
     implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonAnnotationsVersion}"
     implementation "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}"
     implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
@@ -118,8 +164,8 @@ dependencies {
     shaded "de.javagl:jgltf-model:${jgltfVersion}"
     shaded "de.javagl:jgltf-impl-v1:${jgltfVersion}"
     shaded "de.javagl:jgltf-impl-v2:${jgltfVersion}"
-    shaded "ar.com.hjg:pngj:2.1.0"
-    shaded "net.sf.trove4j:trove4j:3.0.3"
+    shaded "ar.com.hjg:pngj:${pngjVersion}"
+    shaded "net.sf.trove4j:trove4j:${troveVersion}"
     shaded "com.fasterxml.jackson.core:jackson-annotations:${jacksonAnnotationsVersion}"
     shaded "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}"
     shaded "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
@@ -140,7 +186,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
     ]
     inputs.properties replaceProperties
     expand replaceProperties
-    from "${mcProject.projectDir}/src/main/templates"
+    from "${mcProjectDir}/src/main/templates"
     into "build/generated/sources/modMetadata"
 }
 
@@ -164,13 +210,6 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-idea {
-    module {
-        downloadSources = true
-        downloadJavadoc = true
-    }
-}
-
 // Use Shadow to relocate jgltf to avoid mod conflicts
 tasks.named('shadowJar') {
     archiveClassifier.set('')
@@ -181,7 +220,7 @@ tasks.named('shadowJar') {
     relocate 'com.fasterxml.jackson', 'com.voxelbridge.shadow.jackson'
     mergeServiceFiles()
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    destinationDirectory = layout.buildDirectory.dir("libs-${activeMc}")
+    destinationDirectory = layout.buildDirectory.dir("libs")
 }
 
 // Make assemble/build use the shaded artifact
@@ -190,38 +229,24 @@ tasks.named('assemble') { dependsOn tasks.shadowJar }
 // Disable plain jar to avoid filename clash with shadowJar
 tasks.named('jar') { enabled = false }
 
-def mcProfiles = [
-    "1.21.1": [
-        active_mc                  : "1.21.1",
-        minecraft_version          : "1.21.1",
-        minecraft_version_range    : "[1.21.1]",
-        parchment_minecraft_version: "1.21.1",
-        parchment_mappings_version : "2024.11.17",
-        neo_version                : "21.1.216"
-    ],
-    "1.21.8": [
-        active_mc                  : "1.21.8",
-        minecraft_version          : "1.21.8",
-        minecraft_version_range    : "[1.21.8,1.22)",
-        parchment_minecraft_version: "1.21.8",
-        parchment_mappings_version : "2025.09.14",
-        neo_version                : "21.8.52"
-    ]
-]
-
-def registerProfileTask = { String name, String profileKey, List<String> taskList, String desc ->
-    tasks.register(name, GradleBuild) {
-        group = "build"
-        description = desc
-        dir = rootProject.projectDir
-        tasks = taskList
-        def props = mcProfiles[profileKey]
-        if (props == null) {
-            throw new GradleException("Unknown mc profile: ${profileKey}")
-        }
-        props.each { k, v -> startParameter.projectProperties.put(k, v) }
+def taskGroupRoot = "voxelbridge/neoforge/mod"
+def groupForTask = { Task task ->
+    def name = task.name
+    def category
+    if (name ==~ /^(run|prepare).*/ || name.endsWith("Run") || name.startsWith("genIntellijRuns")) {
+        category = "moddev"
+    } else if (name.startsWith("publish") || name == "publishToMavenLocal") {
+        category = "publish"
+    } else if (task instanceof org.gradle.api.tasks.VerificationTask || name == "check" || name.endsWith("Test")) {
+        category = "verification"
+    } else if (name == "build" || name == "assemble" || name == "clean" || name.endsWith("Jar") || name.endsWith("SourcesJar")) {
+        category = "build"
+    } else {
+        category = "misc"
     }
+    return "${taskGroupRoot}/${activeMc}/${category}"
 }
 
-registerProfileTask("build1211", "1.21.1", [":mod:build"], "Build mod against mc-1.21.1")
-registerProfileTask("build1218", "1.21.8", [":mod:build"], "Build mod against mc-1.21.8")
+tasks.configureEach { task ->
+    task.group = groupForTask(task)
+}

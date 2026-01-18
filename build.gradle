@@ -9,7 +9,7 @@ tasks.named('wrapper', Wrapper).configure {
 def activeMc = (findProperty('active_mc') ?: '1.21.1').toString()
 
 subprojects { subproj ->
-    if (subproj.name.startsWith('mc-') && subproj.name != "mc-${activeMc}") {
+    if (subproj.path.startsWith(':neoforge:mc-') && subproj.name != "mc-${activeMc}") {
         subproj.tasks.configureEach { task ->
             task.enabled = false
         }
