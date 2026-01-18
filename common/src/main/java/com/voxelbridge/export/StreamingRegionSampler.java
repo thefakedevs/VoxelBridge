@@ -19,8 +19,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.Map;
 import java.util.Set;
@@ -36,7 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * and exports them as soon as they become available.
  * Updated to use Atomic Export strategy.
  */
-@OnlyIn(Dist.CLIENT)
 public final class StreamingRegionSampler {
 
     private StreamingRegionSampler() {}

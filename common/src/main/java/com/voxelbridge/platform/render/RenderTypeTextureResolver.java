@@ -5,8 +5,6 @@ import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,7 +14,6 @@ import java.util.Optional;
 /**
  * Resolves texture resource locations from RenderType instances using reflection.
  */
-@OnlyIn(Dist.CLIENT)
 public final class RenderTypeTextureResolver implements RenderTypeResolver {
 
     public static final RenderTypeTextureResolver INSTANCE = new RenderTypeTextureResolver();

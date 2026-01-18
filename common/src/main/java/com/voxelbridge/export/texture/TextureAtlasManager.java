@@ -12,8 +12,6 @@ import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -28,7 +26,6 @@ import java.util.*;
  * - INDIVIDUAL: single texture per sprite
  * - ATLAS: packed UDIM tiles using a simple shelf packer (size configurable)
  */
-@OnlyIn(Dist.CLIENT)
 public final class TextureAtlasManager {
     private static final int MAX_TINT_SLOTS = 64 * 64;
     private static final int DEFAULT_TINT = 0xFFFFFF;

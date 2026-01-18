@@ -7,8 +7,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -17,7 +15,6 @@ import java.nio.file.Path;
  * Delegates export operations to GltfExportService.
  * Kept for backward compatibility.
  */
-@OnlyIn(Dist.CLIENT)
 public final class ExportService {
 
     private ExportService() {}

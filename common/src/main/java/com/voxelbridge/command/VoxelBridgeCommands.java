@@ -12,7 +12,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
+import com.mojang.brigadier.CommandDispatcher;
 
 /**
  * Client-side /voxelbridge command registration.
@@ -42,7 +42,7 @@ public final class VoxelBridgeCommands {
         ExportControl.clearSelection();
     }
 
-    public static void register(RegisterClientCommandsEvent event) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         var root = Commands.literal("voxelbridge");
 
         root.then(Commands.literal("pos1")
@@ -352,7 +352,7 @@ public final class VoxelBridgeCommands {
         }));
 
         // Register the literal once and reuse the returned node for the "vb" shortcut.
-        CommandNode<CommandSourceStack> rootNode = event.getDispatcher().register(root);
-        event.getDispatcher().register(Commands.literal("vb").redirect(rootNode));
+        CommandNode<CommandSourceStack> rootNode = dispatcher.register(root);
+        dispatcher.register(Commands.literal("vb").redirect(rootNode));
     }
 }

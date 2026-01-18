@@ -13,8 +13,6 @@ import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.entity.*;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import net.minecraft.world.level.block.state.properties.WoodType;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Resolves the actual texture used by a BlockEntity render. Some render types
@@ -22,7 +20,6 @@ import net.neoforged.api.distmarker.OnlyIn;
  * the block entity state to find the concrete texture so that exporting can
  * load it from the resource manager.
  */
-@OnlyIn(Dist.CLIENT)
 public final class BlockEntityTextureResolver implements TextureResolver<BlockEntity> {
 
     public static final BlockEntityTextureResolver INSTANCE = new BlockEntityTextureResolver();

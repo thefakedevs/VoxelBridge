@@ -1,15 +1,11 @@
 package com.voxelbridge.export.exporter.blockentity;
 
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-
 /**
  * Result of attempting to export a BlockEntity.
  *
  * @param rendered Whether the BlockEntity was successfully rendered
  * @param replaceBlockModel If true, skip rendering the standard block model
  */
-@OnlyIn(Dist.CLIENT)
 public record BlockEntityExportResult(boolean rendered, boolean replaceBlockModel) {
 
     public static final BlockEntityExportResult NOT_HANDLED =

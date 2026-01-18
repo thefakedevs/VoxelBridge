@@ -11,8 +11,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.entity.BannerBlockEntity;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
@@ -22,8 +20,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-
-@OnlyIn(Dist.CLIENT)
 final class BannerTextureBaker {
     private static final ResourceLocation FLAG_ONLY_TEXTURE = ResourceLocation.withDefaultNamespace("entity/banner/base");
     private static final ResourceLocation BASE_WITH_POLE_TEXTURE = ResourceLocation.withDefaultNamespace("entity/banner_base");

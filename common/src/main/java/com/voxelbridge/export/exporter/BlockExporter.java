@@ -11,8 +11,7 @@ import com.voxelbridge.export.exporter.blockentity.BlockEntityExportResult;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
-import com.voxelbridge.modhandler.ModHandledQuads;
-import com.voxelbridge.modhandler.ModHandlerRegistry;
+import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.multiplayer.ClientChunkCache;
@@ -171,12 +170,13 @@ public final class BlockExporter {
         }
 
         // Get quads via Adapter (handles ModelData and Fabric API internally)
-        ModHandledQuads handledQuads = ModHandlerRegistry.shouldHandle(be)
-            ? ModHandlerRegistry.handle(ctx, level, state, be, pos, model)
+        var modHandler = Adapters.getModHandler();
+        List<BakedQuad> handledQuads = modHandler.shouldHandle(be)
+            ? modHandler.handle(ctx, level, state, be, pos, model)
             : null;
         List<BakedQuad> quads;
         if (handledQuads != null) {
-            quads = handledQuads.quads();
+            quads = handledQuads;
         } else {
             long seed = state.is(Blocks.LILY_PAD)
                 ? GeometryUtil.computeBushSeed(pos.getX(), pos.getY(), pos.getZ())

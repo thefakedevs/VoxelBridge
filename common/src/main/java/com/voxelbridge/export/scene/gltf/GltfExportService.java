@@ -15,8 +15,6 @@ import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,7 +30,6 @@ import java.nio.file.Path;
  * - File naming conventions
  * - glTF scene builder configuration
  */
-@OnlyIn(Dist.CLIENT)
 public final class GltfExportService {
 
     private GltfExportService() {}

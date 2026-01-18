@@ -5,8 +5,6 @@ import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
@@ -15,7 +13,6 @@ import java.util.Arrays;
  * Shared helper to locate and cache PBR companion textures (_n / _s) for a given sprite key.
  * This is a lightweight version of the BlockExporter logic, reused by fluids and BER paths.
  */
-@OnlyIn(Dist.CLIENT)
 public final class PbrTextureHelper {
     private PbrTextureHelper() {}
 

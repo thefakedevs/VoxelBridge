@@ -6,6 +6,8 @@ public final class Adapters {
     private static EntityRenderBridge entityRenderBridge;
     private static BlockEntityRenderBridge blockEntityRenderBridge;
     private static SelectionRenderBridge selectionRenderBridge;
+    private static FluidSpriteResolver fluidSpriteResolver;
+    private static ModHandlerBridge modHandlerBridge;
 
     private Adapters() {}
 
@@ -13,12 +15,16 @@ public final class Adapters {
                             RenderAdapter renderAdapterImpl,
                             EntityRenderBridge entityRenderBridgeImpl,
                             BlockEntityRenderBridge blockEntityRenderBridgeImpl,
-                            SelectionRenderBridge selectionRenderBridgeImpl) {
+                            SelectionRenderBridge selectionRenderBridgeImpl,
+                            FluidSpriteResolver fluidSpriteResolverImpl,
+                            ModHandlerBridge modHandlerBridgeImpl) {
         worldAdapter = worldAdapterImpl;
         renderAdapter = renderAdapterImpl;
         entityRenderBridge = entityRenderBridgeImpl;
         blockEntityRenderBridge = blockEntityRenderBridgeImpl;
         selectionRenderBridge = selectionRenderBridgeImpl;
+        fluidSpriteResolver = fluidSpriteResolverImpl;
+        modHandlerBridge = modHandlerBridgeImpl;
     }
 
     public static WorldAdapter getWorld() {
@@ -54,5 +60,19 @@ public final class Adapters {
             throw new IllegalStateException("SelectionRenderBridge not initialized!");
         }
         return selectionRenderBridge;
+    }
+
+    public static FluidSpriteResolver getFluidSpriteResolver() {
+        if (fluidSpriteResolver == null) {
+            throw new IllegalStateException("FluidSpriteResolver not initialized!");
+        }
+        return fluidSpriteResolver;
+    }
+
+    public static ModHandlerBridge getModHandler() {
+        if (modHandlerBridge == null) {
+            throw new IllegalStateException("ModHandlerBridge not initialized!");
+        }
+        return modHandlerBridge;
     }
 }

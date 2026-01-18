@@ -26,8 +26,6 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -38,7 +36,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * Renders BlockEntities and captures their geometry to an IR sink.
  * This replaces the old BerRenderHelper + BerCaptureBuffer system.
  */
-@OnlyIn(Dist.CLIENT)
 public final class BlockEntityRenderer {
 
     private static AtlasLocator ATLAS_LOCATOR = new DefaultAtlasLocator(ClientAccessHolder.get());

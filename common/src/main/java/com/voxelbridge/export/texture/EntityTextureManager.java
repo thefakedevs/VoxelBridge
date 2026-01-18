@@ -6,14 +6,10 @@ import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.texture.ExportOptions;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import java.util.Locale;
-
-@OnlyIn(Dist.CLIENT)
 public final class EntityTextureManager {
 
     private static final int DEFAULT_TEX_SIZE = 16;

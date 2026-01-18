@@ -17,8 +17,6 @@ import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.WoodType;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -28,8 +26,6 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
 import java.util.Map;
-
-@OnlyIn(Dist.CLIENT)
 public final class SignBlockEntityHandler implements BlockEntityHandler {
 
     private static final int SCALE = 16; // Scale up texture for readable text

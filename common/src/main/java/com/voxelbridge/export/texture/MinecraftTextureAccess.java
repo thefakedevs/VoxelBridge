@@ -6,8 +6,6 @@ import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.texture.TextureLoader;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
@@ -18,7 +16,6 @@ import java.util.stream.Collectors;
 /**
  * Minecraft-backed texture access adapter.
  */
-@OnlyIn(Dist.CLIENT)
 public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasSprite> {
 
     public static final MinecraftTextureAccess INSTANCE = new MinecraftTextureAccess();

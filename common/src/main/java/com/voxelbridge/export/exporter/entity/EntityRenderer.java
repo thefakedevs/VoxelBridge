@@ -30,8 +30,6 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -40,7 +38,6 @@ import java.util.Locale;
 /**
  * Captures entity renderer output into an IR sink.
  */
-@OnlyIn(Dist.CLIENT)
 public final class EntityRenderer {
 
     private static AtlasLocator ATLAS_LOCATOR = new DefaultAtlasLocator(ClientAccessHolder.get());

@@ -1,5 +1,6 @@
 package com.voxelbridge.export.exporter;
 
+import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.export.ExportContext;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -13,15 +14,11 @@ import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.client.textures.FluidSpriteCache;
 
 /**
  * Format-agnostic sampler for fluid geometry.
  * Uses Minecraft's liquid renderer to generate fluid geometry.
  */
-@OnlyIn(Dist.CLIENT)
 public final class FluidExporter {
     private FluidExporter() {}
 
@@ -73,9 +70,9 @@ public final class FluidExporter {
                                                         BlockAndTintGetter level,
                                                         BlockPos pos,
                                                         FluidState fs) {
-        // Primary path: Neo/vanilla fluid sprite cache (supports custom fluids)
+        // Primary path: platform-specific fluid sprite resolver (supports custom fluids)
         try {
-            TextureAtlasSprite[] sprites = FluidSpriteCache.getFluidSprites(level, pos, fs);
+            TextureAtlasSprite[] sprites = Adapters.getFluidSpriteResolver().resolve(level, pos, fs);
             if (sprites != null && sprites.length >= 2) {
                 TextureAtlasSprite still = sprites[0];
                 TextureAtlasSprite flow = sprites[1];

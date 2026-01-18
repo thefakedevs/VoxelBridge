@@ -5,14 +5,13 @@ import com.voxelbridge.util.client.RayCastUtil;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 /**
  * Handles the VoxelBridge hotkeys for selecting positions and triggering exports.
  */
 public class KeyInputHandler {
 
-    public static void onClientTick(ClientTickEvent.Post event) {
+    public static void onClientTick() {
         var mc = ClientAccessHolder.get().getMinecraft();
         if (mc.player == null || mc.level == null) {
             return;

@@ -6,8 +6,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.List;
 
@@ -15,7 +13,6 @@ import java.util.List;
  * Main entry point for BlockEntity export.
  * Delegates to specialized handlers in priority order.
  */
-@OnlyIn(Dist.CLIENT)
 public final class BlockEntityExporter {
 
     // List of handlers in priority order (specific handlers first, generic last)

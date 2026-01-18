@@ -8,8 +8,6 @@ import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
@@ -17,7 +15,6 @@ import java.io.InputStream;
 /**
  * TextureLoader reads vanilla or resource-pack textures and exposes tint helpers.
  */
-@OnlyIn(Dist.CLIENT)
 public final class TextureLoader {
 
     private TextureLoader() {}

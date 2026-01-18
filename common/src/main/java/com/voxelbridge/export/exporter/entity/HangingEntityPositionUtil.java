@@ -3,13 +3,10 @@ package com.voxelbridge.export.exporter.entity;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.decoration.HangingEntity;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Utility for calculating render offsets for hanging entities.
  */
-@OnlyIn(Dist.CLIENT)
 public final class HangingEntityPositionUtil {
 
     private HangingEntityPositionUtil() {}

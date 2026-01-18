@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import com.voxelbridge.platform.neoforge.NeoForgeEventBusBridge;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import java.util.Map;
@@ -24,7 +25,11 @@ import java.util.Map;
 public final class NeoForgeSelectionRenderBridge implements SelectionRenderBridge {
 
     @Override
-    public void onRenderLevel(RenderLevelStageEvent event) {
+    public void register(Object gameBus) {
+        NeoForgeEventBusBridge.addListener(gameBus, this::onRenderLevel);
+    }
+
+    private void onRenderLevel(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }

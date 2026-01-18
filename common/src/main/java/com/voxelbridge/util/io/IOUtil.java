@@ -1,8 +1,5 @@
 package com.voxelbridge.util.io;
 
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,7 +9,6 @@ import java.time.format.DateTimeFormatter;
 /**
  * Utility helpers for export directory management.
  */
-@OnlyIn(Dist.CLIENT)
 public final class IOUtil {
     private IOUtil() {}
 

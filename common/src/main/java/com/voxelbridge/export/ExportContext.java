@@ -13,8 +13,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 import java.util.Map;
@@ -25,7 +23,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Shared export context used by every exporter (thread-safe).
  * Wraps Minecraft runtime services plus MC-agnostic export state.
  */
-@OnlyIn(Dist.CLIENT)
 public final class ExportContext {
 
     private final SamplerContext sampler;

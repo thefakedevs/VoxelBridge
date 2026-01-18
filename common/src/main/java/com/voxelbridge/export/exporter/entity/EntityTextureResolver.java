@@ -16,8 +16,6 @@ import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.decoration.Painting;
 import net.minecraft.world.entity.decoration.PaintingVariant;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -26,7 +24,6 @@ import java.util.Map;
 /**
  * Resolves textures for entity renderers with entity-specific overrides.
  */
-@OnlyIn(Dist.CLIENT)
 public final class EntityTextureResolver implements TextureResolver<Entity> {
 
     public static final EntityTextureResolver INSTANCE = new EntityTextureResolver();

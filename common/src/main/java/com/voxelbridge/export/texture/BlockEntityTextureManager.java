@@ -8,8 +8,6 @@ import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.awt.image.BufferedImage;
 
@@ -18,7 +16,6 @@ import java.awt.image.BufferedImage;
  * BlockEntity textures are complete texture files that need to be loaded differently
  * than sprite-based block textures.
  */
-@OnlyIn(Dist.CLIENT)
 public final class BlockEntityTextureManager {
 
     private static final int DEFAULT_NORMAL = PbrTextureHelper.DEFAULT_NORMAL_COLOR;

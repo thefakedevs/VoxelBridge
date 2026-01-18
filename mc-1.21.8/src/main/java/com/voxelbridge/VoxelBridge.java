@@ -24,7 +24,9 @@ public class VoxelBridge {
             new com.voxelbridge.adapter.NeoForgeRenderAdapter(),
             new com.voxelbridge.adapter.NeoForgeEntityRenderBridge(),
             new com.voxelbridge.adapter.NeoForgeBlockEntityRenderBridge(),
-            new com.voxelbridge.adapter.NeoForgeSelectionRenderBridge()
+            new com.voxelbridge.adapter.NeoForgeSelectionRenderBridge(),
+            new com.voxelbridge.adapter.NeoForgeFluidSpriteResolver(),
+            new com.voxelbridge.adapter.NoopModHandlerBridge()
         );
         PlatformBootstrap platform = new NeoForgePlatformBootstrap(dist, modBus);
         platform.init();

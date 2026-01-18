@@ -6,14 +6,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Handler for exporting specific types of BlockEntities.
  * Each handler is responsible for rendering one or more BlockEntity types.
  */
-@OnlyIn(Dist.CLIENT)
 public interface BlockEntityHandler {
 
     /**

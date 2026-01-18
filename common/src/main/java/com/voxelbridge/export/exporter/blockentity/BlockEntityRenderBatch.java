@@ -2,8 +2,6 @@ package com.voxelbridge.export.exporter.blockentity;
 
 import com.voxelbridge.util.debug.LogModule;
 import net.minecraft.client.Minecraft;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -13,7 +11,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  *
  * Thread-safe for concurrent enqueue from multiple worker threads.
  */
-@OnlyIn(Dist.CLIENT)
 public final class BlockEntityRenderBatch {
 
     // Concurrent queue so worker threads can enqueue safely

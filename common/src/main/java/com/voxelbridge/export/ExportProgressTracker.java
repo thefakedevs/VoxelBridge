@@ -2,8 +2,6 @@ package com.voxelbridge.export;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.Collections;
 import java.util.Map;
@@ -14,7 +12,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Tracks chunk-level export progress for rendering and HUD updates.
  */
-@OnlyIn(Dist.CLIENT)
 public final class ExportProgressTracker {
     public enum ChunkState {
         PENDING, // Not started

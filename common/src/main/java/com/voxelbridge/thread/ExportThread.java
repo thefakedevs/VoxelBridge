@@ -7,15 +7,12 @@ import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Path;
 
 /** Asynchronous glTF export thread with completion notifications. */
-@OnlyIn(Dist.CLIENT)
 public class ExportThread extends Thread {
     private final Level level;
     private final BlockPos pos1, pos2;
