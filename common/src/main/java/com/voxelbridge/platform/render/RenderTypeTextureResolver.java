@@ -72,6 +72,8 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
             if (state == null) {
                 return false;
             }
+            
+            // Use reflection
             Field cullField = RenderType.CompositeState.class.getDeclaredField("cullState");
             cullField.setAccessible(true);
             Object cullState = cullField.get(state);
@@ -95,6 +97,7 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
                 return null;
             }
 
+            // Use reflection
             Field textureField = RenderType.CompositeState.class.getDeclaredField("textureState");
             textureField.setAccessible(true);
             Object textureState = textureField.get(state);
@@ -153,8 +156,8 @@ public final class RenderTypeTextureResolver implements RenderTypeResolver {
     }
 
     private static RenderType.CompositeState compositeState(RenderType renderType) {
+        // Use reflection
         try {
-            // Use reflection to access CompositeRenderType and state() method
             Class<?> compositeRenderTypeClass = Class.forName("net.minecraft.client.renderer.RenderType$CompositeRenderType");
             if (!compositeRenderTypeClass.isInstance(renderType)) {
                 return null;

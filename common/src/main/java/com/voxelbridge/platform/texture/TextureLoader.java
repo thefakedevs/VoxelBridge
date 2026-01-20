@@ -94,7 +94,10 @@ public final class TextureLoader {
         if (sprite == null) {
             return null;
         }
-        NativeImage nativeImg = sprite.contents().getOriginalImage();
+        NativeImage nativeImg = com.voxelbridge.compat.SpriteCompat.getOriginalImage(sprite);
+        if (nativeImg == null) {
+            return null;
+        }
         BufferedImage img = nativeImageToBufferedImage(nativeImg);
 
         // Extract first frame for animated textures

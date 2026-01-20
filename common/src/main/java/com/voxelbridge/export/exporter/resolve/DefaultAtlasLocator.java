@@ -24,7 +24,7 @@ public final class DefaultAtlasLocator implements AtlasLocator {
         if (!(tex instanceof TextureAtlas atlas)) {
             return null;
         }
-        for (TextureAtlasSprite sprite : atlas.getTextures().values()) {
+        for (TextureAtlasSprite sprite : com.voxelbridge.compat.AtlasCompat.getAllSprites(atlas)) {
             if (contains(sprite, u, v)) {
                 return sprite;
             }

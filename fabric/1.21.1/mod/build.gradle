@@ -1,6 +1,5 @@
 plugins {
-    // Use a recent Loom release compatible with MC 1.21.1 and Gradle 9
-    id 'fabric-loom' version '1.10.0-alpha.13' apply false
+    id 'fabric-loom' version '1.10.0-alpha.13'
     id 'maven-publish'
 }
 
@@ -11,28 +10,11 @@ ext {
 def activeFabricMc = (project.findProperty('active_fabric_mc') ?: '1.21.1').toString()
 def platform = "fabric"
 def mcProjectDir = rootProject.file("fabric/${activeFabricMc}")
-if (!mcProjectDir.exists()) {
-    throw new GradleException("Missing Fabric sources at ${mcProjectDir}.")
-}
 
-def fabricMinecraftVersion = project.findProperty('fabric_minecraft_version')?.toString()
-def fabricYarnMappings = project.findProperty('fabric_yarn_mappings')?.toString()
-def fabricLoaderVersion = project.findProperty('fabric_loader_version')?.toString()
-def fabricApiVersion = project.findProperty('fabric_api_version')?.toString()
-def fabricVersionsReady = [fabricMinecraftVersion, fabricYarnMappings, fabricLoaderVersion, fabricApiVersion].every { it }
-def fabricSourcesReady = mcProjectDir.exists()
-def fabricReady = fabricVersionsReady && fabricSourcesReady
+def fabricMinecraftVersion = project.fabric_minecraft_version
+def fabricLoaderVersion = project.fabric_loader_version
+def fabricApiVersion = project.fabric_api_version
 def fabricRunDir = project.rootProject.file("run/${platform}/${activeFabricMc}")
-
-if (!fabricSourcesReady) {
-    logger.lifecycle("Fabric sources not found at ${mcProjectDir}. Fabric tasks are disabled.")
-}
-if (!fabricVersionsReady) {
-    logger.lifecycle("Fabric version properties missing. Set fabric_minecraft_version, fabric_yarn_mappings, fabric_loader_version, fabric_api_version.")
-}
-if (!fabricReady) {
-    tasks.configureEach { it.enabled = false }
-}
 
 buildDir = rootProject.file("build/${platform}/${activeFabricMc}")
 
@@ -44,96 +26,92 @@ repositories {
     mavenCentral()
 }
 
-if (fabricReady) {
-    apply plugin: 'fabric-loom'
+base {
+    archivesName = "${mod_id}-fabric"
+}
 
-    base {
-        archivesName = "${mod_id}-fabric"
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+dependencies {
+    minecraft "com.mojang:minecraft:${fabricMinecraftVersion}"
+    // Use Mojang official mappings for compatibility with common module
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${fabricLoaderVersion}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
+
+    implementation "ar.com.hjg:pngj:2.1.0"
+    implementation "net.sf.trove4j:trove4j:3.0.3"
+
+    def jgltfVersion = '2.0.4'
+    implementation "de.javagl:jgltf-model:${jgltfVersion}"
+    implementation "de.javagl:jgltf-impl-v1:${jgltfVersion}"
+    implementation "de.javagl:jgltf-impl-v2:${jgltfVersion}"
+    include "de.javagl:jgltf-model:${jgltfVersion}"
+    include "de.javagl:jgltf-impl-v1:${jgltfVersion}"
+    include "de.javagl:jgltf-impl-v2:${jgltfVersion}"
+
+    def jacksonDatabindVersion = '2.13.4.2'
+    def jacksonCoreVersion = '2.13.4'
+    def jacksonAnnotationsVersion = '2.13.4'
+    implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonAnnotationsVersion}"
+    implementation "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}"
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
+    include "com.fasterxml.jackson.core:jackson-annotations:${jacksonAnnotationsVersion}"
+    include "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}"
+    include "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
+
+    include "ar.com.hjg:pngj:2.1.0"
+    include "net.sf.trove4j:trove4j:3.0.3"
+}
+
+sourceSets {
+    main {
+        java.srcDirs = [
+            "${mcProjectDir}/src/main/java",
+            "${rootProject.projectDir}/core/src/main/java",
+            "${rootProject.projectDir}/common/src/main/java"
+        ]
+        resources.srcDirs = [ "${mcProjectDir}/src/main/resources" ]
     }
+}
 
-    java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
 
-    dependencies {
-        minecraft "com.mojang:minecraft:${fabricMinecraftVersion}"
-        mappings "net.fabricmc:yarn:${fabricYarnMappings}:v2"
-        modImplementation "net.fabricmc:fabric-loader:${fabricLoaderVersion}"
-        // Pull the full Fabric API to keep module versions in sync and avoid mixin mismatches
-        modImplementation "net.fabricmc.fabric-api:fabric-api:${fabricApiVersion}"
-
-        implementation "ar.com.hjg:pngj:2.1.0"
-        implementation "net.sf.trove4j:trove4j:3.0.3"
-
-        def jgltfVersion = '2.0.4'
-        implementation "de.javagl:jgltf-model:${jgltfVersion}"
-        implementation "de.javagl:jgltf-impl-v1:${jgltfVersion}"
-        implementation "de.javagl:jgltf-impl-v2:${jgltfVersion}"
-        include "de.javagl:jgltf-model:${jgltfVersion}"
-        include "de.javagl:jgltf-impl-v1:${jgltfVersion}"
-        include "de.javagl:jgltf-impl-v2:${jgltfVersion}"
-
-        def jacksonDatabindVersion = '2.13.4.2'
-        def jacksonCoreVersion = '2.13.4'
-        def jacksonAnnotationsVersion = '2.13.4'
-        implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonAnnotationsVersion}"
-        implementation "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}"
-        implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
-        include "com.fasterxml.jackson.core:jackson-annotations:${jacksonAnnotationsVersion}"
-        include "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}"
-        include "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
-
-        include "ar.com.hjg:pngj:2.1.0"
-        include "net.sf.trove4j:trove4j:3.0.3"
+processResources {
+    inputs.property 'mod_id', mod_id
+    inputs.property 'mod_name', mod_name
+    inputs.property 'mod_version', mod_version
+    inputs.property 'mod_description', mod_description
+    inputs.property 'mod_authors', mod_authors
+    inputs.property 'mod_license', mod_license
+    inputs.property 'fabric_loader_version', fabricLoaderVersion
+    inputs.property 'fabric_minecraft_version', fabricMinecraftVersion
+    filesMatching('fabric.mod.json') {
+        expand(
+            mod_id: mod_id,
+            mod_name: mod_name,
+            mod_version: mod_version,
+            mod_description: mod_description,
+            mod_authors: mod_authors,
+            mod_license: mod_license,
+            fabric_loader_version: fabricLoaderVersion,
+            fabric_minecraft_version: fabricMinecraftVersion
+        )
     }
+}
 
-    sourceSets {
-        main {
-            java.srcDirs = [
-                "${mcProjectDir}/src/main/java",
-                "${rootProject.projectDir}/core/src/main/java"
-            ]
-            resources.srcDirs = [ "${mcProjectDir}/src/main/resources" ]
+loom {
+    runs {
+        configureEach {
+            runDir = fabricRunDir.toString()
+        }
+        client {
+            client()
+            name = "Fabric Client"
         }
     }
-
-    tasks.withType(JavaCompile).configureEach {
-        options.encoding = 'UTF-8'
-    }
-
-    processResources {
-        inputs.property 'mod_id', mod_id
-        inputs.property 'mod_name', mod_name
-        inputs.property 'mod_version', mod_version
-        inputs.property 'mod_description', mod_description
-        inputs.property 'mod_authors', mod_authors
-        inputs.property 'mod_license', mod_license
-        inputs.property 'fabric_loader_version', fabricLoaderVersion ?: ''
-        inputs.property 'fabric_minecraft_version', fabricMinecraftVersion ?: ''
-        filesMatching('fabric.mod.json') {
-            expand(
-                mod_id: mod_id,
-                mod_name: mod_name,
-                mod_version: mod_version,
-                mod_description: mod_description,
-                mod_authors: mod_authors,
-                mod_license: mod_license,
-                fabric_loader_version: fabricLoaderVersion ?: '',
-                fabric_minecraft_version: fabricMinecraftVersion ?: ''
-            )
-        }
-    }
-
-    loom {
-        runs {
-            configureEach {
-                runDir = fabricRunDir
-            }
-            client {
-                client()
-                name = "Fabric Client"
-            }
-        }
-    }
-
 }
 
 def taskGroupRoot = "voxelbridge/fabric/mod/${activeFabricMc}"

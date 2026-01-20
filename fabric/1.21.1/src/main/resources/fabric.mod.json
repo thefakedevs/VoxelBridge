@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": [
+    "${mod_authors}"
+  ],
+  "contact": {},
+  "license": "${mod_license}",
+  "icon": "assets/voxelbridge/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.voxelbridge.VoxelBridge"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${fabric_loader_version}",
+    "minecraft": "${fabric_minecraft_version}",
+    "fabric-api": "*"
+  },
+  "mixins": [
+    "voxelbridge.mixins.json"
+  ]
+}
