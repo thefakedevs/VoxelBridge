@@ -236,10 +236,12 @@ public class NeoForgePlatformRenderHelper implements PlatformRenderHelper {
         resolveDrawStringMethods();
         try {
             if (shadow && drawStringTextWithShadow != null) {
-                return (int) drawStringTextWithShadow.invoke(gfx, font, text, x, y, color, true);
+                Object result = drawStringTextWithShadow.invoke(gfx, font, text, x, y, color, true);
+                return (result instanceof Integer i) ? i : 0;
             }
             if (drawStringTextNoShadow != null) {
-                return (int) drawStringTextNoShadow.invoke(gfx, font, text, x, y, color);
+                Object result = drawStringTextNoShadow.invoke(gfx, font, text, x, y, color);
+                return (result instanceof Integer i) ? i : 0;
             }
         } catch (ReflectiveOperationException ignored) {
         }
@@ -265,10 +267,12 @@ public class NeoForgePlatformRenderHelper implements PlatformRenderHelper {
         resolveDrawStringMethods();
         try {
             if (shadow && drawStringComponentWithShadow != null) {
-                return (int) drawStringComponentWithShadow.invoke(gfx, font, text, x, y, color, true);
+                Object result = drawStringComponentWithShadow.invoke(gfx, font, text, x, y, color, true);
+                return (result instanceof Integer i) ? i : 0;
             }
             if (drawStringComponentNoShadow != null) {
-                return (int) drawStringComponentNoShadow.invoke(gfx, font, text, x, y, color);
+                Object result = drawStringComponentNoShadow.invoke(gfx, font, text, x, y, color);
+                return (result instanceof Integer i) ? i : 0;
             }
         } catch (ReflectiveOperationException ignored) {
         }
