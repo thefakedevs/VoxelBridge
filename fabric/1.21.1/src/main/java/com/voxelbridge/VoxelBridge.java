@@ -23,7 +23,10 @@ public class VoxelBridge implements ClientModInitializer {
                 new FabricBlockEntityRenderBridge(),
                 new FabricSelectionRenderBridge(),
                 new FabricFluidSpriteResolver(),
-                new NoopModHandlerBridge());
+                new NoopModHandlerBridge(),
+                null,
+                null,
+                null);
         PlatformBootstrap platform = new FabricPlatformBootstrap();
         platform.init();
     }

@@ -8,6 +8,9 @@ public final class Adapters {
     private static SelectionRenderBridge selectionRenderBridge;
     private static FluidSpriteResolver fluidSpriteResolver;
     private static ModHandlerBridge modHandlerBridge;
+    private static PlatformRenderHelper platformRenderHelper;
+    private static PlatformTextureHelper platformTextureHelper;
+    private static PlatformModelHelper platformModelHelper;
 
     private Adapters() {}
 
@@ -17,7 +20,10 @@ public final class Adapters {
                             BlockEntityRenderBridge blockEntityRenderBridgeImpl,
                             SelectionRenderBridge selectionRenderBridgeImpl,
                             FluidSpriteResolver fluidSpriteResolverImpl,
-                            ModHandlerBridge modHandlerBridgeImpl) {
+                            ModHandlerBridge modHandlerBridgeImpl,
+                            PlatformRenderHelper platformRenderHelperImpl,
+                            PlatformTextureHelper platformTextureHelperImpl,
+                            PlatformModelHelper platformModelHelperImpl) {
         worldAdapter = worldAdapterImpl;
         renderAdapter = renderAdapterImpl;
         entityRenderBridge = entityRenderBridgeImpl;
@@ -25,6 +31,9 @@ public final class Adapters {
         selectionRenderBridge = selectionRenderBridgeImpl;
         fluidSpriteResolver = fluidSpriteResolverImpl;
         modHandlerBridge = modHandlerBridgeImpl;
+        platformRenderHelper = platformRenderHelperImpl;
+        platformTextureHelper = platformTextureHelperImpl;
+        platformModelHelper = platformModelHelperImpl;
     }
 
     public static WorldAdapter getWorld() {
@@ -74,5 +83,26 @@ public final class Adapters {
             throw new IllegalStateException("ModHandlerBridge not initialized!");
         }
         return modHandlerBridge;
+    }
+
+    public static PlatformRenderHelper getPlatformRenderHelper() {
+        if (platformRenderHelper == null) {
+            throw new IllegalStateException("PlatformRenderHelper not initialized!");
+        }
+        return platformRenderHelper;
+    }
+
+    public static PlatformTextureHelper getTextureHelper() {
+        if (platformTextureHelper == null) {
+            throw new IllegalStateException("PlatformTextureHelper not initialized!");
+        }
+        return platformTextureHelper;
+    }
+
+    public static PlatformModelHelper getModelHelper() {
+        if (platformModelHelper == null) {
+            throw new IllegalStateException("PlatformModelHelper not initialized!");
+        }
+        return platformModelHelper;
     }
 }

@@ -41,12 +41,22 @@ public final class TextureLoader {
                 if (logResolve) {
                     VoxelBridgeLogger.warn(LogModule.TEXTURE_RESOLVE, String.format("[TextureLoader][WARN] Missing resource %s", png));
                 }
-                BufferedImage dynamic = DynamicTextureReader.tryRead(png);
-                if (dynamic != null) {
-                    if (logResolve) {
-                        VoxelBridgeLogger.info(LogModule.TEXTURE_RESOLVE, String.format("[TextureLoader] Loaded dynamic texture %s (%dx%d)", png, dynamic.getWidth(), dynamic.getHeight()));
+                
+                // Try to read dynamic texture via platform helper
+                var dynamicOpt = com.voxelbridge.adapter.Adapters.getTextureHelper().readTexture(png);
+                
+                if (dynamicOpt.isPresent()) {
+                    NativeImage nativeDynamic = dynamicOpt.get();
+                    try {
+                        BufferedImage dynamic = nativeImageToBufferedImage(nativeDynamic);
+                        if (logResolve) {
+                            VoxelBridgeLogger.info(LogModule.TEXTURE_RESOLVE, String.format("[TextureLoader] Loaded dynamic texture %s (%dx%d)", png, dynamic.getWidth(), dynamic.getHeight()));
+                        }
+                        return preserveAnimationStrip ? dynamic : extractFirstFrame(dynamic);
+                    } finally {
+                        // NativeImage from helper is a copy, we should close it after conversion
+                        nativeDynamic.close();
                     }
-                    return preserveAnimationStrip ? dynamic : extractFirstFrame(dynamic);
                 }
                 return null;
             }

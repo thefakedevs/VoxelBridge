@@ -13,6 +13,7 @@ public enum LogModule {
     SAMPLER_FLUID("sampler.fluid", "sampler_fluid.log"),
 
     TEXTURE("texture", "texture.log"),
+    DYNAMIC_TEXTURE("texture.dynamic", "texture_dynamic.log"),
     TEXTURE_RESOLVE("texture.resolve", "texture_resolve.log"),
     TEXTURE_REGISTER("texture.register", "texture_register.log"),
     TEXTURE_ATLAS("texture.atlas", "texture_atlas.log"),
