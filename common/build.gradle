@@ -1,44 +1,35 @@
 plugins {
     id 'java-library'
-    id 'net.neoforged.moddev' version '2.0.116'
+    id 'fabric-loom' version '1.10.0-alpha.13'
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+base {
+    archivesName = "${mod_id}-common"
+}
 
-repositories {
-    mavenCentral()
-    maven { url = 'https://maven.neoforged.net/releases' }
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
 }
 
 dependencies {
+    // Core dependency
     api project(':shared:core')
-    compileOnly "net.neoforged:neoforge:${neo_version}"
+
+    // Minecraft Development Environment (Vanilla Only)
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    
+    // Use Official Mojang Mappings to ensure compatibility with NeoForge
+    mappings loom.officialMojangMappings()
+
+    // NOTE: We do NOT depend on fabric-loader here. 
+    // This ensures 'common' cannot accidentally use Fabric or NeoForge APIs.
 
     compileOnly "org.apache.logging.log4j:log4j-api:2.20.0"
     compileOnly "org.apache.logging.log4j:log4j-core:2.20.0"
     compileOnly "it.unimi.dsi:fastutil:8.5.12"
 }
 
-neoForge {
-    version = project.neo_version
-
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
-
-    mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
-        }
-    }
-}
-
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-}
-
-def projectTaskGroup = "voxelbridge/shared"
-tasks.configureEach { task ->
-    task.group = projectTaskGroup
 }
