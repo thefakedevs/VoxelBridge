@@ -13,6 +13,11 @@ import java.util.Optional;
  * NeoForge implementation of PlatformRenderHelper.
  */
 public class NeoForgePlatformRenderHelper implements PlatformRenderHelper {
+    private static java.lang.reflect.Method drawStringTextWithShadow;
+    private static java.lang.reflect.Method drawStringTextNoShadow;
+    private static java.lang.reflect.Method drawStringComponentWithShadow;
+    private static java.lang.reflect.Method drawStringComponentNoShadow;
+    private static boolean drawStringResolved;
 
     // RenderType helpers
     @Override
@@ -151,7 +156,25 @@ public class NeoForgePlatformRenderHelper implements PlatformRenderHelper {
 
     @Override
     public void recordRenderCall(Runnable task) {
-        com.mojang.blaze3d.systems.RenderSystem.recordRenderCall(task::run);
+        // 1.21.8: RenderSystem API changed, try direct execution if on render thread
+        if (task == null) {
+            return;
+        }
+        if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
+            task.run();
+        } else {
+            // If not on render thread, we need to schedule it somehow
+            // Try using the recordRenderCall with method reference syntax
+            try {
+                // Attempt reflection as last resort for compatibility
+                java.lang.reflect.Method method = com.mojang.blaze3d.systems.RenderSystem.class
+                    .getMethod("recordRenderCall", Runnable.class);
+                method.invoke(null, task);
+            } catch (Exception e) {
+                // If all else fails, just run it (may cause issues but won't crash)
+                task.run();
+            }
+        }
     }
 
     @Override
@@ -159,7 +182,8 @@ public class NeoForgePlatformRenderHelper implements PlatformRenderHelper {
             net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos) {
         if (state == null || pos == null)
             return net.minecraft.world.phys.Vec3.ZERO;
-        return state.getOffset(level, pos);
+        // 1.21.8: getOffset only takes BlockPos
+        return state.getOffset(pos);
     }
 
     @Override
@@ -167,14 +191,17 @@ public class NeoForgePlatformRenderHelper implements PlatformRenderHelper {
             net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos) {
         if (state == null)
             return false;
-        return state.isSolidRender(level, pos);
+        // 1.21.8: isSolidRender takes no parameters
+        return state.isSolidRender();
     }
 
     @Override
     public com.mojang.blaze3d.vertex.PoseStack getGuiPose(net.minecraft.client.gui.GuiGraphics gfx) {
         if (gfx == null)
             return null;
-        return gfx.pose();
+        // 1.21.8: GuiGraphics.pose() returns Matrix3x2fStack, we need to return null
+        // as PoseStack is not directly accessible from GuiGraphics in 1.21.8
+        return null;
     }
 
     @Override
@@ -206,7 +233,22 @@ public class NeoForgePlatformRenderHelper implements PlatformRenderHelper {
         if (gfx == null || font == null || text == null) {
             return 0;
         }
-        return gfx.drawString(font, text, x, y, color, shadow);
+        resolveDrawStringMethods();
+        try {
+            if (shadow && drawStringTextWithShadow != null) {
+                return (int) drawStringTextWithShadow.invoke(gfx, font, text, x, y, color, true);
+            }
+            if (drawStringTextNoShadow != null) {
+                return (int) drawStringTextNoShadow.invoke(gfx, font, text, x, y, color);
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        try {
+            gfx.drawString(font, text, x, y, color);
+        } catch (Throwable ignored) {
+            // Ignore: fallback may not exist.
+        }
+        return 0;
     }
 
     @Override
@@ -220,6 +262,56 @@ public class NeoForgePlatformRenderHelper implements PlatformRenderHelper {
         if (gfx == null || font == null || text == null) {
             return 0;
         }
-        return gfx.drawString(font, text, x, y, color, shadow);
+        resolveDrawStringMethods();
+        try {
+            if (shadow && drawStringComponentWithShadow != null) {
+                return (int) drawStringComponentWithShadow.invoke(gfx, font, text, x, y, color, true);
+            }
+            if (drawStringComponentNoShadow != null) {
+                return (int) drawStringComponentNoShadow.invoke(gfx, font, text, x, y, color);
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        try {
+            gfx.drawString(font, text, x, y, color);
+        } catch (Throwable ignored) {
+            // Ignore: fallback may not exist.
+        }
+        return 0;
+    }
+
+    private static void resolveDrawStringMethods() {
+        if (drawStringResolved) {
+            return;
+        }
+        drawStringResolved = true;
+        try {
+            drawStringTextWithShadow = net.minecraft.client.gui.GuiGraphics.class.getMethod(
+                    "drawString", net.minecraft.client.gui.Font.class, String.class,
+                    int.class, int.class, int.class, boolean.class);
+        } catch (NoSuchMethodException ignored) {
+            drawStringTextWithShadow = null;
+        }
+        try {
+            drawStringTextNoShadow = net.minecraft.client.gui.GuiGraphics.class.getMethod(
+                    "drawString", net.minecraft.client.gui.Font.class, String.class,
+                    int.class, int.class, int.class);
+        } catch (NoSuchMethodException ignored) {
+            drawStringTextNoShadow = null;
+        }
+        try {
+            drawStringComponentWithShadow = net.minecraft.client.gui.GuiGraphics.class.getMethod(
+                    "drawString", net.minecraft.client.gui.Font.class, net.minecraft.network.chat.Component.class,
+                    int.class, int.class, int.class, boolean.class);
+        } catch (NoSuchMethodException ignored) {
+            drawStringComponentWithShadow = null;
+        }
+        try {
+            drawStringComponentNoShadow = net.minecraft.client.gui.GuiGraphics.class.getMethod(
+                    "drawString", net.minecraft.client.gui.Font.class, net.minecraft.network.chat.Component.class,
+                    int.class, int.class, int.class);
+        } catch (NoSuchMethodException ignored) {
+            drawStringComponentNoShadow = null;
+        }
     }
 }

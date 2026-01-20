@@ -23,4 +23,21 @@ public interface PlatformRenderHelper {
     void pushPose(com.mojang.blaze3d.vertex.PoseStack pose);
     void popPose(com.mojang.blaze3d.vertex.PoseStack pose);
     void translatePose(com.mojang.blaze3d.vertex.PoseStack pose, float x, float y, float z);
+
+    // GUI draw helpers
+    int drawString(net.minecraft.client.gui.GuiGraphics gfx,
+                   net.minecraft.client.gui.Font font,
+                   java.lang.String text,
+                   int x,
+                   int y,
+                   int color,
+                   boolean shadow);
+
+    int drawString(net.minecraft.client.gui.GuiGraphics gfx,
+                   net.minecraft.client.gui.Font font,
+                   net.minecraft.network.chat.Component text,
+                   int x,
+                   int y,
+                   int color,
+                   boolean shadow);
 }

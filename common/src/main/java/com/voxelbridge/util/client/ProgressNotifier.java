@@ -1,5 +1,6 @@
 package com.voxelbridge.util.client;
 
+import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.compat.GuiPoseCompat;
 import com.voxelbridge.export.ExportProgressTracker;
 import net.minecraft.ChatFormatting;
@@ -146,7 +147,8 @@ public final class ProgressNotifier {
                 lastProgress.displayPercent());
         int titleWidth = mc.font.width(title);
         int titleColor = stageBarColor(lastProgress.stage());
-        gfx.drawString(mc.font, title, (screenW - titleWidth) / 2, y + 8, titleColor, true);
+        Adapters.getPlatformRenderHelper().drawString(
+                gfx, mc.font, title, (screenW - titleWidth) / 2, y + 8, titleColor, true);
 
         // Line 2: Colorful Details
         MutableComponent details = Component.empty();
@@ -171,7 +173,8 @@ public final class ProgressNotifier {
                .append(Component.literal(memoryStats()).withStyle(memColor));
         
         int detailWidth = mc.font.width(details);
-        gfx.drawString(mc.font, details, (screenW - detailWidth) / 2, y + 18, 0xFFFFFFFF, true);
+        Adapters.getPlatformRenderHelper().drawString(
+                gfx, mc.font, details, (screenW - detailWidth) / 2, y + 18, 0xFFFFFFFF, true);
 
         GuiPoseCompat.pop(gfx);
     }

@@ -42,7 +42,7 @@ repositories {
 }
 
 base {
-    archivesName = mod_id
+    archivesName = "VoxelBridge-neoforge-${activeMc}"
 }
 
 // Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
@@ -102,8 +102,6 @@ neoForge {
     mods {
         "${mod_id}" {
             sourceSet(sourceSets.main)
-            sourceSet(project(":shared:common").sourceSets.main)
-            sourceSet(project(":shared:core").sourceSets.main)
         }
     }
 }
@@ -130,20 +128,21 @@ def addRunRuntimeLibs = { String runName ->
 
 sourceSets {
     main {
-        java.srcDirs = [ "${mcProjectDir}/src/main/java" ]
+        java.srcDirs = [
+            "${mcProjectDir}/src/main/java",
+            rootProject.file("common/src/main/java"),
+            rootProject.file("core/src/main/java")
+        ]
         resources.srcDirs = [
             "${mcProjectDir}/src/main/resources",
-            "${mcProjectDir}/src/generated/resources"
+            "${mcProjectDir}/src/generated/resources",
+            rootProject.file("common/src/main/resources"),
+            rootProject.file("core/src/main/resources")
         ]
     }
 }
 
 dependencies {
-    implementation project(':shared:common')
-    shaded project(':shared:common')
-    implementation project(':shared:core')
-    shaded project(':shared:core')
-
     if (forgifiedFabricApiVersion) {
         // Add Forgified Fabric API when a compatible version is configured.
         implementation "org.sinytra.forgified-fabric-api:forgified-fabric-api:${forgifiedFabricApiVersion}"
@@ -228,6 +227,10 @@ tasks.named('assemble') { dependsOn tasks.shadowJar }
 
 // Disable plain jar to avoid filename clash with shadowJar
 tasks.named('jar') { enabled = false }
+
+tasks.named('clean') {
+    delete rootProject.file('common/build'), rootProject.file('core/build')
+}
 
 def taskGroupRoot = "voxelbridge/neoforge/mod"
 def groupForTask = { Task task ->

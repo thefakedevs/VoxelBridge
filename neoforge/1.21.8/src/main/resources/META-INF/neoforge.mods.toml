@@ -16,6 +16,10 @@ logoFile = "assets/voxelbridge/logo.png"
 description = '''Exports Minecraft blocks, fluids, and block entities into glTF files.
 '''
 
+# Mixin configuration
+[[mixins]]
+config = "voxelbridge.mixins.json"
+
 
 [[dependencies.voxelbridge]]
 modId = "neoforge"
