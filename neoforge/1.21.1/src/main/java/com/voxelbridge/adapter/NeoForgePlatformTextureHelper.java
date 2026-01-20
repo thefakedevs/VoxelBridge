@@ -17,9 +17,6 @@ import net.minecraft.world.entity.decoration.PaintingVariant;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -29,14 +26,6 @@ import java.util.Optional;
  * NeoForge implementation of PlatformTextureHelper.
  */
 public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
-
-    private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
-
-    // Method handles reused from previously removed helper logic
-    private static final MethodHandle GET_ORIGINAL_IMAGE = findHandle(
-            SpriteContents.class, NativeImage.class, "getOriginalImage");
-    private static final MethodHandle GET_TEXTURES = findHandle(
-            TextureAtlas.class, Map.class, "getTextures");
 
     @Override
     public int getPixelRgba(NativeImage img, int x, int y) {
@@ -52,14 +41,7 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
         SpriteContents contents = sprite.contents();
         if (contents == null)
             return null;
-
-        if (GET_ORIGINAL_IMAGE != null) {
-            try {
-                return (NativeImage) GET_ORIGINAL_IMAGE.invoke(contents);
-            } catch (Throwable ignored) {
-            }
-        }
-        return null;
+        return ((com.voxelbridge.mixin.SpriteContentsAccessor) (Object) contents).voxelbridge$getOriginalImage();
     }
 
     @Override
@@ -67,17 +49,9 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
     public Collection<TextureAtlasSprite> getAllSprites(TextureAtlas atlas) {
         if (atlas == null)
             return Collections.emptyList();
-
-        if (GET_TEXTURES != null) {
-            try {
-                Object result = GET_TEXTURES.invoke(atlas);
-                if (result instanceof Map<?, ?> map) {
-                    return ((Map<ResourceLocation, TextureAtlasSprite>) map).values();
-                }
-            } catch (Throwable ignored) {
-            }
-        }
-        return Collections.emptyList();
+        Map<ResourceLocation, TextureAtlasSprite> map =
+                ((com.voxelbridge.mixin.TextureAtlasAccessor) (Object) atlas).voxelbridge$getTextures();
+        return map != null ? map.values() : Collections.emptyList();
     }
 
     @Override
@@ -99,8 +73,8 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
                 }
             }
 
-            if (texture instanceof net.minecraft.client.renderer.texture.HttpTexture) {
-                File file = findFileField(texture);
+            if (texture instanceof net.minecraft.client.renderer.texture.HttpTexture httpTexture) {
+                File file = ((com.voxelbridge.mixin.HttpTextureAccessor) (Object) httpTexture).voxelbridge$getFile();
                 if (file != null && file.exists()) {
                     try {
                         return Optional.of(NativeImage.read(new FileInputStream(file)));
@@ -153,22 +127,16 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
             Holder<PaintingVariant> variantHolder = painting.getVariant();
             PaintingVariant variant = variantHolder.value();
 
-            // Use optimal native path: Get sprite directly from PaintingTextureManager
-            // The class PaintingTextureManager is package-private or hidden, so we use
-            // reflection/inference
-            Object manager = net.minecraft.client.Minecraft.getInstance().getPaintingTextures();
-            TextureAtlasSprite sprite = null;
-            try {
-                // Try reflection to find 'get' method
-                java.lang.reflect.Method getMethod = manager.getClass().getMethod("get", PaintingVariant.class);
-                sprite = (TextureAtlasSprite) getMethod.invoke(manager, variant);
-            } catch (Exception e) {
-                // If reflection fails, we fall back to file path logic below
-            }
+            // Use native path: Get sprite directly from PaintingTextureManager.
+            TextureAtlasSprite sprite = net.minecraft.client.Minecraft.getInstance()
+                    .getPaintingTextures()
+                    .get(variant);
 
             if (sprite != null) {
+                ResourceLocation spriteName = sprite.contents() != null ? sprite.contents().name() : variant.assetId();
+                spriteName = normalizePaintingSpriteName(spriteName);
                 return new ResolvedTexture(
-                        sprite.atlasLocation(),
+                        spriteName,
                         sprite.getU0(), sprite.getU1(), sprite.getV0(), sprite.getV1(),
                         true,
                         sprite,
@@ -208,8 +176,9 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
                     .getSprite(woodLoc);
 
             if (sprite != null) {
+                ResourceLocation spriteName = sprite.contents() != null ? sprite.contents().name() : woodLoc;
                 return new ResolvedTexture(
-                        sprite.atlasLocation(),
+                        spriteName,
                         sprite.getU0(), sprite.getU1(), sprite.getV0(), sprite.getV1(),
                         true,
                         sprite,
@@ -225,28 +194,16 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
         return new ResolvedTexture(loc, 0f, 1f, 0f, 1f, false, null, null);
     }
 
-    private static MethodHandle findHandle(Class<?> target, Class<?> returnType, String name, Class<?>... params) {
-        try {
-            return LOOKUP.findVirtual(target, name, MethodType.methodType(returnType, params));
-        } catch (NoSuchMethodException | IllegalAccessException ignored) {
+    private static ResourceLocation normalizePaintingSpriteName(ResourceLocation spriteName) {
+        if (spriteName == null) {
             return null;
         }
+        String path = spriteName.getPath();
+        if (path.startsWith("textures/painting/") || path.startsWith("painting/")) {
+            return spriteName;
+        }
+        return ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), "painting/" + path);
     }
 
-    private java.io.File findFileField(Object target) {
-        Class<?> cls = target.getClass();
-        while (cls != null && cls != Object.class) {
-            for (java.lang.reflect.Field f : cls.getDeclaredFields()) {
-                if (java.io.File.class.isAssignableFrom(f.getType())) {
-                    try {
-                        f.setAccessible(true);
-                        return (java.io.File) f.get(target);
-                    } catch (Exception ignored) {
-                    }
-                }
-            }
-            cls = cls.getSuperclass();
-        }
-        return null;
-    }
+    // HttpTexture file access is handled via mixin accessor.
 }

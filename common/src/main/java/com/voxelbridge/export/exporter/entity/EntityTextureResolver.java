@@ -2,6 +2,7 @@ package com.voxelbridge.export.exporter.entity;
 
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import net.minecraft.client.renderer.RenderType;
@@ -9,6 +10,7 @@ import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ItemFrame;
 
 /**
  * Resolves textures for entity renderers with entity-specific overrides.
@@ -40,7 +42,17 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
     }
 
     private static ResolvedTexture resolveEntitySpecific(Entity entity, RenderType renderType) {
-        return com.voxelbridge.adapter.Adapters.getTextureHelper().resolveEntityTexture(entity, renderType);
+        if (entity instanceof ItemFrame) {
+            ResourceLocation base = RenderTypeTextureResolver.INSTANCE.resolve(renderType);
+            if (base != null) {
+                if (base.getPath().contains(":")) {
+                    base = ResourceLocation.fromNamespaceAndPath(base.getNamespace(), base.getPath().replace(':', '/'));
+                }
+                return resolveTextureWithAtlasDetection(base);
+            }
+            return Adapters.getTextureHelper().resolveEntityTexture(entity, renderType);
+        }
+        return Adapters.getTextureHelper().resolveEntityTexture(entity, renderType);
     }
 
     private static ResolvedTexture resolveTextureWithAtlasDetection(ResourceLocation texture) {
