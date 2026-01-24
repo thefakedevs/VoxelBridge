@@ -54,7 +54,7 @@ public final class VoxelBridgeCommands {
                     return 0;
                 }
                 setPos1(hit);
-                ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + getPos1()));
+                ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + getPos1().toShortString()));
                 return 1;
             })
             .then(Commands.argument("x", IntegerArgumentType.integer())
@@ -65,7 +65,7 @@ public final class VoxelBridgeCommands {
                             int y = IntegerArgumentType.getInteger(ctx, "y");
                             int z = IntegerArgumentType.getInteger(ctx, "z");
                             setPos1(new BlockPos(x, y, z));
-                            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + getPos1()));
+                            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos1 set to " + getPos1().toShortString()));
                             return 1;
                         })))));
 
@@ -78,7 +78,7 @@ public final class VoxelBridgeCommands {
                     return 0;
                 }
                 setPos2(hit);
-                ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + getPos2()));
+                ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + getPos2().toShortString()));
                 return 1;
             })
             .then(Commands.argument("x", IntegerArgumentType.integer())
@@ -89,14 +89,14 @@ public final class VoxelBridgeCommands {
                             int y = IntegerArgumentType.getInteger(ctx, "y");
                             int z = IntegerArgumentType.getInteger(ctx, "z");
                             setPos2(new BlockPos(x, y, z));
-                            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + getPos2()));
+                            ctx.getSource().sendSystemMessage(Component.literal("a[VoxelBridge] pos2 set to " + getPos2().toShortString()));
                             return 1;
                         })))));
 
         root.then(Commands.literal("info").executes(ctx -> {
             ctx.getSource().sendSystemMessage(Component.literal("6[VoxelBridge] Selection info:"));
-            ctx.getSource().sendSystemMessage(Component.literal("e  pos1: f" + (getPos1() != null ? getPos1() : "unset")));
-            ctx.getSource().sendSystemMessage(Component.literal("e  pos2: f" + (getPos2() != null ? getPos2() : "unset")));
+                ctx.getSource().sendSystemMessage(Component.literal("e  pos1: f" + (getPos1() != null ? getPos1().toShortString() : "unset")));
+                ctx.getSource().sendSystemMessage(Component.literal("e  pos2: f" + (getPos2() != null ? getPos2().toShortString() : "unset")));
             ctx.getSource().sendSystemMessage(Component.literal("e  Atlas mode: f" + ExportRuntimeConfig.getAtlasMode().getDescription()));
             ctx.getSource().sendSystemMessage(Component.literal("e  Atlas size: f" + ExportRuntimeConfig.getAtlasSize().getDescription()));
             ctx.getSource().sendSystemMessage(Component.literal("e  Atlas padding: f" + ExportRuntimeConfig.getAtlasPadding() + "px"));

@@ -27,7 +27,7 @@ public final class FabricSelectionRenderBridge implements SelectionRenderBridge 
     @Override
     public void register(Object gameBus) {
         // In Fabric, we ignore gameBus and use Fabric API directly
-        WorldRenderEvents.END.register(this::onRenderWorld);
+        WorldRenderEvents.AFTER_TRANSLUCENT.register(this::onRenderWorld);
     }
 
     private void onRenderWorld(WorldRenderContext context) {
@@ -41,8 +41,8 @@ public final class FabricSelectionRenderBridge implements SelectionRenderBridge 
         Minecraft mc = ClientAccessHolder.get().getMinecraft();
         Vec3 camPos = context.camera().getPosition();
         PoseStack poseStack = context.matrixStack();
-        MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
-        VertexConsumer consumer = bufferSource.getBuffer(RenderType.lines());
+        MultiBufferSource consumers = context.consumers();
+        VertexConsumer consumer = consumers.getBuffer(RenderType.lines());
 
         poseStack.pushPose();
         poseStack.translate(-camPos.x, -camPos.y, -camPos.z);
@@ -58,11 +58,13 @@ public final class FabricSelectionRenderBridge implements SelectionRenderBridge 
         if (pos1 != null && pos2 != null) {
             renderSelectionBox(poseStack, consumer, pos1, pos2, 0.0f, 1.0f, 1.0f, 0.5f);
             renderChunkStatus(poseStack, consumer, pos1, pos2);
-            renderProgressLabel(poseStack, mc, pos1, pos2, bufferSource);
+            renderProgressLabel(poseStack, mc, pos1, pos2, consumers);
         }
 
         poseStack.popPose();
-        bufferSource.endBatch(RenderType.lines());
+        if (consumers instanceof MultiBufferSource.BufferSource bufferSource) {
+            bufferSource.endBatch(RenderType.lines());
+        }
     }
 
     private static void renderBox(PoseStack poseStack, VertexConsumer consumer,

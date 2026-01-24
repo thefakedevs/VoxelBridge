@@ -35,7 +35,7 @@ public final class FabricCommands {
                     }
                     ExportControl.setPos1(hit);
                     ctx.getSource()
-                            .sendFeedback(Component.literal("§a[VoxelBridge] pos1 set to " + ExportControl.getPos1()));
+                            .sendFeedback(Component.literal("§a[VoxelBridge] pos1 set to " + ExportControl.getPos1().toShortString()));
                     return 1;
                 })
                 .then(ClientCommandManager.argument("x", IntegerArgumentType.integer())
@@ -47,7 +47,7 @@ public final class FabricCommands {
                                             int z = IntegerArgumentType.getInteger(ctx, "z");
                                             ExportControl.setPos1(new BlockPos(x, y, z));
                                             ctx.getSource().sendFeedback(Component
-                                                    .literal("§a[VoxelBridge] pos1 set to " + ExportControl.getPos1()));
+                                                    .literal("§a[VoxelBridge] pos1 set to " + ExportControl.getPos1().toShortString()));
                                             return 1;
                                         })))));
 
@@ -61,7 +61,7 @@ public final class FabricCommands {
                     }
                     ExportControl.setPos2(hit);
                     ctx.getSource()
-                            .sendFeedback(Component.literal("§a[VoxelBridge] pos2 set to " + ExportControl.getPos2()));
+                            .sendFeedback(Component.literal("§a[VoxelBridge] pos2 set to " + ExportControl.getPos2().toShortString()));
                     return 1;
                 })
                 .then(ClientCommandManager.argument("x", IntegerArgumentType.integer())
@@ -73,7 +73,7 @@ public final class FabricCommands {
                                             int z = IntegerArgumentType.getInteger(ctx, "z");
                                             ExportControl.setPos2(new BlockPos(x, y, z));
                                             ctx.getSource().sendFeedback(Component
-                                                    .literal("§a[VoxelBridge] pos2 set to " + ExportControl.getPos2()));
+                                                    .literal("§a[VoxelBridge] pos2 set to " + ExportControl.getPos2().toShortString()));
                                             return 1;
                                         })))));
 

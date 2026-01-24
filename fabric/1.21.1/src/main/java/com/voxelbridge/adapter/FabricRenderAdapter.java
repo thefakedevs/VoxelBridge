@@ -4,7 +4,7 @@ import com.voxelbridge.adapter.QuadBatch;
 import com.voxelbridge.adapter.QuadSource;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.export.quad.QuadDataUtil;
-import com.voxelbridge.modhandler.frapi.FabricApiHelper;
+import com.voxelbridge.platform.render.frapi.FabricRenderApiHelper;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
 import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
@@ -46,7 +46,7 @@ public class FabricRenderAdapter implements RenderAdapter {
             return quads;
         }
 
-        return FabricApiHelper.extractQuads(fabricModel, level, state, pos, rand, spriteFinder);
+        return FabricRenderApiHelper.extractQuads(fabricModel, level, state, pos, rand, spriteFinder);
     }
 
     @Override

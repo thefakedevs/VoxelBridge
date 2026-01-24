@@ -23,7 +23,7 @@ public class KeyInputHandler {
                 mc.player.displayClientMessage(Component.literal("[VoxelBridge] No block targeted."), false);
             } else {
                 ExportControl.setPos1(hit);
-                mc.player.displayClientMessage(Component.literal("[VoxelBridge] pos1 set to " + hit), false);
+                mc.player.displayClientMessage(Component.literal("[VoxelBridge] pos1 set to " + hit.toShortString()), false);
             }
         }
 
@@ -33,7 +33,7 @@ public class KeyInputHandler {
                 mc.player.displayClientMessage(Component.literal("[VoxelBridge] No block targeted."), false);
             } else {
                 ExportControl.setPos2(hit);
-                mc.player.displayClientMessage(Component.literal("[VoxelBridge] pos2 set to " + hit), false);
+                mc.player.displayClientMessage(Component.literal("[VoxelBridge] pos2 set to " + hit.toShortString()), false);
             }
         }
 

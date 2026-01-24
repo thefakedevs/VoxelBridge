@@ -1,4 +1,4 @@
-package com.voxelbridge.modhandler.frapi;
+package com.voxelbridge.platform.render.frapi;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
@@ -26,8 +26,8 @@ import java.util.List;
 /**
  * Fabric Rendering API helper for extracting quads from FabricBakedModel.
  */
-public final class FabricApiHelper {
-    private FabricApiHelper() {}
+public final class FabricRenderApiHelper {
+    private FabricRenderApiHelper() {}
 
     public static List<BakedQuad> extractQuads(
         FabricBakedModel model,
