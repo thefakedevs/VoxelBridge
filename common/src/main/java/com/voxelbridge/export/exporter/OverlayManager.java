@@ -7,12 +7,11 @@ import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.core.util.color.ColorModeHandler;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.core.util.image.ImageSampling;
-import com.voxelbridge.compat.QuadCompat;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.quad.QuadData;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.util.pool.ObjectPool;
 import com.voxelbridge.platform.client.ClientAccessHolder;
-import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
@@ -80,7 +79,7 @@ public final class OverlayManager {
      * @param spriteKey sprite key
      */
     public void cacheOverlay(String baseMaterialKey, BlockState state, BlockPos pos,
-                             BakedQuad quad, Vec3 randomOffset, String spriteKey) {
+                             QuadData quad, Vec3 randomOffset, String spriteKey) {
         cacheOverlayInternal(baseMaterialKey, state, pos, quad, randomOffset, spriteKey, "_overlay");
     }
 
@@ -89,7 +88,7 @@ public final class OverlayManager {
      * Uses "_hilight" suffix for material key.
      */
     public void cacheHilight(String baseMaterialKey, BlockState state, BlockPos pos,
-                             BakedQuad quad, Vec3 randomOffset, String spriteKey) {
+                             QuadData quad, Vec3 randomOffset, String spriteKey) {
         cacheOverlayInternal(baseMaterialKey, state, pos, quad, randomOffset, spriteKey, "_hilight");
     }
 
@@ -97,15 +96,15 @@ public final class OverlayManager {
      * Caches an overlay quad with the provided material suffix.
      */
     private void cacheOverlayInternal(String baseMaterialKey, BlockState state, BlockPos pos,
-                             BakedQuad quad, Vec3 randomOffset, String spriteKey, String materialSuffix) {
+                             QuadData quad, Vec3 randomOffset, String spriteKey, String materialSuffix) {
         if (baseMaterialKey == null || baseMaterialKey.isEmpty()) {
             baseMaterialKey = "unknown";
         }
 
-        var sprite = QuadCompat.getSprite(quad);
+        var sprite = quad.sprite();
         if (sprite == null) return;
 
-        Direction dir = QuadCompat.getDirection(quad);
+        Direction dir = quad.direction();
 
         // Register dynamic overlay texture
         boolean isDynamicTexture = spriteKey.contains("_overlay")
@@ -135,7 +134,7 @@ public final class OverlayManager {
         float[] localPos = positions12Pool.acquire();
 
         try {
-            int[] verts = QuadCompat.getVertices(quad);
+            int[] verts = quad.vertices();
             if (verts.length < 32) return;
 
             float u0 = sprite.getU0();
@@ -257,7 +256,7 @@ public final class OverlayManager {
     /**
      * Extracts overlay color from vertex colors or tint index.
      */
-    private int extractOverlayColor(BlockState state, BlockPos pos, BakedQuad quad, int[] vertexColors) {
+    private int extractOverlayColor(BlockState state, BlockPos pos, QuadData quad, int[] vertexColors) {
         for (int i = 0; i < 4; i++) {
             int argb = vertexColors[i];
             int rgb = argb & 0x00FFFFFF;
@@ -266,7 +265,7 @@ public final class OverlayManager {
             }
         }
 
-        int tintIndex = QuadCompat.getTintIndex(quad);
+        int tintIndex = quad.tintIndex();
         if (tintIndex >= 0) {
             int argb = ClientAccessHolder.get().getMinecraft().getBlockColors().getColor(state, level, pos, tintIndex);
             return (argb == -1) ? 0xFFFFFFFF : argb;

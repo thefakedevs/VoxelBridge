@@ -7,9 +7,7 @@
         "SpriteContentsAccessor",
         "BakedQuadAccessor",
         "HttpTextureAccessor",
-        "PaintingTextureManagerAccessor",
-        "TextureAtlasHolderAccessor",
-        "DynamicTextureAccessor"
+        "TextureAtlasHolderAccessor"
     ],
     "injectors": {
         "defaultRequire": 1

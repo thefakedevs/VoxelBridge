@@ -1,10 +1,12 @@
 package com.voxelbridge.adapter;
 
+import com.voxelbridge.export.quad.QuadDataUtil;
 import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+
 import java.util.List;
 
 /**
@@ -31,7 +33,7 @@ public interface RenderAdapter {
      * Implementations may override to provide richer source info.
      */
     default QuadBatch getQuadBatch(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
-        return new QuadBatch(getQuads(model, state, pos, level, seed), QuadSource.PLATFORM_DEFAULT);
+        return new QuadBatch(QuadDataUtil.wrapBakedQuads(getQuads(model, state, pos, level, seed)), QuadSource.PLATFORM_DEFAULT);
     }
 
     /**

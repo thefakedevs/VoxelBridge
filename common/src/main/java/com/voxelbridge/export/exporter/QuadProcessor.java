@@ -3,15 +3,14 @@ package com.voxelbridge.export.exporter;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.ir.RenderLayer;
 import com.voxelbridge.core.ir.TintMode;
-import com.voxelbridge.compat.QuadCompat;
 import com.voxelbridge.core.util.color.ColorUtil;
 import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.core.util.color.ColorModeHandler;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.quad.QuadData;
 import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.platform.client.ClientAccessHolder;
-import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -66,13 +65,13 @@ public final class QuadProcessor {
      *
      * @param state block state
      * @param pos block position
-     * @param quad the baked quad
+     * @param quad the quad data
      * @param blockKey material key for this block
      * @param randomOffset vanilla random offset
      */
-    public void processQuad(BlockState state, BlockPos pos, BakedQuad quad,
+    public void processQuad(BlockState state, BlockPos pos, QuadData quad,
                             String blockKey, Vec3 randomOffset) {
-        TextureAtlasSprite sprite = QuadCompat.getSprite(quad);
+        TextureAtlasSprite sprite = quad.sprite();
         if (sprite == null) return;
 
         String spriteKey = ctx.getTextureAccess().resolveSpriteKey(sprite);
@@ -140,7 +139,7 @@ public final class QuadProcessor {
         ctx.registerSpriteMaterial(spriteKey, materialKey);
 
         if (planeOffset != null) {
-            planeOffset.applyOffset(vertexData.positions(), vertexData.normal(), QuadCompat.getDirection(quad));
+            planeOffset.applyOffset(vertexData.positions(), vertexData.normal(), quad.direction());
         }
 
         // Output quad (Intern keys)
@@ -155,8 +154,8 @@ public final class QuadProcessor {
     /**
      * Computes tint color from block colors. Returns -1 if no tint logic exists.
      */
-    private int computeTintColor(BlockState state, BlockPos pos, BakedQuad quad) {
-        int tintIndex = QuadCompat.getTintIndex(quad);
+    private int computeTintColor(BlockState state, BlockPos pos, QuadData quad) {
+        int tintIndex = quad.tintIndex();
         if (tintIndex < 0) return -1;
         return ClientAccessHolder.get().getMinecraft().getBlockColors().getColor(state, level, pos, tintIndex);
     }

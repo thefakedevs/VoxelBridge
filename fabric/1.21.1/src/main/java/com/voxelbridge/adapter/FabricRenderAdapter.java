@@ -1,12 +1,18 @@
 package com.voxelbridge.adapter;
 
+import com.voxelbridge.adapter.QuadBatch;
+import com.voxelbridge.adapter.QuadSource;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
+import com.voxelbridge.export.quad.QuadDataUtil;
+import com.voxelbridge.modhandler.frapi.FabricApiHelper;
 import com.voxelbridge.platform.client.ClientAccessHolder;
+import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
+import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
 import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
@@ -35,26 +41,30 @@ public class FabricRenderAdapter implements RenderAdapter {
             return quads;
         }
         RandomSource rand = RandomSource.create(seed);
-
-        // Use vanilla API - no ModelData in Fabric
-        try {
-            for (Direction dir : Direction.values()) {
-                List<BakedQuad> q = bakedModel.getQuads(state, dir, rand);
-                if (q != null)
-                    quads.addAll(q);
-            }
-            // Null direction (general quads)
-            List<BakedQuad> q2 = bakedModel.getQuads(state, null, rand);
-            if (q2 != null)
-                quads.addAll(q2);
-        } catch (Throwable ignored) {
+        SpriteFinder spriteFinder = getSpriteFinder();
+        if (spriteFinder == null || !(bakedModel instanceof FabricBakedModel fabricModel)) {
+            return quads;
         }
 
-        return quads;
+        return FabricApiHelper.extractQuads(fabricModel, level, state, pos, rand, spriteFinder);
+    }
+
+    @Override
+    public QuadBatch getQuadBatch(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
+        return new QuadBatch(QuadDataUtil.wrapBakedQuads(getQuads(model, state, pos, level, seed)), QuadSource.FRAPI);
     }
 
     @Override
     public String getSpriteName(TextureAtlasSprite sprite) {
         return SpriteKeyResolver.resolve(sprite);
+    }
+
+    private SpriteFinder getSpriteFinder() {
+        var modelManager = ClientAccessHolder.get().getModelManager();
+        if (modelManager == null) {
+            return null;
+        }
+        TextureAtlas atlas = modelManager.getAtlas(TextureAtlas.LOCATION_BLOCKS);
+        return SpriteFinder.get(atlas);
     }
 }

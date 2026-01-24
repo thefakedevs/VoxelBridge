@@ -1,7 +1,6 @@
 package com.voxelbridge.export.exporter;
 
 import com.voxelbridge.compat.BlockStateCompat;
-import com.voxelbridge.compat.QuadCompat;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.ir.IrSink;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
@@ -12,6 +11,8 @@ import com.voxelbridge.export.exporter.blockentity.BlockEntityExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
 import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.adapter.QuadBatch;
+import com.voxelbridge.export.quad.QuadData;
+import com.voxelbridge.export.quad.QuadDataUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.multiplayer.ClientChunkCache;
@@ -174,9 +175,9 @@ public final class BlockExporter {
         List<BakedQuad> handledQuads = modHandler.shouldHandle(be)
             ? modHandler.handle(ctx, level, state, be, pos, model)
             : null;
-        List<BakedQuad> quads;
+        List<QuadData> quads;
         if (handledQuads != null) {
-            quads = handledQuads;
+            quads = QuadDataUtil.wrapBakedQuads(handledQuads);
         } else {
             long seed = state.is(Blocks.LILY_PAD)
                 ? GeometryUtil.computeBushSeed(pos.getX(), pos.getY(), pos.getZ())
@@ -191,8 +192,8 @@ public final class BlockExporter {
         String[] spriteKeys = new String[quadCount];
         boolean isCtmCompact = false;
         for (int i = 0; i < quadCount; i++) {
-            BakedQuad quad = quads.get(i);
-            var sprite = QuadCompat.getSprite(quad);
+            QuadData quad = quads.get(i);
+            var sprite = quad.sprite();
             if (quad == null || sprite == null) continue;
             String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(sprite);
             spriteKeys[i] = spriteKey;
@@ -215,7 +216,7 @@ public final class BlockExporter {
         boolean baseSeen = false;
         String baseSpriteKey = null;
         for (int i = 0; i < quadCount; i++) {
-            BakedQuad quad = quads.get(i);
+            QuadData quad = quads.get(i);
             String spriteKey = spriteKeys[i];
             if (quad == null || spriteKey == null) continue;
 
@@ -242,11 +243,11 @@ public final class BlockExporter {
         // PASS 2: Process base quads
         byte[] sameBlockOcclusionCache = null;
         for (int i = 0; i < quadCount; i++) {
-            BakedQuad quad = quads.get(i);
+            QuadData quad = quads.get(i);
             String spriteKey = spriteKeys[i];
             if (quad == null || spriteKey == null) continue;
 
-            Direction dir = QuadCompat.getDirection(quad);
+            Direction dir = quad.direction();
 
             // Skip if processed as overlay
             if (isOverlay[i]) {

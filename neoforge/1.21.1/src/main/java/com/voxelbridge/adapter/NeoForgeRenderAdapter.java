@@ -1,5 +1,6 @@
 package com.voxelbridge.adapter;
 
+import com.voxelbridge.export.quad.QuadDataUtil;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.modhandler.frapi.FrapiCompat;
 import com.voxelbridge.platform.client.ClientAccessHolder;
@@ -24,6 +25,8 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
     public NeoForgeRenderAdapter() {
     }
 
+    private record QuadResult(List<BakedQuad> quads, QuadSource source) {}
+
     @Override
     public Object getBlockModel(BlockState state) {
         var modelManager = ClientAccessHolder.get().getModelManager();
@@ -35,26 +38,31 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
 
     @Override
     public List<BakedQuad> getQuads(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
-        return getQuadBatch(model, state, pos, level, seed).quads();
+        return buildQuadResult(model, state, pos, level, seed).quads();
     }
 
     @Override
     public QuadBatch getQuadBatch(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
+        QuadResult result = buildQuadResult(model, state, pos, level, seed);
+        return new QuadBatch(QuadDataUtil.wrapBakedQuads(result.quads()), result.source());
+    }
+
+    private QuadResult buildQuadResult(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
         List<BakedQuad> quads = new ArrayList<>();
         if (!(model instanceof BakedModel bakedModel)) {
-            return new QuadBatch(quads, QuadSource.PLATFORM_DEFAULT);
+            return new QuadResult(quads, QuadSource.PLATFORM_DEFAULT);
         }
         RandomSource rand = RandomSource.create(seed);
         Object spriteFinder = getSpriteFinder();
-        
+
         // 1. Get ModelData (NeoForge specific)
         ModelData modelData = ModelData.EMPTY;
         if (level instanceof Level l) {
-             try {
+            try {
                 modelData = l.getModelData(pos);
             } catch (Throwable ignored) {}
         }
-        
+
         try {
             if (bakedModel instanceof IBakedModelExtension extension) {
                 if (level instanceof Level l) {
@@ -67,7 +75,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
         if (spriteFinder != null) {
             List<BakedQuad> fabricQuads = FrapiCompat.extractQuads(bakedModel, level, state, pos, rand, spriteFinder);
             if (!fabricQuads.isEmpty()) {
-                return new QuadBatch(fabricQuads, QuadSource.FRAPI);
+                return new QuadResult(fabricQuads, QuadSource.FRAPI);
             }
         }
 
@@ -82,7 +90,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
             if (q2 != null) quads.addAll(q2);
         } catch (Throwable ignored) {}
 
-        return new QuadBatch(quads, QuadSource.PLATFORM_DEFAULT);
+        return new QuadResult(quads, QuadSource.PLATFORM_DEFAULT);
     }
 
     @Override

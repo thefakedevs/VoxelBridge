@@ -1,9 +1,8 @@
 package com.voxelbridge.export.util.geometry;
 
-import com.voxelbridge.compat.QuadCompat;
+import com.voxelbridge.export.quad.QuadData;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
 
-import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
@@ -29,9 +28,9 @@ public final class VertexExtractor {
     ) {}
 
     /**
-     * Extracts vertex data from a BakedQuad with world transformation.
+     * Extracts vertex data from a quad with world transformation.
      *
-     * @param quad the baked quad
+     * @param quad the quad data
      * @param pos block position
      * @param sprite texture sprite for UV normalization
      * @param offsetX world X offset (for centering)
@@ -41,7 +40,7 @@ public final class VertexExtractor {
      * @return extracted vertex data
      */
     public static VertexData extractFromQuad(
-        BakedQuad quad,
+        QuadData quad,
         BlockPos pos,
         TextureAtlasSprite sprite,
         double offsetX,
@@ -53,7 +52,7 @@ public final class VertexExtractor {
         float[] uv = new float[8];
         int[] colors = new int[4];
 
-        int[] verts = QuadCompat.getVertices(quad);
+        int[] verts = quad.vertices();
         float u0 = sprite.getU0(), u1 = sprite.getU1();
         float v0 = sprite.getV0(), v1 = sprite.getV1();
 
@@ -99,7 +98,7 @@ public final class VertexExtractor {
      * Optional colors array may be provided to capture per-vertex color values.
      */
     public static void extractPositionsUv(
-        BakedQuad quad,
+        QuadData quad,
         BlockPos pos,
         TextureAtlasSprite sprite,
         double offsetX,
@@ -113,7 +112,7 @@ public final class VertexExtractor {
         if (positionsOut == null || positionsOut.length < 12) return;
         if (uvOut == null || uvOut.length < 8) return;
 
-        int[] verts = QuadCompat.getVertices(quad);
+        int[] verts = quad.vertices();
         float u0 = sprite.getU0(), u1 = sprite.getU1();
         float v0 = sprite.getV0(), v1 = sprite.getV1();
 
@@ -152,15 +151,15 @@ public final class VertexExtractor {
     }
 
     /**
-     * Extracts local vertex positions (0-1 range) from a BakedQuad.
+     * Extracts local vertex positions (0-1 range) from a quad.
      * Used for overlay offset calculations to avoid float precision loss.
      *
-     * @param quad the baked quad
+     * @param quad the quad data
      * @return local positions (12 floats)
      */
-    public static float[] extractLocalPositions(BakedQuad quad) {
+    public static float[] extractLocalPositions(QuadData quad) {
         float[] localPos = new float[12];
-        int[] verts = QuadCompat.getVertices(quad);
+        int[] verts = quad.vertices();
 
         for (int i = 0; i < 4; i++) {
             int base = i * 8;

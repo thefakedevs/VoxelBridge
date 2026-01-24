@@ -1,6 +1,5 @@
 package com.voxelbridge.compat;
 
-import com.voxelbridge.mixin.DynamicTextureAccessor;
 import com.voxelbridge.mixin.HttpTextureAccessor;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -51,7 +50,7 @@ public final class FabricTextureAccess {
     public static NativeImage getDynamicTexturePixels(AbstractTexture texture) {
         if (texture instanceof DynamicTexture) {
             try {
-                return ((DynamicTextureAccessor) texture).voxelbridge$getPixels();
+                return ((DynamicTexture) texture).getPixels();
             } catch (Throwable t) {
                 // Fallback to public method
             }

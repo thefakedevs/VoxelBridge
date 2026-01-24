@@ -1,6 +1,5 @@
 package com.voxelbridge.compat;
 
-import com.voxelbridge.mixin.PaintingTextureManagerAccessor;
 import com.voxelbridge.mixin.TextureAtlasHolderAccessor;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -19,9 +18,9 @@ public final class FabricPaintingAccess {
      * Gets the back sprite from PaintingTextureManager.
      */
     public static TextureAtlasSprite getBackSprite(Object paintingManager) {
-        if (paintingManager instanceof PaintingTextureManagerAccessor accessor) {
+        if (paintingManager instanceof PaintingTextureManager manager) {
             try {
-                return accessor.voxelbridge$getBackSprite();
+                return manager.getBackSprite();
             } catch (Throwable t) {
                 // Fallback
             }
