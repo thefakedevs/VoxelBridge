@@ -37,6 +37,7 @@ public final class ExportProgressTracker {
     private static volatile Stage stage = Stage.IDLE;
     private static volatile String stageDetail = "";
     private static volatile Float phasePercent = null;
+    private static volatile boolean abortRequested = false;
     private static final String FORMAT_LABEL = "glTF";
 
     private ExportProgressTracker() {}
@@ -51,6 +52,7 @@ public final class ExportProgressTracker {
         stage = Stage.IDLE;
         stageDetail = "";
         phasePercent = null;
+        abortRequested = false;
     }
 
     /**
@@ -89,6 +91,18 @@ public final class ExportProgressTracker {
         stage = Stage.SAMPLING;
         stageDetail = "Sampling blocks";
         phasePercent = null;
+        abortRequested = false;
+    }
+
+    public static void requestAbort() {
+        abortRequested = true;
+        stage = Stage.IDLE;
+        stageDetail = "";
+        phasePercent = null;
+    }
+
+    public static boolean isAbortRequested() {
+        return abortRequested;
     }
 
     public static void setStage(Stage newStage, String detail) {

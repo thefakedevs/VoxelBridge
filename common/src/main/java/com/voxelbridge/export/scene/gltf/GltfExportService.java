@@ -121,12 +121,18 @@ public final class GltfExportService {
         StreamingRegionSampler.sampleRegion(level, pos1, pos2, irSink, ctx);
         VoxelBridgeLogger.duration("block_sampling", VoxelBridgeLogger.elapsedSince(tSampling));
         ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
+        if (ExportProgressTracker.isAbortRequested()) {
+            throw new IOException("Export aborted");
+        }
 
         // Texture export is handled before glTF assembly so the writer is MC-agnostic.
         ExportProgressTracker.setStage(ExportProgressTracker.Stage.ATLAS, "Building atlases");
         ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
         TextureExportPipeline.build(ctx, gltfDir, ctx.getAtlasBook().keySet());
         ProgressNotifier.showDetailed(mc, ExportProgressTracker.progress());
+        if (ExportProgressTracker.isAbortRequested()) {
+            throw new IOException("Export aborted");
+        }
 
         // OPTIMIZATION: Removed forced GC calls to eliminate 1-5 second Full GC pauses
         // Let JVM manage GC automatically for better throughput

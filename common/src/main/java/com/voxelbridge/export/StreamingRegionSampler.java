@@ -46,6 +46,9 @@ public final class StreamingRegionSampler {
                                     BlockPos pos2,
                                     IrSink sink,
                                     ExportContext ctx) {
+        if (ExportProgressTracker.isAbortRequested()) {
+            return;
+        }
         VoxelBridgeLogger.info(LogModule.EXPORT, "[StreamingRegionSampler] Starting streaming export (Atomic Mode)");
 
         if (!(level instanceof ClientLevel clientLevel)) {
@@ -123,6 +126,9 @@ public final class StreamingRegionSampler {
         Thread monitor = new Thread(() -> {
             try {
                 while (keepRunning.get()) {
+                    if (ExportProgressTracker.isAbortRequested()) {
+                        break;
+                    }
                     ExportProgressTracker.Progress progress = ExportProgressTracker.progress();
                     final ChunkPos playerChunk = mc.player != null ? mc.player.chunkPosition() : null;
                     final int activeDistance = Math.max(0, mc.options != null ? mc.options.getEffectiveRenderDistance() : 0);
@@ -132,6 +138,9 @@ public final class StreamingRegionSampler {
                     Map<Long, ExportProgressTracker.ChunkState> snapshot = ExportProgressTracker.snapshot();
                     for (ChunkPos chunkPos : allChunks) {
                         if (processing.contains(chunkPos)) continue;
+                        if (ExportProgressTracker.isAbortRequested()) {
+                            break;
+                        }
 
                         long key = chunkPos.toLong();
                         ExportProgressTracker.ChunkState state = snapshot.get(key);
@@ -178,11 +187,11 @@ public final class StreamingRegionSampler {
                     if (progress.pending() > 0 && cycle % 5 == 0) {
                         ProgressNotifier.showDetailed(mc, progress);
                     }
-                    Thread.sleep(200);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+                Thread.sleep(200);
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         }, "VoxelBridge-Monitor");
 
         monitor.setDaemon(true);
@@ -192,6 +201,9 @@ public final class StreamingRegionSampler {
             long startTime = System.currentTimeMillis();
             long timeout = 600_000;
             while (!ExportProgressTracker.progress().isComplete()) {
+                if (ExportProgressTracker.isAbortRequested()) {
+                    break;
+                }
                 Thread.sleep(1000);
                 if (System.currentTimeMillis() - startTime > timeout) break;
             }
@@ -201,7 +213,7 @@ public final class StreamingRegionSampler {
 
             // Force-export any remaining pending chunks after timeout.
             ExportProgressTracker.Progress progress = ExportProgressTracker.progress();
-            if (progress.pending() > 0) {
+            if (progress.pending() > 0 && !ExportProgressTracker.isAbortRequested()) {
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.EXPORT)) {
                     VoxelBridgeLogger.info(LogModule.EXPORT, String.format("[StreamingRegionSampler] Force exporting %d pending chunks...", progress.pending()));
                 }
@@ -269,6 +281,9 @@ public final class StreamingRegionSampler {
                                    java.util.Set<Integer> processedEntityIds) {
         boolean started = false;
         try {
+            if (ExportProgressTracker.isAbortRequested()) {
+                return;
+            }
             ExportProgressTracker.markRunning(chunkPos.x, chunkPos.z);
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.EXPORT)) {
                 VoxelBridgeLogger.info(LogModule.EXPORT, "[Streaming] Begin export chunk " + chunkPos);
@@ -320,6 +335,9 @@ public final class StreamingRegionSampler {
 
             // getMaxSection() is exclusive; iterate while < maxSectionY to avoid AIOOB on the last index
             for (int sectionIndex = minSectionY; sectionIndex < maxSectionY; sectionIndex++) {
+                if (ExportProgressTracker.isAbortRequested()) {
+                    return;
+                }
                 // Get section (16x16x16 block region)
                 LevelChunkSection section = worldAdapter.getSection(chunk, worldAdapter.getSectionIndexFromSectionY(chunk, sectionIndex));
                 if (section == null || section.hasOnlyAir()) {
@@ -334,10 +352,16 @@ public final class StreamingRegionSampler {
                     if (worldY < minY || worldY > maxY) continue;
 
                     for (int localZ = 0; localZ < 16; localZ++) {
+                        if (ExportProgressTracker.isAbortRequested()) {
+                            return;
+                        }
                         int worldZ = (chunkPos.z << 4) + localZ;
                         if (worldZ < minZ || worldZ > maxZ) continue;
 
                         for (int localX = 0; localX < 16; localX++) {
+                            if (ExportProgressTracker.isAbortRequested()) {
+                                return;
+                            }
                             int worldX = (chunkPos.x << 4) + localX;
                             if (worldX < minX || worldX > maxX) continue;
 
@@ -437,6 +461,9 @@ public final class StreamingRegionSampler {
                                         java.util.Set<Integer> processedEntityIds) {
         boolean started = false;
         try {
+            if (ExportProgressTracker.isAbortRequested()) {
+                return;
+            }
             ExportProgressTracker.markRunning(chunkPos.x, chunkPos.z);
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.EXPORT)) {
             VoxelBridgeLogger.info(LogModule.EXPORT, "[Streaming][Force] Begin force export chunk " + chunkPos);
@@ -468,6 +495,9 @@ public final class StreamingRegionSampler {
             int worldMinY = worldAdapter.getMinBuildHeight(level);
 
             for (int sectionIndex = minSectionY; sectionIndex < maxSectionY; sectionIndex++) {
+                if (ExportProgressTracker.isAbortRequested()) {
+                    return;
+                }
                 LevelChunkSection section = worldAdapter.getSection(chunk, worldAdapter.getSectionIndexFromSectionY(chunk, sectionIndex));
                 if (section == null || section.hasOnlyAir()) {
                     continue; // Skip empty sections
@@ -481,10 +511,16 @@ public final class StreamingRegionSampler {
                     if (worldY < minY || worldY > maxY) continue;
 
                     for (int localZ = 0; localZ < 16; localZ++) {
+                        if (ExportProgressTracker.isAbortRequested()) {
+                            return;
+                        }
                         int worldZ = (chunkPos.z << 4) + localZ;
                         if (worldZ < minZ || worldZ > maxZ) continue;
 
                         for (int localX = 0; localX < 16; localX++) {
+                            if (ExportProgressTracker.isAbortRequested()) {
+                                return;
+                            }
                             int worldX = (chunkPos.x << 4) + localX;
                             if (worldX < minX || worldX > maxX) continue;
 

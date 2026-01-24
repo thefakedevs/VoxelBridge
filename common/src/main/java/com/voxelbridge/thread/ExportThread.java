@@ -48,6 +48,15 @@ public class ExportThread extends Thread {
             VoxelBridgeLogger.info(LogModule.EXPORT, msg);
 
         } catch (Throwable e) {
+            if (Thread.currentThread().isInterrupted()) {
+                VoxelBridgeLogger.warn(LogModule.EXPORT, "[Export] Export aborted.");
+                mc.execute(() -> {
+                    if (mc.player != null) {
+                        mc.player.displayClientMessage(Component.literal("[VoxelBridge] Export aborted."), false);
+                    }
+                });
+                return;
+            }
             e.printStackTrace();
             StringWriter sw = new StringWriter();
             e.printStackTrace(new PrintWriter(sw));
@@ -57,6 +66,8 @@ public class ExportThread extends Thread {
                 if (mc.player != null)
                     mc.player.displayClientMessage(Component.literal("[VoxelBridge] Export failed: " + e.getMessage()), false);
             });
+        } finally {
+            com.voxelbridge.export.ExportControl.clearActiveExport(this);
         }
     }
 }

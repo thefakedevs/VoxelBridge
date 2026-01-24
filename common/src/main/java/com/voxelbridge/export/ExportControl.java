@@ -2,6 +2,8 @@ package com.voxelbridge.export;
 
 import com.voxelbridge.thread.ExportThread;
 import com.voxelbridge.util.io.IOUtil;
+import com.voxelbridge.util.client.ProgressNotifier;
+import com.voxelbridge.config.ExportRuntimeConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
@@ -13,6 +15,7 @@ import java.nio.file.Path;
 public final class ExportControl {
     private static BlockPos pos1;
     private static BlockPos pos2;
+    private static volatile ExportThread currentExport;
 
     private ExportControl() {}
 
@@ -35,9 +38,11 @@ public final class ExportControl {
     }
 
     public static void clearSelection() {
+        abortExport();
         pos1 = null;
         pos2 = null;
         ExportProgressTracker.clear();
+        ProgressNotifier.reset();
     }
 
     public static ExportResult startExport(Level level) {
@@ -49,12 +54,39 @@ public final class ExportControl {
         }
 
         try {
+            ProgressNotifier.reset();
             Path outDir = IOUtil.ensureExportDir();
             Thread exportThread = new ExportThread(level, pos1, pos2, outDir);
+            currentExport = (ExportThread) exportThread;
             exportThread.start();
             return new ExportResult(true, "Exporting to glTF...");
         } catch (Exception e) {
             return new ExportResult(false, "Export failed: " + e.getMessage());
+        }
+    }
+
+    public static void abortExport() {
+        ExportProgressTracker.requestAbort();
+        ProgressNotifier.reset();
+        ExportThread thread = currentExport;
+        if (thread != null) {
+            thread.interrupt();
+        }
+        currentExport = null;
+    }
+
+    public static void resetAll() {
+        abortExport();
+        pos1 = null;
+        pos2 = null;
+        ExportProgressTracker.clear();
+        ExportRuntimeConfig.resetDefaults();
+        ProgressNotifier.reset();
+    }
+
+    public static void clearActiveExport(ExportThread thread) {
+        if (currentExport == thread) {
+            currentExport = null;
         }
     }
 

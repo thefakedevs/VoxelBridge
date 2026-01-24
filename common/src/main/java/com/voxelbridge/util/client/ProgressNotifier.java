@@ -50,6 +50,13 @@ public final class ProgressNotifier {
         });
     }
 
+    public static void reset() {
+        lastProgress = null;
+        lastProgressNanos = 0L;
+        smoothedPercent = 0f;
+        lastRenderNanos = 0L;
+    }
+
     // buildStatus removed as it's no longer used for Action Bar
 
     private static String eta(ExportProgressTracker.Progress p) {
@@ -111,12 +118,6 @@ public final class ProgressNotifier {
             if (stageChanged) {
                 lastProgress = current;
                 lastProgressNanos = System.nanoTime();
-                float resetTarget = (float) (current.displayPercent() / 100.0);
-                if (current.stage() == ExportProgressTracker.Stage.SAMPLING
-                    && (current.done() + current.failed()) == 0) {
-                    resetTarget = 0f;
-                }
-                smoothedPercent = Math.max(0f, Math.min(1f, resetTarget));
                 lastRenderNanos = System.nanoTime();
             }
         }
@@ -143,11 +144,6 @@ public final class ProgressNotifier {
         int y = 12; // Top offset
 
         float targetPct = Math.max(0f, Math.min(1f, lastProgress.displayPercent() / 100f));
-        if (lastProgress.stage() == ExportProgressTracker.Stage.SAMPLING
-            && (lastProgress.done() + lastProgress.failed()) == 0
-            && targetPct < smoothedPercent) {
-            smoothedPercent = 0f;
-        }
         long now = System.nanoTime();
         if (lastRenderNanos == 0L) {
             lastRenderNanos = now;
@@ -236,7 +232,7 @@ public final class ProgressNotifier {
             case SAMPLING -> 0xFF3B82F6;   // Deep Blue (Sampling)
             case ATLAS -> 0xFFFF00FF;      // Magenta (Atlas)
             case FINALIZE -> 0xFFFFFF55;   // Yellow (MC §e)
-            case COMPLETE -> 0xFF55FF55;   // Green (MC §a)
+            case COMPLETE -> 0xFF00D800;   // Green (00D800)
             default -> 0xFFCCCCCC;
         };
     }

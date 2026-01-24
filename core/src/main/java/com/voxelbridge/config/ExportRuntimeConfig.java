@@ -171,5 +171,17 @@ public final class ExportRuntimeConfig {
         pbrDecodeEnabled = enabled;
     }
 
+    public static void resetDefaults() {
+        atlasMode = AtlasMode.ATLAS;
+        atlasSize = AtlasSize.SIZE_8192;
+        atlasPadding = 0;
+        colorMode = ColorMode.BOTH;
+        coordinateMode = CoordinateMode.CENTERED;
+        exportThreadCount = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
+        vanillaRandomTransformEnabled = true;
+        animationEnabled = false;
+        fillCaveEnabled = false;
+        pbrDecodeEnabled = false;
+    }
 
 }
