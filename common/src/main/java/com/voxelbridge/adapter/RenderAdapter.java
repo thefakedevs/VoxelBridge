@@ -27,6 +27,14 @@ public interface RenderAdapter {
     List<BakedQuad> getQuads(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed);
 
     /**
+     * Extracts quads and tags their source for downstream routing.
+     * Implementations may override to provide richer source info.
+     */
+    default QuadBatch getQuadBatch(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
+        return new QuadBatch(getQuads(model, state, pos, level, seed), QuadSource.PLATFORM_DEFAULT);
+    }
+
+    /**
      * Resolves the unique resource location string for a texture sprite.
      * e.g., "minecraft:block/stone"
      */

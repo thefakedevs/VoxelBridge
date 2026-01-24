@@ -10,8 +10,8 @@ import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExportResult;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityExporter;
 import com.voxelbridge.export.exporter.blockentity.BlockEntityRenderBatch;
-import com.voxelbridge.export.util.geometry.VertexExtractor;
 import com.voxelbridge.adapter.Adapters;
+import com.voxelbridge.adapter.QuadBatch;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.multiplayer.ClientChunkCache;
@@ -181,14 +181,14 @@ public final class BlockExporter {
             long seed = state.is(Blocks.LILY_PAD)
                 ? GeometryUtil.computeBushSeed(pos.getX(), pos.getY(), pos.getZ())
                 : Mth.getSeed(pos.getX(), pos.getY(), pos.getZ());
-            quads = com.voxelbridge.adapter.Adapters.getRender().getQuads(model, state, pos, level, seed);
+            QuadBatch batch = com.voxelbridge.adapter.Adapters.getRender().getQuadBatch(model, state, pos, level, seed);
+            quads = batch.quads();
         }
 
         if (quads.isEmpty()) return;
 
         int quadCount = quads.size();
         String[] spriteKeys = new String[quadCount];
-        boolean hasCtmSprite = false;
         boolean isCtmCompact = false;
         for (int i = 0; i < quadCount; i++) {
             BakedQuad quad = quads.get(i);
@@ -196,9 +196,6 @@ public final class BlockExporter {
             if (quad == null || sprite == null) continue;
             String spriteKey = com.voxelbridge.adapter.Adapters.getRender().getSpriteName(sprite);
             spriteKeys[i] = spriteKey;
-            if (!hasCtmSprite && isCtmOverlaySprite(spriteKey)) {
-                hasCtmSprite = true;
-            }
             if (!isCtmCompact && isContinuitySprite(spriteKey)) {
                 isCtmCompact = true;
             }
@@ -213,30 +210,32 @@ public final class BlockExporter {
 
         ctx.registerSpriteMaterial(blockKey, blockKey);
 
-        // PASS 1: Position-based CTM overlay detection (skip if no CTM sprites)
-        if (hasCtmSprite && quadCount > 1) {
-            detectCtmOverlaysByPosition(quads, spriteKeys, state, pos, blockKey, randomOffset);
-        }
-
-        // PASS 1b: Detect and cache overlays
+        // PASS 1: Detect and cache overlays (order-based)
+        boolean[] isOverlay = new boolean[quadCount];
+        boolean baseSeen = false;
+        String baseSpriteKey = null;
         for (int i = 0; i < quadCount; i++) {
             BakedQuad quad = quads.get(i);
             String spriteKey = spriteKeys[i];
             if (quad == null || spriteKey == null) continue;
 
-            // Check vanilla overlay
-            if (OverlayManager.isVanillaOverlay(spriteKey)) {
-                String vanillaBase = OverlayManager.extractVanillaOverlayBase(spriteKey);
-                if (vanillaBase == null) vanillaBase = blockKey;
-                overlayManager.cacheOverlay(vanillaBase, state, pos, quad, randomOffset, spriteKey);
-                continue;  // Skip this quad in PASS 2
+            boolean overlayCandidate = isOverlaySprite(spriteKey);
+            boolean hilightCandidate = isHilightOverlay(spriteKey);
+
+            if (!baseSeen) {
+                baseSeen = true;
+                baseSpriteKey = spriteKey;
+                continue;
             }
 
-            // Check hilight overlay
-            if (isHilightOverlay(spriteKey)) {
-                // Hilight: bypass overlay suffix, let OverlayManager use sprite name (_hilight) for material/offset
-                overlayManager.cacheOverlayNoMarkup(blockKey, state, pos, quad, randomOffset, spriteKey);
-                continue;  // Skip this quad in PASS 2
+            if (overlayCandidate || hilightCandidate) {
+                String overlayBase = baseSpriteKey != null ? baseSpriteKey : blockKey;
+                if (hilightCandidate) {
+                    overlayManager.cacheHilight(overlayBase, state, pos, quad, randomOffset, spriteKey);
+                } else {
+                    overlayManager.cacheOverlay(overlayBase, state, pos, quad, randomOffset, spriteKey);
+                }
+                isOverlay[i] = true;
             }
         }
 
@@ -250,7 +249,7 @@ public final class BlockExporter {
             Direction dir = QuadCompat.getDirection(quad);
 
             // Skip if processed as overlay
-            if (overlayManager.isProcessedOverlay(spriteKey)) {
+            if (isOverlay[i]) {
                 continue;
             }
 
@@ -309,73 +308,15 @@ public final class BlockExporter {
         });
     }
 
-    private void detectCtmOverlaysByPosition(List<BakedQuad> quads, String[] spriteKeys, BlockState state, BlockPos pos, String blockKey, Vec3 randomOffset) {
-        record QuadEntry(int index, BakedQuad quad, String spriteKey, long posHash, boolean approxSquare,
-                         float uMin, float uMax, float vMin, float vMax) {}
-
-        Map<Long, List<QuadEntry>> groups = new HashMap<>(quads.size());
-        float[] positions = new float[12];
-        float[] uv = new float[8];
-        float[] uvBounds = new float[4];
-
-        for (int i = 0; i < quads.size(); i++) {
-            BakedQuad quad = quads.get(i);
-            String spriteKey = spriteKeys[i];
-            if (quad == null || spriteKey == null) continue;
-            var sprite = QuadCompat.getSprite(quad);
-            VertexExtractor.extractPositionsUv(quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset, positions, uv, null);
-            long posHash = GeometryUtil.computePositionHash(positions);
-            boolean approxSquare = GeometryUtil.isApproxAxisAlignedSquare(positions, 0.01f);
-
-            if (!GeometryUtil.computeUvBounds(uv, uvBounds)) {
-                continue;
-            }
-            float uMin = uvBounds[0];
-            float uMax = uvBounds[1];
-            float vMin = uvBounds[2];
-            float vMax = uvBounds[3];
-
-            groups.computeIfAbsent(posHash, k -> new ArrayList<>())
-                .add(new QuadEntry(i, quad, spriteKey, posHash, approxSquare, uMin, uMax, vMin, vMax));
-        }
-
-        for (List<QuadEntry> group : groups.values()) {
-            if (group.size() < 2) continue;
-
-            // CTM overlay detection: square quad + CTM sprite.
-            boolean hasCtmSprite = group.stream().anyMatch(q -> isCtmOverlaySprite(q.spriteKey()));
-            QuadEntry first = group.get(0);
-            if (!hasCtmSprite || !first.approxSquare()) continue;
-
-            // Allow any rectangle as long as the UV AABB size matches (same shape).
-            float du = first.uMax - first.uMin;
-            float dv = first.vMax - first.vMin;
-            final float UV_EPS = 1e-4f;
-            boolean sameShape = group.stream().allMatch(q -> Math.abs((q.uMax - q.uMin) - du) < UV_EPS
-                && Math.abs((q.vMax - q.vMin) - dv) < UV_EPS);
-            if (!sameShape) continue;
-
-            int minIndex = group.stream().mapToInt(QuadEntry::index).min().orElse(Integer.MAX_VALUE);
-
-            group.stream()
-                .sorted(Comparator.comparingInt(QuadEntry::index))
-                .filter(q -> q.index() != minIndex)
-                .forEach(q -> overlayManager.cacheOverlay(blockKey, state, pos, q.quad(), randomOffset, q.spriteKey()));
-        }
-    }
-
-    private boolean isCtmOverlaySprite(String spriteKey) {
-        if (spriteKey == null) return false;
-        String lower = spriteKey.toLowerCase(Locale.ROOT);
-        return lower.matches(".*_\\d+$")
-            || lower.contains("/ctm/")
-            || lower.contains("ctm/")
-            || lower.contains("continuity");
-    }
-
     private boolean isContinuitySprite(String spriteKey) {
         if (spriteKey == null) return false;
         return spriteKey.toLowerCase(Locale.ROOT).contains("continuity");
+    }
+
+    private boolean isOverlaySprite(String spriteKey) {
+        if (spriteKey == null) return false;
+        String lower = spriteKey.toLowerCase(Locale.ROOT);
+        return lower.contains("_overlay") || lower.contains("continuity");
     }
 
     private boolean isHilightOverlay(String spriteKey) {

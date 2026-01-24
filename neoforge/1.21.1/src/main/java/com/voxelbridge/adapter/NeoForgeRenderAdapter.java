@@ -35,9 +35,14 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
 
     @Override
     public List<BakedQuad> getQuads(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
+        return getQuadBatch(model, state, pos, level, seed).quads();
+    }
+
+    @Override
+    public QuadBatch getQuadBatch(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
         List<BakedQuad> quads = new ArrayList<>();
         if (!(model instanceof BakedModel bakedModel)) {
-            return quads;
+            return new QuadBatch(quads, QuadSource.PLATFORM_DEFAULT);
         }
         RandomSource rand = RandomSource.create(seed);
         Object spriteFinder = getSpriteFinder();
@@ -62,7 +67,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
         if (spriteFinder != null) {
             List<BakedQuad> fabricQuads = FrapiCompat.extractQuads(bakedModel, level, state, pos, rand, spriteFinder);
             if (!fabricQuads.isEmpty()) {
-                return fabricQuads;
+                return new QuadBatch(fabricQuads, QuadSource.FRAPI);
             }
         }
 
@@ -77,7 +82,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
             if (q2 != null) quads.addAll(q2);
         } catch (Throwable ignored) {}
 
-        return quads;
+        return new QuadBatch(quads, QuadSource.PLATFORM_DEFAULT);
     }
 
     @Override

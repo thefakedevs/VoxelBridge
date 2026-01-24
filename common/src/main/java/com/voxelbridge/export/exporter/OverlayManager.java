@@ -24,8 +24,8 @@ import java.awt.image.BufferedImage;
 import java.util.*;
 
 /**
- * Manages overlay quad detection, caching, and rendering.
- * Overlays are organized by position to keep per-face overlay ordering stable.
+ * Manages overlay quad caching and rendering.
+ * Overlays are emitted in capture order.
  */
 public final class OverlayManager {
 
@@ -34,11 +34,7 @@ public final class OverlayManager {
     private final double offsetX, offsetY, offsetZ;
     private final PlaneOffsetTracker planeOffset;
 
-    // Cache overlays by their position hash
-    private final Map<Long, List<OverlayQuadData>> overlayCacheByPosition = new HashMap<>();
-
-    // Track which sprites have been processed as overlays
-    private final Set<String> processedOverlaySprites = new HashSet<>();
+    private final List<OverlayQuadData> overlayCache = new ArrayList<>();
 
     // Object pools for memory efficiency
     private final ObjectPool<float[]> positions12Pool = new ObjectPool<>(256, () -> new float[12]);
@@ -70,56 +66,7 @@ public final class OverlayManager {
      * Clears all overlay caches. Call this before processing each block.
      */
     public void clear() {
-        overlayCacheByPosition.clear();
-        processedOverlaySprites.clear();
-    }
-
-    /**
-     * Checks if a sprite has been marked as processed overlay.
-     */
-    public boolean isProcessedOverlay(String spriteKey) {
-        return processedOverlaySprites.contains(spriteKey);
-    }
-
-    /**
-     * Detects if a sprite is a vanilla overlay (contains "_overlay" in name).
-     */
-    public static boolean isVanillaOverlay(String spriteKey) {
-        return spriteKey != null && spriteKey.contains("_overlay");
-    }
-
-    /**
-     * Extracts base material key from vanilla overlay sprite name.
-     * Example: "minecraft:block/grass_block_overlay" -> "minecraft:grass_block"
-     */
-    public static String extractVanillaOverlayBase(String spriteKey) {
-        if (spriteKey == null || !spriteKey.contains("_overlay")) {
-            return null;
-        }
-
-        String key = spriteKey;
-        String namespace = "minecraft";
-        String path = key;
-
-        // Parse namespace
-        int colon = key.indexOf(':');
-        if (colon >= 0) {
-            namespace = key.substring(0, colon);
-            path = key.substring(colon + 1);
-        }
-
-        // Remove "block/" prefix if present
-        if (path.startsWith("block/")) {
-            path = path.substring("block/".length());
-        }
-
-        // Remove "_overlay" suffix
-        path = path.replace("_overlay", "");
-
-        // Remove directional suffixes (e.g., _top, _side)
-        path = path.replaceAll("_(top|side|bottom|north|south|east|west)$", "");
-
-        return namespace + ":" + path;
+        overlayCache.clear();
     }
 
     /**
@@ -147,22 +94,13 @@ public final class OverlayManager {
     }
 
     /**
-     * Caches an overlay quad without marking it as processed (for non-traditional overlays).
-     * Uses original materialKey instead of appending "_overlay".
+     * Caches an overlay quad with the provided material suffix.
      */
-    public void cacheOverlayNoMarkup(String baseMaterialKey, BlockState state, BlockPos pos,
-                                     BakedQuad quad, Vec3 randomOffset, String spriteKey) {
-        cacheOverlayInternal(baseMaterialKey, state, pos, quad, randomOffset, spriteKey, null);
-    }
-
     private void cacheOverlayInternal(String baseMaterialKey, BlockState state, BlockPos pos,
                              BakedQuad quad, Vec3 randomOffset, String spriteKey, String materialSuffix) {
         if (baseMaterialKey == null || baseMaterialKey.isEmpty()) {
             baseMaterialKey = "unknown";
         }
-
-        // Mark sprite as processed (all overlays skip PASS 2)
-        processedOverlaySprites.add(spriteKey);
 
         var sprite = QuadCompat.getSprite(quad);
         if (sprite == null) return;
@@ -236,12 +174,6 @@ public final class OverlayManager {
                 return;
             }
 
-            // Compute position hash before applying overlay offsets (per-face grouping)
-            float[] baseWorldPos = VertexExtractor.localToWorld(localPos, pos, offsetX, offsetY, offsetZ, randomOffset);
-            long posHash = GeometryUtil.computePositionHash(baseWorldPos);
-
-            List<OverlayQuadData> overlayList = overlayCacheByPosition.computeIfAbsent(posHash, k -> new ArrayList<>());
-
             // Convert to world coordinates
             float[] worldPos = VertexExtractor.localToWorld(localPos, pos, offsetX, offsetY, offsetZ, randomOffset);
             System.arraycopy(worldPos, 0, positions, 0, 12);
@@ -253,7 +185,7 @@ public final class OverlayManager {
                 positions.clone(), normal, uv0.clone(),
                 spriteKey, overlayColor, dir, baseMaterialKey, effectiveSuffix
             );
-            overlayList.add(data);
+            overlayCache.add(data);
         } finally {
             int4Pool.release(vertexColors);
             positions12Pool.release(localPos);
@@ -288,39 +220,37 @@ public final class OverlayManager {
      * @param cullChecker function to check if a face should be culled
      */
     public void outputOverlays(IrSink sceneSink, BlockState state, CullChecker cullChecker) {
-        for (List<OverlayQuadData> overlays : overlayCacheByPosition.values()) {
-            if (overlays.isEmpty()) continue;
+        if (overlayCache.isEmpty()) return;
 
-            for (OverlayQuadData overlay : overlays) {
-                // Use suffix if provided (e.g., "_overlay", "_hilight"), otherwise use base materialKey
-                String overlayMaterialKey = overlay.materialSuffix != null
-                    ? overlay.materialKey + overlay.materialSuffix
-                    : overlay.materialKey;
-                overlayMaterialKey = ctx.resolveMaterialKey(overlay.spriteKey, overlayMaterialKey);
-                Direction dir = overlay.direction;
+        for (OverlayQuadData overlay : overlayCache) {
+            // Use suffix if provided (e.g., "_overlay", "_hilight"), otherwise use base materialKey
+            String overlayMaterialKey = overlay.materialSuffix != null
+                ? overlay.materialKey + overlay.materialSuffix
+                : overlay.materialKey;
+            overlayMaterialKey = ctx.resolveMaterialKey(overlay.spriteKey, overlayMaterialKey);
+            Direction dir = overlay.direction;
 
-                // Apply occlusion culling
-                if (dir != null && cullChecker.shouldCull(dir)) {
-                    continue;  // Skip occluded overlay face
-                }
-
-                if (planeOffset != null) {
-                    planeOffset.applyOffset(overlay.positions, overlay.normal, dir);
-                }
-
-                // Output visible overlay
-                boolean doubleSided = state.getBlock() instanceof BushBlock;
-                ColorModeHandler.ColorData overlayColorData = ColorModeHandler.prepareColors(
-                    ctx.getColorMode(), ctx.getColorMapAccess(), overlay.color, true);
-                ctx.registerSpriteMaterial(overlay.spriteKey, overlayMaterialKey);
-                TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
-                    ? TintMode.COLORMAP
-                    : TintMode.VERTEX_COLOR;
-                sceneSink.addQuad(overlayMaterialKey, overlay.spriteKey, overlay.spriteKey,
-                    RenderLayer.UNKNOWN, tintMode, doubleSided, false,
-                    overlay.positions, overlay.uv, overlayColorData.uv1(), overlay.normal,
-                    overlayColorData.colors());
+            // Apply occlusion culling
+            if (dir != null && cullChecker.shouldCull(dir)) {
+                continue;  // Skip occluded overlay face
             }
+
+            if (planeOffset != null) {
+                planeOffset.applyOffset(overlay.positions, overlay.normal, dir);
+            }
+
+            // Output visible overlay
+            boolean doubleSided = state.getBlock() instanceof BushBlock;
+            ColorModeHandler.ColorData overlayColorData = ColorModeHandler.prepareColors(
+                ctx.getColorMode(), ctx.getColorMapAccess(), overlay.color, true);
+            ctx.registerSpriteMaterial(overlay.spriteKey, overlayMaterialKey);
+            TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
+                ? TintMode.COLORMAP
+                : TintMode.VERTEX_COLOR;
+            sceneSink.addQuad(overlayMaterialKey, overlay.spriteKey, overlay.spriteKey,
+                RenderLayer.UNKNOWN, tintMode, doubleSided, false,
+                overlay.positions, overlay.uv, overlayColorData.uv1(), overlay.normal,
+                overlayColorData.colors());
         }
     }
 

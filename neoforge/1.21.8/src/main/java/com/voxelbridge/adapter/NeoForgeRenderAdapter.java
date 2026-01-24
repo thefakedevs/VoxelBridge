@@ -1,5 +1,7 @@
 package com.voxelbridge.adapter;
 
+import com.voxelbridge.adapter.QuadBatch;
+import com.voxelbridge.adapter.QuadSource;
 import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -34,12 +36,17 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
 
     @Override
     public List<BakedQuad> getQuads(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
+        return getQuadBatch(model, state, pos, level, seed).quads();
+    }
+
+    @Override
+    public QuadBatch getQuadBatch(Object model, BlockState state, BlockPos pos, BlockAndTintGetter level, long seed) {
         List<BakedQuad> quads = new ArrayList<>();
         RandomSource rand = RandomSource.create(seed);
         // Collect parts -> quads
         try {
             if (!(model instanceof BlockStateModel stateModel)) {
-                return quads;
+                return new QuadBatch(quads, QuadSource.PLATFORM_DEFAULT);
             }
             List<BlockModelPart> parts = new ArrayList<>();
             if (stateModel instanceof BlockStateModelExtension extension) {
@@ -58,7 +65,7 @@ public class NeoForgeRenderAdapter implements RenderAdapter {
             }
         } catch (Throwable ignored) {}
 
-        return quads;
+        return new QuadBatch(quads, QuadSource.PLATFORM_DEFAULT);
     }
 
     @Override
