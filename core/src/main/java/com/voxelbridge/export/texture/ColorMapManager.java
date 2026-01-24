@@ -44,36 +44,38 @@ public final class ColorMapManager {
         // normalize alpha to 255 for mapping
         int norm = argb | 0xFF000000;
         var map = state.getColorMap();
-        ExportState.TexturePlacement existing = map.get(norm);
-        if (existing != null) return existing;
+        synchronized (map) {
+            ExportState.TexturePlacement existing = map.get(norm);
+            if (existing != null) return existing;
 
-        int pageSize = com.voxelbridge.config.ExportRuntimeConfig.getAtlasSize().getSize();
-        int slotsPerRow = pageSize / SLOT_SIZE;
-        long slotsPerPage = (long) slotsPerRow * slotsPerRow;
+            int pageSize = com.voxelbridge.config.ExportRuntimeConfig.getAtlasSize().getSize();
+            int slotsPerRow = pageSize / SLOT_SIZE;
+            long slotsPerPage = (long) slotsPerRow * slotsPerRow;
 
-        long slot = state.getNextColorSlot().getAndIncrement();
-        long page = slot / slotsPerPage;
-        long idx = slot % slotsPerPage;
+            long slot = state.getNextColorSlot().getAndIncrement();
+            long page = slot / slotsPerPage;
+            long idx = slot % slotsPerPage;
 
-        int slotRow = (int) (idx / slotsPerRow);
-        int slotCol = (int) (idx % slotsPerRow);
+            int slotRow = (int) (idx / slotsPerRow);
+            int slotCol = (int) (idx % slotsPerRow);
 
-        int x = slotCol * SLOT_SIZE;
-        int y = slotRow * SLOT_SIZE;
+            int x = slotCol * SLOT_SIZE;
+            int y = slotRow * SLOT_SIZE;
 
-        int tileU = (int) (page % 10);
-        int tileV = (int) (page / 10);
+            int tileU = (int) (page % 10);
+            int tileV = (int) (page / 10);
 
-        // Add a 0.5px margin for safety
-        float u0 = tileU + (x + 0.5f) / pageSize;
-        // Fix UDIM V coordinate: negate tileV to compensate for coordinate flip elsewhere
-        float v0 = -tileV + (y + 0.5f) / pageSize;
-        float u1 = tileU + (x + SLOT_SIZE - 0.5f) / pageSize;
-        float v1 = -tileV + (y + SLOT_SIZE - 0.5f) / pageSize;
+            // Add a 0.5px margin for safety
+            float u0 = tileU + (x + 0.5f) / pageSize;
+            // Fix UDIM V coordinate: negate tileV to compensate for coordinate flip elsewhere
+            float v0 = -tileV + (y + 0.5f) / pageSize;
+            float u1 = tileU + (x + SLOT_SIZE - 0.5f) / pageSize;
+            float v1 = -tileV + (y + SLOT_SIZE - 0.5f) / pageSize;
 
-        ExportState.TexturePlacement placement = new ExportState.TexturePlacement((int) page, tileU, tileV, x, y, SLOT_SIZE, SLOT_SIZE, u0, v0, u1, v1, null);
-        map.put(norm, placement);
-        return placement;
+            ExportState.TexturePlacement placement = new ExportState.TexturePlacement((int) page, tileU, tileV, x, y, SLOT_SIZE, SLOT_SIZE, u0, v0, u1, v1, null);
+            map.put(norm, placement);
+            return placement;
+        }
     }
 
     /**

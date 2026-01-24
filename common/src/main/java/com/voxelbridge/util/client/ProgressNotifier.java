@@ -18,6 +18,8 @@ public final class ProgressNotifier {
 
     private static ExportProgressTracker.Progress lastProgress;
     private static long lastProgressNanos = 0L;
+    private static float smoothedPercent = 0f;
+    private static long lastRenderNanos = 0L;
 
     private ProgressNotifier() {}
 
@@ -109,13 +111,27 @@ public final class ProgressNotifier {
             if (stageChanged) {
                 lastProgress = current;
                 lastProgressNanos = System.nanoTime();
+                float resetTarget = (float) (current.displayPercent() / 100.0);
+                if (current.stage() == ExportProgressTracker.Stage.SAMPLING
+                    && (current.done() + current.failed()) == 0) {
+                    resetTarget = 0f;
+                }
+                smoothedPercent = Math.max(0f, Math.min(1f, resetTarget));
+                lastRenderNanos = System.nanoTime();
             }
         }
+        float fadeAlpha = 1.0f;
         if (lastProgress.stage() == ExportProgressTracker.Stage.COMPLETE) {
             long elapsedNs = System.nanoTime() - lastProgressNanos;
-            if (elapsedNs > 1_000_000_000L) {
-                lastProgress = null;
-                return;
+            long holdNs = 3_000_000_000L;
+            long fadeNs = 1_000_000_000L;
+            if (elapsedNs > holdNs) {
+                long fadeElapsed = elapsedNs - holdNs;
+                if (fadeElapsed >= fadeNs) {
+                    lastProgress = null;
+                    return;
+                }
+                fadeAlpha = 1.0f - (fadeElapsed / (float) fadeNs);
             }
         }
 
@@ -126,7 +142,22 @@ public final class ProgressNotifier {
         int x = (screenW - barWidth) / 2;
         int y = 12; // Top offset
 
-        float dispPct = Math.max(0f, Math.min(1f, lastProgress.displayPercent() / 100f));
+        float targetPct = Math.max(0f, Math.min(1f, lastProgress.displayPercent() / 100f));
+        if (lastProgress.stage() == ExportProgressTracker.Stage.SAMPLING
+            && (lastProgress.done() + lastProgress.failed()) == 0
+            && targetPct < smoothedPercent) {
+            smoothedPercent = 0f;
+        }
+        long now = System.nanoTime();
+        if (lastRenderNanos == 0L) {
+            lastRenderNanos = now;
+        }
+        float dt = (now - lastRenderNanos) / 1_000_000_000f;
+        lastRenderNanos = now;
+        float speed = targetPct >= smoothedPercent ? 10f : 4f;
+        float alpha = 1f - (float) Math.exp(-speed * Math.min(dt, 0.25f));
+        smoothedPercent = smoothedPercent + (targetPct - smoothedPercent) * alpha;
+        float dispPct = Math.max(0f, Math.min(1f, smoothedPercent));
         int filled = Math.round(barWidth * dispPct);
 
         // Raise Z-level to render above everything
@@ -134,11 +165,11 @@ public final class ProgressNotifier {
         GuiPoseCompat.translate(gfx, 0, 0, 1000.0f);
 
         // Outline (Black border)
-        gfx.fill(x - 1, y - 1, x + barWidth + 1, y + barHeight + 1, 0xFF000000);
+        gfx.fill(x - 1, y - 1, x + barWidth + 1, y + barHeight + 1, applyAlpha(0xFF000000, fadeAlpha));
         // Background
-        gfx.fill(x, y, x + barWidth, y + barHeight, 0xFF444444);
+        gfx.fill(x, y, x + barWidth, y + barHeight, applyAlpha(0xFF444444, fadeAlpha));
         // Progress
-        gfx.fill(x, y, x + filled, y + barHeight, stageBarColor(lastProgress.stage()));
+        gfx.fill(x, y, x + filled, y + barHeight, applyAlpha(stageBarColor(lastProgress.stage()), fadeAlpha));
 
         // Line 1: Title
         String title = String.format("[%s] %s %.1f%%",
@@ -146,7 +177,7 @@ public final class ProgressNotifier {
                 stageLabel(lastProgress.stage(), lastProgress.stageDetail()),
                 lastProgress.displayPercent());
         int titleWidth = mc.font.width(title);
-        int titleColor = stageBarColor(lastProgress.stage());
+        int titleColor = applyAlpha(stageBarColor(lastProgress.stage()), fadeAlpha);
         Adapters.getPlatformRenderHelper().drawString(
                 gfx, mc.font, title, (screenW - titleWidth) / 2, y + 8, titleColor, true);
 
@@ -173,8 +204,9 @@ public final class ProgressNotifier {
                .append(Component.literal(memoryStats()).withStyle(memColor));
         
         int detailWidth = mc.font.width(details);
+        int detailColor = applyAlpha(0xFFFFFFFF, fadeAlpha);
         Adapters.getPlatformRenderHelper().drawString(
-                gfx, mc.font, details, (screenW - detailWidth) / 2, y + 18, 0xFFFFFFFF, true);
+                gfx, mc.font, details, (screenW - detailWidth) / 2, y + 18, detailColor, true);
 
         GuiPoseCompat.pop(gfx);
     }
@@ -202,10 +234,17 @@ public final class ProgressNotifier {
     private static int stageBarColor(ExportProgressTracker.Stage stage) {
         return switch (stage) {
             case SAMPLING -> 0xFF3B82F6;   // Deep Blue (Sampling)
-            case ATLAS -> 0xFFEC4899;      // Pink/Magenta (Atlas)
-            case FINALIZE -> 0xFFF59E0B;   // Amber (Writing)
-            case COMPLETE -> 0xFF10B981;   // Emerald (Complete)
+            case ATLAS -> 0xFFFF00FF;      // Magenta (Atlas)
+            case FINALIZE -> 0xFFFFFF55;   // Yellow (MC §e)
+            case COMPLETE -> 0xFF55FF55;   // Green (MC §a)
             default -> 0xFFCCCCCC;
         };
+    }
+
+    private static int applyAlpha(int argb, float alpha) {
+        alpha = Math.max(0f, Math.min(1f, alpha));
+        int a = (argb >>> 24) & 0xFF;
+        int na = Math.round(a * alpha);
+        return (na << 24) | (argb & 0x00FFFFFF);
     }
 }

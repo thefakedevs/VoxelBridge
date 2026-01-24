@@ -8,6 +8,7 @@ import com.voxelbridge.export.texture.ExportOptions;
 import com.voxelbridge.export.texture.TextureExportPlanner;
 import com.voxelbridge.export.texture.TextureExporter;
 import com.voxelbridge.export.texture.TexturePathPlanner;
+import com.voxelbridge.export.texture.AtlasBuilder;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
@@ -153,7 +154,13 @@ public final class TextureExportRegistry {
         }
         if (image == null) {
             VoxelBridgeLogger.error(LogModule.TEXTURE, String.format("[TextureExport][ERROR] Missing image for %s (target=%s)", spriteKey, target));
-            throw new RuntimeException("Failed to resolve entity texture for " + spriteKey);
+            BufferedImage placeholder = AtlasBuilder.createMissingTexture();
+            try {
+                TextureExporter.writePng(placeholder, target);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to resolve entity texture for " + spriteKey, e);
+            }
+            return rel;
         }
         try {
             TextureExporter.writePng(image, target);
