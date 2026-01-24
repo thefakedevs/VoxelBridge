@@ -243,7 +243,7 @@ public final class OverlayManager {
             ColorModeHandler.ColorData overlayColorData = ColorModeHandler.prepareColors(
                 ctx.getColorMode(), ctx.getColorMapAccess(), overlay.color, true);
             ctx.registerSpriteMaterial(overlay.spriteKey, overlayMaterialKey);
-            TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
+            TintMode tintMode = ctx.getColorMode() != null && ctx.getColorMode().usesColormap()
                 ? TintMode.COLORMAP
                 : TintMode.VERTEX_COLOR;
             sceneSink.addQuad(overlayMaterialKey, overlay.spriteKey, overlay.spriteKey,

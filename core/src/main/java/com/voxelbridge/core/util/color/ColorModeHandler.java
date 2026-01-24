@@ -30,21 +30,21 @@ public final class ColorModeHandler {
      * @return ColorData containing uv1 and colors
      */
     public static ColorData prepareColors(ColorMode mode, ColorMapAccess colorMaps, int argb, boolean hasTint) {
-        if (mode == ColorMode.VERTEX_COLOR) {
-            // VertexColor mode: colors in COLOR_0
-            return new ColorData(
-                null,  // no TEXCOORD_1
-                GeometryUtil.computeVertexColors(argb, hasTint)
-            );
-        } else {
-            // ColorMap mode: use TEXCOORD_1
-            // Force white slot for non-tinted to avoid extra LUT entries
-            float[] colorUv = getColormapUV(colorMaps, hasTint ? argb : 0xFFFFFFFF);
-            return new ColorData(
-                colorUv,
-                GeometryUtil.whiteColor()
-            );
+        if (mode == null) {
+            mode = ColorMode.VERTEX_COLOR;
         }
+
+        boolean useVertex = mode.usesVertexColor();
+        boolean useColormap = mode.usesColormap();
+
+        float[] colors = useVertex
+            ? GeometryUtil.computeVertexColors(argb, hasTint)
+            : GeometryUtil.whiteColor();
+        float[] uv1 = useColormap
+            ? getColormapUV(colorMaps, hasTint ? argb : 0xFFFFFFFF)
+            : null;
+
+        return new ColorData(uv1, colors);
     }
 
     /**
@@ -57,29 +57,31 @@ public final class ColorModeHandler {
      */
     public static ColorData prepareColorsWithUV(ColorMode mode, ColorMapAccess colorMaps,
                                                 int argb, float[] normalizedUVs) {
-        if (mode == ColorMode.VERTEX_COLOR) {
-            // VertexColor mode: colors in COLOR_0
-            return new ColorData(
-                null,  // no TEXCOORD_1
-                GeometryUtil.computeVertexColors(argb, true)  // fluids always have color
-            );
-        } else {
-            // ColorMap mode: remap UVs to colormap texture
+        if (mode == null) {
+            mode = ColorMode.VERTEX_COLOR;
+        }
+
+        boolean useVertex = mode.usesVertexColor();
+        boolean useColormap = mode.usesColormap();
+
+        float[] colors = useVertex
+            ? GeometryUtil.computeVertexColors(argb, true)  // fluids always have color
+            : GeometryUtil.whiteColor();
+
+        float[] uv1 = null;
+        if (useColormap) {
             ColorMapUv lut = colorMaps.registerColor(argb);
             float u0 = lut.u0(), v0 = lut.v0(), u1 = lut.u1(), v1 = lut.v1();
             float du = u1 - u0, dv = v1 - v0;
 
-            float[] uv1 = new float[8];
+            uv1 = new float[8];
             for (int i = 0; i < 4; i++) {
                 uv1[i * 2] = u0 + normalizedUVs[i * 2] * du;
                 uv1[i * 2 + 1] = v0 + normalizedUVs[i * 2 + 1] * dv;
             }
-
-            return new ColorData(
-                uv1,
-                GeometryUtil.whiteColor()
-            );
         }
+
+        return new ColorData(uv1, colors);
     }
 
     /**

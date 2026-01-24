@@ -112,7 +112,8 @@ public final class QuadProcessor {
 
         if (hasBaked) {
             // Prefer baked vertex colors (e.g., FRAPI-provided tint) over vanilla tint.
-            if (ctx.getColorMode() == ColorMode.COLORMAP) {
+            ColorMode mode = ctx.getColorMode();
+            if (mode != null && mode.usesColormap()) {
                 int bakedTint = ColorUtil.extractBakedTintArgb(vertexData.colors());
                 colorData = ColorModeHandler.prepareColors(
                     ctx.getColorMode(), ctx.getColorMapAccess(), bakedTint, true);
@@ -143,7 +144,7 @@ public final class QuadProcessor {
         }
 
         // Output quad (Intern keys)
-        TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
+        TintMode tintMode = ctx.getColorMode() != null && ctx.getColorMode().usesColormap()
             ? TintMode.COLORMAP
             : TintMode.VERTEX_COLOR;
         sceneSink.addQuad(ctx.intern(materialKey), ctx.intern(spriteKey), null,

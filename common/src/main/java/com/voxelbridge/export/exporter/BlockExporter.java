@@ -211,34 +211,9 @@ public final class BlockExporter {
 
         ctx.registerSpriteMaterial(blockKey, blockKey);
 
-        // PASS 1: Detect and cache overlays (order-based)
+        // PASS 1: Detect and cache overlays (position-based; avoids CTM compact splitting)
         boolean[] isOverlay = new boolean[quadCount];
-        boolean baseSeen = false;
-        String baseSpriteKey = null;
-        for (int i = 0; i < quadCount; i++) {
-            QuadData quad = quads.get(i);
-            String spriteKey = spriteKeys[i];
-            if (quad == null || spriteKey == null) continue;
-
-            boolean overlayCandidate = isOverlaySprite(spriteKey);
-            boolean hilightCandidate = isHilightOverlay(spriteKey);
-
-            if (!baseSeen) {
-                baseSeen = true;
-                baseSpriteKey = spriteKey;
-                continue;
-            }
-
-            if (overlayCandidate || hilightCandidate) {
-                String overlayBase = baseSpriteKey != null ? baseSpriteKey : blockKey;
-                if (hilightCandidate) {
-                    overlayManager.cacheHilight(overlayBase, state, pos, quad, randomOffset, spriteKey);
-                } else {
-                    overlayManager.cacheOverlay(overlayBase, state, pos, quad, randomOffset, spriteKey);
-                }
-                isOverlay[i] = true;
-            }
-        }
+        detectOverlaysByPosition(quads, spriteKeys, isOverlay, state, pos, blockKey, randomOffset);
 
         // PASS 2: Process base quads
         byte[] sameBlockOcclusionCache = null;
@@ -314,15 +289,116 @@ public final class BlockExporter {
         return spriteKey.toLowerCase(Locale.ROOT).contains("continuity");
     }
 
-    private boolean isOverlaySprite(String spriteKey) {
+    private boolean isOverlayCandidateSprite(String spriteKey) {
         if (spriteKey == null) return false;
         String lower = spriteKey.toLowerCase(Locale.ROOT);
-        return lower.contains("_overlay") || lower.contains("continuity");
+        return lower.contains("_overlay")
+            || lower.contains("_hilight")
+            || lower.contains("/ctm/")
+            || lower.contains("ctm/")
+            || lower.contains("continuity");
     }
 
     private boolean isHilightOverlay(String spriteKey) {
         if (spriteKey == null) return false;
         return spriteKey.toLowerCase(Locale.ROOT).contains("_hilight");
+    }
+
+    private void detectOverlaysByPosition(List<QuadData> quads,
+                                          String[] spriteKeys,
+                                          boolean[] isOverlay,
+                                          BlockState state,
+                                          BlockPos pos,
+                                          String blockKey,
+                                          Vec3 randomOffset) {
+        record QuadEntry(int index, QuadData quad, String spriteKey, long posHash,
+                         float uMin, float uMax, float vMin, float vMax,
+                         boolean overlayCandidate, boolean hilight) {}
+
+        Map<Long, List<QuadEntry>> groups = new HashMap<>();
+
+        for (int i = 0; i < quads.size(); i++) {
+            QuadData quad = quads.get(i);
+            String spriteKey = spriteKeys[i];
+            if (quad == null || spriteKey == null) continue;
+            var sprite = quad.sprite();
+            if (sprite == null) continue;
+
+            var vertexData = com.voxelbridge.export.util.geometry.VertexExtractor.extractFromQuad(
+                quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset
+            );
+            float[] uv = vertexData.uvs();
+            float uMin = Math.min(Math.min(uv[0], uv[2]), Math.min(uv[4], uv[6]));
+            float uMax = Math.max(Math.max(uv[0], uv[2]), Math.max(uv[4], uv[6]));
+            float vMin = Math.min(Math.min(uv[1], uv[3]), Math.min(uv[5], uv[7]));
+            float vMax = Math.max(Math.max(uv[1], uv[3]), Math.max(uv[5], uv[7]));
+
+            long posHash = computePositionHash(vertexData.positions());
+            boolean overlayCandidate = isOverlayCandidateSprite(spriteKey);
+            boolean hilight = isHilightOverlay(spriteKey);
+            groups.computeIfAbsent(posHash, k -> new ArrayList<>())
+                .add(new QuadEntry(i, quad, spriteKey, posHash, uMin, uMax, vMin, vMax, overlayCandidate, hilight));
+        }
+
+        final float UV_EPS = 1e-4f;
+        for (List<QuadEntry> group : groups.values()) {
+            if (group.size() < 2) continue;
+            boolean hasCandidate = group.stream().anyMatch(q -> q.overlayCandidate);
+            if (!hasCandidate) continue;
+            boolean hasCtmCandidate = group.stream().anyMatch(q -> isCtmCandidateSprite(q.spriteKey));
+
+            QuadEntry first = group.get(0);
+            float du = first.uMax - first.uMin;
+            float dv = first.vMax - first.vMin;
+            boolean sameShape = group.stream().allMatch(q ->
+                Math.abs((q.uMax - q.uMin) - du) < UV_EPS &&
+                Math.abs((q.vMax - q.vMin) - dv) < UV_EPS);
+            if (!sameShape) continue;
+
+            int minIndex = group.stream().mapToInt(QuadEntry::index).min().orElse(Integer.MAX_VALUE);
+            group.sort(Comparator.comparingInt(QuadEntry::index));
+
+            String baseMaterialKey = hasCtmCandidate
+                ? blockKey
+                : (spriteKeys[minIndex] != null ? spriteKeys[minIndex] : blockKey);
+
+            for (QuadEntry entry : group) {
+                if (entry.index == minIndex) continue;
+                if (entry.hilight) {
+                    overlayManager.cacheHilight(baseMaterialKey, state, pos, entry.quad, randomOffset, entry.spriteKey);
+                } else {
+                    overlayManager.cacheOverlay(baseMaterialKey, state, pos, entry.quad, randomOffset, entry.spriteKey);
+                }
+                isOverlay[entry.index] = true;
+            }
+        }
+    }
+
+    private boolean isCtmCandidateSprite(String spriteKey) {
+        if (spriteKey == null) return false;
+        String lower = spriteKey.toLowerCase(Locale.ROOT);
+        return lower.contains("/ctm/") || lower.contains("ctm/") || lower.contains("continuity");
+    }
+
+    private long computePositionHash(float[] positions) {
+        Integer[] order = {0, 1, 2, 3};
+        java.util.Arrays.sort(order, (a, b) -> {
+            int ia = a * 3;
+            int ib = b * 3;
+            int cmpX = Float.compare(positions[ia], positions[ib]);
+            if (cmpX != 0) return cmpX;
+            int cmpY = Float.compare(positions[ia + 1], positions[ib + 1]);
+            if (cmpY != 0) return cmpY;
+            return Float.compare(positions[ia + 2], positions[ib + 2]);
+        });
+        long hash = 1125899906842597L;
+        for (int idx : order) {
+            int pi = idx * 3;
+            hash = 31 * hash + Math.round(positions[pi] * 100f);
+            hash = 31 * hash + Math.round(positions[pi + 1] * 100f);
+            hash = 31 * hash + Math.round(positions[pi + 2] * 100f);
+        }
+        return hash;
     }
 
     // ===== Occlusion culling helpers =====

@@ -82,9 +82,10 @@ public final class ColorMapManager {
      * White color is pre-reserved in slot 0 by initializeReservedSlots().
      */
     public static void generateColorMaps(ExportState state, Path outDir) throws IOException {
-        // Skip colormap generation in VertexColor mode
-        if (com.voxelbridge.config.ExportRuntimeConfig.getColorMode() == ColorMode.VERTEX_COLOR) {
-            VoxelBridgeLogger.info(LogModule.TEXTURE, "[ColorMap] Skipping colormap generation (VertexColor mode)");
+        // Skip colormap generation when colormap is not used
+        ColorMode mode = com.voxelbridge.config.ExportRuntimeConfig.getColorMode();
+        if (mode == null || !mode.usesColormap()) {
+            VoxelBridgeLogger.info(LogModule.TEXTURE, "[ColorMap] Skipping colormap generation (colormap disabled)");
             return;
         }
 

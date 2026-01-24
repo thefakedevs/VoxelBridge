@@ -22,11 +22,16 @@ public final class UvRemapUtil {
     }
 
     public static boolean isColormapMode() {
-        return ExportRuntimeConfig.getColorMode() == ColorMode.COLORMAP;
+        ColorMode mode = ExportRuntimeConfig.getColorMode();
+        return mode != null && mode.usesColormap();
     }
 
     public static boolean isColormapMode(ExportOptions options) {
-        return options != null && options.colorMode() == ColorMode.COLORMAP;
+        if (options == null) {
+            return false;
+        }
+        ColorMode mode = options.colorMode();
+        return mode != null && mode.usesColormap();
     }
 
     public static boolean shouldRemap(ExportState state, String spriteKey) {

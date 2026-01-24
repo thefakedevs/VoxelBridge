@@ -166,7 +166,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         String bucketKey = animName != null ? animName : materialKey;
 
         // Colormap mode: all quads must have TEXCOORD_1; non-tinted points to reserved white slot
-        if (options.colorMode() == ColorMode.COLORMAP) {
+        if (options.colorMode() != null && options.colorMode().usesColormap()) {
             if (uv1 == null || uv1.length < 8) {
                 float[] lut = ColorMapManager.remapColorUV(state, 0xFFFFFFFF);
                 float u0 = lut[0], v0 = lut[1], u1v = lut[2], v1v = lut[3];
@@ -290,7 +290,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
                         
                         // Pre-calculate default UV1 for ColorMap mode if needed
                         float[] defaultUv1 = null;
-                        if (options.colorMode() == ColorMode.COLORMAP) {
+                        if (options.colorMode() != null && options.colorMode().usesColormap()) {
                             if (bulk.flatUv1s() == null || bulk.flatUv1s().length == 0) {
                                 float[] lut = ColorMapManager.remapColorUV(state, 0xFFFFFFFF);
                                 float u0 = lut[0], v0 = lut[1], u1v = lut[2], v1v = lut[3];

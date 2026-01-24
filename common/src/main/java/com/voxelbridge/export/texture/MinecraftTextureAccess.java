@@ -27,7 +27,11 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
         if (spriteKey == null) {
             return null;
         }
-        return TextureLoader.spriteKeyToTexturePNG(spriteKey).toString();
+        try {
+            return TextureLoader.spriteKeyToTexturePNG(spriteKey).toString();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @Override
@@ -35,8 +39,12 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
         if (resourceKey == null) {
             return null;
         }
-        ResourceLocation loc = ResourceLocation.parse(resourceKey);
-        return TextureLoader.readTexture(loc, preserveAnimationStrip);
+        try {
+            ResourceLocation loc = ResourceLocation.parse(resourceKey);
+            return TextureLoader.readTexture(loc, preserveAnimationStrip);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     @Override

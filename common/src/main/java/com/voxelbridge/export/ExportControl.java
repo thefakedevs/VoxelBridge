@@ -25,12 +25,12 @@ public final class ExportControl {
     }
 
     public static void setPos1(BlockPos pos) {
-        pos1 = pos;
+        pos1 = pos != null ? pos.immutable() : null;
         ExportProgressTracker.previewSelection(pos1, pos2);
     }
 
     public static void setPos2(BlockPos pos) {
-        pos2 = pos;
+        pos2 = pos != null ? pos.immutable() : null;
         ExportProgressTracker.previewSelection(pos1, pos2);
     }
 

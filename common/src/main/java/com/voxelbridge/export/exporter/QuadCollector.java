@@ -152,7 +152,7 @@ final class QuadCollector implements VertexConsumer {
             ctx.getColorMode(), ctx.getColorMapAccess(), quadArgb, normalizedUVs);
 
         // Send to sink (fluids typically do not have overlays)
-        TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
+        TintMode tintMode = ctx.getColorMode() != null && ctx.getColorMode().usesColormap()
             ? TintMode.COLORMAP
             : TintMode.VERTEX_COLOR;
         String materialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);

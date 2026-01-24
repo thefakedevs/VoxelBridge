@@ -171,18 +171,21 @@ public final class RenderCaptureUtil {
     }
 
     public static ColorModeResult applyColorMode(ExportContext ctx, float[] colors, float[] emptyUv) {
-        TintMode tintMode = ctx.getColorMode() == ColorMode.COLORMAP
+        ColorMode mode = ctx.getColorMode();
+        TintMode tintMode = mode != null && mode.usesColormap()
             ? TintMode.COLORMAP
             : TintMode.VERTEX_COLOR;
-        if (ctx.getColorMode() == ColorMode.VERTEX_COLOR) {
+        if (mode == null || !mode.usesColormap()) {
             return new ColorModeResult(emptyUv, tintMode);
         }
         int argb = toArgb(colors);
         boolean hasTint = !isWhite(colors);
         ColorModeHandler.ColorData colorData = ColorModeHandler.prepareColors(
-            ctx.getColorMode(), ctx.getColorMapAccess(), argb, hasTint);
+            mode, ctx.getColorMapAccess(), argb, hasTint);
         float[] uv1 = colorData.uv1() != null ? colorData.uv1() : emptyUv;
-        System.arraycopy(GeometryUtil.whiteColor(), 0, colors, 0, colors.length);
+        if (colorData.colors() != null && colors != null) {
+            System.arraycopy(colorData.colors(), 0, colors, 0, colors.length);
+        }
         return new ColorModeResult(uv1, tintMode);
     }
 

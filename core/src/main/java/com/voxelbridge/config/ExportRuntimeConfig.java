@@ -61,7 +61,7 @@ public final class ExportRuntimeConfig {
     private static AtlasMode atlasMode = AtlasMode.ATLAS;
     private static AtlasSize atlasSize = AtlasSize.SIZE_8192;
     private static int atlasPadding = 0;
-    private static ColorMode colorMode = ColorMode.VERTEX_COLOR;
+    private static ColorMode colorMode = ColorMode.BOTH;
     private static CoordinateMode coordinateMode = CoordinateMode.CENTERED;
     private static int exportThreadCount = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
     // Enable vanilla random transforms (e.g., grass offset, random model rotations).
