@@ -29,7 +29,7 @@ repositories {
 }
 
 base {
-    archivesName = "${mod_id}-fabric"
+    archivesName = "VoxelBridge-fabric-${activeFabricMc}"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)

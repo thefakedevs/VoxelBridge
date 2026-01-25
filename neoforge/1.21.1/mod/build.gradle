@@ -154,7 +154,7 @@ dependencies {
     compileOnly "org.apache.logging.log4j:log4j-api:2.20.0"
     compileOnly "org.apache.logging.log4j:log4j-core:2.20.0"
 
-    implementation "me.shedaniel.cloth:cloth-config-neoforge:${cloth_config_neoforge_version}"
+    implementation "me.shedaniel.cloth:cloth-config-neoforge:${cloth_config_neoforge_version_1_21_1}"
 
     implementation "de.javagl:jgltf-model:${jgltfVersion}"
     implementation "de.javagl:jgltf-impl-v1:${jgltfVersion}"
