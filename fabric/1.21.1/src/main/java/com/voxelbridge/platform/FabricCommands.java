@@ -127,7 +127,7 @@ public final class FabricCommands {
             if (mc == null) {
                 return 0;
             }
-            mc.execute(() -> mc.setScreen(FabricConfigScreen.create(mc.screen)));
+            FabricConfigScreen.requestOpen(mc.screen);
             return 1;
         }));
 

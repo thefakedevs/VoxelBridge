@@ -31,7 +31,7 @@ public class VoxelBridge {
             new com.voxelbridge.adapter.NeoForgePlatformTextureHelper(),
             new com.voxelbridge.adapter.NeoForgePlatformModelHelper()
         );
-        PlatformBootstrap platform = new NeoForgePlatformBootstrap(dist, modBus);
+        PlatformBootstrap platform = new NeoForgePlatformBootstrap(dist, modBus, container);
         platform.init();
     }
 }

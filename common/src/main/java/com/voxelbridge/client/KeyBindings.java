@@ -36,10 +36,18 @@ public class KeyBindings {
             "key.categories.voxelbridge"
     );
 
+    public static final KeyMapping KEY_CONFIG = new KeyMapping(
+            "key.voxelbridge.config",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_KP_8, // Numpad 8
+            "key.categories.voxelbridge"
+    );
+
     public static void register(KeyMappingRegistrar registrar) {
         registrar.register(KEY_SET_POS1);
         registrar.register(KEY_SET_POS2);
         registrar.register(KEY_EXPORT);
         registrar.register(KEY_CLEAR);
+        registrar.register(KEY_CONFIG);
     }
 }

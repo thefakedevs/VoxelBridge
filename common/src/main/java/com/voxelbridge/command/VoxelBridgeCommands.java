@@ -342,6 +342,12 @@ public final class VoxelBridgeCommands {
             return result.started() ? 1 : 0;
         }));
 
+        root.then(Commands.literal("config").executes(ctx -> {
+            var mc = ClientAccessHolder.get().getMinecraft();
+            com.voxelbridge.platform.ConfigScreenBridge.openConfigScreen(mc);
+            return 1;
+        }));
+
         // Register the literal once and reuse the returned node for the "vb" shortcut.
         CommandNode<CommandSourceStack> rootNode = dispatcher.register(root);
         dispatcher.register(Commands.literal("vb").redirect(rootNode));

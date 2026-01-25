@@ -6,6 +6,7 @@ import com.voxelbridge.client.KeyBindings;
 import com.voxelbridge.client.KeyInputHandler;
 import com.voxelbridge.config.ExportConfigStore;
 import com.voxelbridge.platform.FabricCommands;
+import com.voxelbridge.platform.ConfigScreenBridge;
 import com.voxelbridge.export.ExportControl;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -28,7 +29,10 @@ public final class FabricPlatformBootstrap implements PlatformBootstrap {
                 .register((dispatcher, registryAccess) -> FabricCommands.register(dispatcher));
 
         // Register client tick handler
-        ClientTickEvents.END_CLIENT_TICK.register(client -> KeyInputHandler.onClientTick());
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            KeyInputHandler.onClientTick();
+            FabricConfigScreen.onClientTick(client);
+        });
 
         // Register selection render (already done in adapter init via register())
         Adapters.getSelectionRender().register(null);
@@ -38,6 +42,8 @@ public final class FabricPlatformBootstrap implements PlatformBootstrap {
 
         // Load persistent config once client is ready
         ExportConfigStore.init();
+
+        ConfigScreenBridge.setOpener(mc -> FabricConfigScreen.requestOpen(mc.screen));
 
         // Only clear selection on world disconnect
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ExportControl.clearSelection());

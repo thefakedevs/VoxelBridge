@@ -4,10 +4,10 @@ import com.voxelbridge.config.ExportConfigStore;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.export.CoordinateMode;
+import me.shedaniel.clothconfig2.api.AbstractConfigListEntry;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
-import me.shedaniel.clothconfig2.api.AbstractConfigListEntry;
 import me.shedaniel.clothconfig2.gui.ClothConfigScreen;
 import me.shedaniel.clothconfig2.gui.entries.EnumListEntry;
 import net.minecraft.client.Minecraft;
@@ -17,46 +17,16 @@ import net.minecraft.network.chat.Component;
 import java.util.Arrays;
 
 /**
- * Fabric-only Cloth Config screen factory.
+ * NeoForge Cloth Config screen factory.
  */
-public final class FabricConfigScreen {
+public final class NeoForgeConfigScreen {
 
-    private static volatile boolean pendingOpen = false;
-    private static volatile Screen pendingParent = null;
     private static volatile ClothConfigScreen activeScreen;
     private static volatile EnumListEntry<ExportRuntimeConfig.AtlasMode> atlasModeEntry;
     private static volatile AbstractConfigListEntry<?> atlasSizeEntry;
     private static volatile AbstractConfigListEntry<?> atlasPaddingEntry;
 
-    private FabricConfigScreen() {
-    }
-
-    public static void requestOpen(Screen parent) {
-        pendingParent = parent;
-        pendingOpen = true;
-    }
-
-    public static void onClientTick(Minecraft mc) {
-        if (pendingOpen) {
-            Screen parent = pendingParent != null ? pendingParent : mc.screen;
-            pendingParent = null;
-            pendingOpen = false;
-            mc.setScreen(create(parent));
-            return;
-        }
-
-        ClothConfigScreen screen = activeScreen;
-        if (screen == null) {
-            return;
-        }
-        if (mc.screen != screen) {
-            activeScreen = null;
-            atlasModeEntry = null;
-            atlasSizeEntry = null;
-            atlasPaddingEntry = null;
-            return;
-        }
-        updateAtlasEntryStates();
+    private NeoForgeConfigScreen() {
     }
 
     public static Screen create(Screen parent) {
@@ -211,27 +181,19 @@ public final class FabricConfigScreen {
                 .build());
     }
 
-    private enum PaddingOption {
-        PAD_0(0, "0 px"),
-        PAD_4(4, "4 px"),
-        PAD_8(8, "8 px"),
-        PAD_12(12, "12 px"),
-        PAD_16(16, "16 px");
-
-        private final int value;
-        private final String label;
-
-        PaddingOption(int value, String label) {
-            this.value = value;
-            this.label = label;
+    public static void onClientTick() {
+        ClothConfigScreen screen = activeScreen;
+        if (screen == null) {
+            return;
         }
-
-        private static PaddingOption fromValue(int value) {
-            return Arrays.stream(values())
-                    .filter(option -> option.value == value)
-                    .findFirst()
-                    .orElse(PAD_0);
+        if (Minecraft.getInstance().screen != screen) {
+            activeScreen = null;
+            atlasModeEntry = null;
+            atlasSizeEntry = null;
+            atlasPaddingEntry = null;
+            return;
         }
+        updateAtlasEntryStates();
     }
 
     private static void registerDynamicEnablement(ClothConfigScreen screen,
@@ -255,5 +217,28 @@ public final class FabricConfigScreen {
         boolean enabled = modeEntry.getValue() == ExportRuntimeConfig.AtlasMode.ATLAS;
         sizeEntry.setEditable(enabled);
         paddingEntry.setEditable(enabled);
+    }
+
+    private enum PaddingOption {
+        PAD_0(0, "0 px"),
+        PAD_4(4, "4 px"),
+        PAD_8(8, "8 px"),
+        PAD_12(12, "12 px"),
+        PAD_16(16, "16 px");
+
+        private final int value;
+        private final String label;
+
+        PaddingOption(int value, String label) {
+            this.value = value;
+            this.label = label;
+        }
+
+        private static PaddingOption fromValue(int value) {
+            return Arrays.stream(values())
+                    .filter(option -> option.value == value)
+                    .findFirst()
+                    .orElse(PAD_0);
+        }
     }
 }

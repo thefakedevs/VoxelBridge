@@ -46,5 +46,9 @@ public class KeyInputHandler {
             ExportControl.ExportResult result = ExportControl.startExport(mc.level);
             mc.player.displayClientMessage(Component.literal("[VoxelBridge] " + result.message()), false);
         }
+
+        if (KeyBindings.KEY_CONFIG.consumeClick()) {
+            com.voxelbridge.platform.ConfigScreenBridge.openConfigScreen(mc);
+        }
     }
 }
