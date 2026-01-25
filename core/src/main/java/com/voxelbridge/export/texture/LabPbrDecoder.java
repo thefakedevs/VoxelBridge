@@ -24,87 +24,77 @@ public final class LabPbrDecoder {
     private LabPbrDecoder() {}
 
     public static void exportDecoded(Path outDir, ExportOptions options, int threadCount, java.util.function.Consumer<Float> progressCallback) throws IOException {
-        if (options == null || options.atlasMode() != ExportOptions.AtlasMode.ATLAS) {
+        if (options == null) {
             return;
         }
 
+        java.util.List<DecodeJob> jobs = new ArrayList<>();
+
+        // Atlas decode (atlas mode only)
         Path atlasDir = outDir.resolve("textures").resolve("atlas");
-        if (!Files.isDirectory(atlasDir)) {
-            return;
-        }
+        if (options.atlasMode() == ExportOptions.AtlasMode.ATLAS && Files.isDirectory(atlasDir)) {
+            Map<String, Path> albedoPages = new HashMap<>();
+            Map<String, Path> normalPages = new HashMap<>();
+            Map<String, Path> specPages = new HashMap<>();
 
-        Map<String, Path> albedoPages = new HashMap<>();
-        Map<String, Path> normalPages = new HashMap<>();
-        Map<String, Path> specPages = new HashMap<>();
-
-        try (var stream = Files.newDirectoryStream(atlasDir, "*.png")) {
-            for (Path p : stream) {
-                String name = p.getFileName().toString();
-                if (name.startsWith("atlas_n_") && name.endsWith(".png")) {
-                    String udim = name.substring("atlas_n_".length(), name.length() - 4);
-                    normalPages.put(udim, p);
-                } else if (name.startsWith("atlas_s_") && name.endsWith(".png")) {
-                    String udim = name.substring("atlas_s_".length(), name.length() - 4);
-                    specPages.put(udim, p);
-                } else if (name.startsWith("atlas_") && name.endsWith(".png")) {
-                    String udim = name.substring("atlas_".length(), name.length() - 4);
-                    albedoPages.put(udim, p);
+            try (var stream = Files.newDirectoryStream(atlasDir, "*.png")) {
+                for (Path p : stream) {
+                    String name = p.getFileName().toString();
+                    if (name.startsWith("atlas_n_") && name.endsWith(".png")) {
+                        String udim = name.substring("atlas_n_".length(), name.length() - 4);
+                        normalPages.put(udim, p);
+                    } else if (name.startsWith("atlas_s_") && name.endsWith(".png")) {
+                        String udim = name.substring("atlas_s_".length(), name.length() - 4);
+                        specPages.put(udim, p);
+                    } else if (name.startsWith("atlas_") && name.endsWith(".png")) {
+                        String udim = name.substring("atlas_".length(), name.length() - 4);
+                        albedoPages.put(udim, p);
+                    }
                 }
             }
+
+            Set<String> udimSet = new HashSet<>();
+            udimSet.addAll(normalPages.keySet());
+            udimSet.addAll(specPages.keySet());
+
+            for (String udim : udimSet) {
+                jobs.add(DecodeJob.atlas(atlasDir, udim,
+                    albedoPages.get(udim), normalPages.get(udim), specPages.get(udim)));
+            }
         }
 
-        Set<String> udimSet = new HashSet<>();
-        udimSet.addAll(normalPages.keySet());
-        udimSet.addAll(specPages.keySet());
-        if (udimSet.isEmpty()) {
-            return;
-        }
+        // Individual + animation decode (scan output dirs for *_n/_s)
+        java.util.Map<Path, DecodeJob> standardJobs = new HashMap<>();
+        collectStandardJobs(standardJobs, outDir.resolve("textures"), true);
+        collectStandardJobs(standardJobs, outDir.resolve("entity_textures"), false);
+        jobs.addAll(standardJobs.values());
 
         int totalTasks = 0;
-        for (String udim : udimSet) {
-            if (normalPages.containsKey(udim)) {
+        for (DecodeJob job : jobs) {
+            if (job.normalPath != null) {
                 totalTasks += 3; // normal, ao, height
             }
-            if (specPages.containsKey(udim)) {
+            if (job.specPath != null) {
                 totalTasks += 4; // roughness, metallic, sss, emissive
             }
         }
         if (totalTasks == 0) {
             return;
         }
+
         final int totalTasksFinal = totalTasks;
         java.util.concurrent.atomic.AtomicInteger completed = new java.util.concurrent.atomic.AtomicInteger(0);
 
         ExecutorService executor = Executors.newFixedThreadPool(Math.max(2, threadCount));
         try {
-            java.util.List<Future<?>> futures = new ArrayList<>(udimSet.size());
-            for (String udim : udimSet) {
+            java.util.List<Future<?>> futures = new ArrayList<>(jobs.size());
+            for (DecodeJob job : jobs) {
                 futures.add(executor.submit(() -> {
                     try {
-                        BufferedImage normal = readImage(normalPages.get(udim));
-                        if (normal != null) {
-                            com.voxelbridge.core.texture.PngjWriter.write(decodeNormal(normal), atlasDir.resolve("atlas_normal_" + udim + ".png"));
-                            reportProgress(progressCallback, completed, totalTasksFinal);
-                            com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.BLUE), atlasDir.resolve("atlas_ao_" + udim + ".png"));
-                            reportProgress(progressCallback, completed, totalTasksFinal);
-                            com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.ALPHA), atlasDir.resolve("atlas_height_" + udim + ".png"));
-                            reportProgress(progressCallback, completed, totalTasksFinal);
-                        }
-
-                        BufferedImage spec = readImage(specPages.get(udim));
-                        if (spec != null) {
-                            BufferedImage albedo = readImage(albedoPages.get(udim));
-                            if (albedo != null && (albedo.getWidth() != spec.getWidth() || albedo.getHeight() != spec.getHeight())) {
-                                albedo = resizeTo(albedo, spec.getWidth(), spec.getHeight());
-                            }
-                            com.voxelbridge.core.texture.PngjWriter.write(decodeRoughness(spec), atlasDir.resolve("atlas_roughness_" + udim + ".png"));
-                            reportProgress(progressCallback, completed, totalTasksFinal);
-                            com.voxelbridge.core.texture.PngjWriter.write(decodeMetallic(spec), atlasDir.resolve("atlas_metallic_" + udim + ".png"));
-                            reportProgress(progressCallback, completed, totalTasksFinal);
-                            com.voxelbridge.core.texture.PngjWriter.write(decodeSss(spec), atlasDir.resolve("atlas_sss_" + udim + ".png"));
-                            reportProgress(progressCallback, completed, totalTasksFinal);
-                            com.voxelbridge.core.texture.PngjWriter.write(decodeEmissive(albedo, spec), atlasDir.resolve("atlas_emissive_" + udim + ".png"));
-                            reportProgress(progressCallback, completed, totalTasksFinal);
+                        if (job.atlas) {
+                            decodeAtlasJob(job, progressCallback, completed, totalTasksFinal);
+                        } else {
+                            decodeStandardJob(job, progressCallback, completed, totalTasksFinal);
                         }
                     } catch (IOException e) {
                         throw new RuntimeException(e);
@@ -122,6 +112,140 @@ public final class LabPbrDecoder {
             throw new IOException("LabPBR decode failed", cause);
         } finally {
             executor.shutdown();
+        }
+    }
+
+    private static void collectStandardJobs(java.util.Map<Path, DecodeJob> jobs, Path rootDir, boolean skipAtlasDir) throws IOException {
+        if (rootDir == null || !Files.isDirectory(rootDir)) {
+            return;
+        }
+        try (var stream = java.nio.file.Files.walk(rootDir)) {
+            stream.filter(p -> p != null && p.getFileName() != null)
+                .filter(p -> p.toString().endsWith(".png"))
+                .forEach(p -> {
+                    if (skipAtlasDir && (p.toString().contains("\\textures\\atlas\\") || p.toString().contains("/textures/atlas/"))) {
+                        return;
+                    }
+                    String name = p.getFileName().toString();
+                    boolean isNormal = name.endsWith("_n.png");
+                    boolean isSpec = name.endsWith("_s.png");
+                    if (!isNormal && !isSpec) {
+                        return;
+                    }
+                    String baseName = name.substring(0, name.length() - 6);
+                    Path basePath = p.getParent().resolve(baseName);
+                    DecodeJob job = jobs.computeIfAbsent(basePath, DecodeJob::standard);
+                    if (isNormal) {
+                        job.normalPath = p;
+                    } else if (isSpec) {
+                        job.specPath = p;
+                    }
+                });
+        }
+        for (DecodeJob job : jobs.values()) {
+            if (!job.atlas && job.albedoPath == null) {
+                Path albedo = job.basePath.resolveSibling(job.basePath.getFileName().toString() + ".png");
+                if (Files.exists(albedo)) {
+                    job.albedoPath = albedo;
+                }
+            }
+        }
+    }
+
+    private static void decodeAtlasJob(DecodeJob job,
+                                       java.util.function.Consumer<Float> progressCallback,
+                                       java.util.concurrent.atomic.AtomicInteger completed,
+                                       int totalTasks) throws IOException {
+        BufferedImage normal = readImage(job.normalPath);
+        if (normal != null) {
+            com.voxelbridge.core.texture.PngjWriter.write(decodeNormal(normal), job.atlasDir.resolve("atlas_normal_" + job.udim + ".png"));
+            reportProgress(progressCallback, completed, totalTasks);
+            com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.BLUE), job.atlasDir.resolve("atlas_ao_" + job.udim + ".png"));
+            reportProgress(progressCallback, completed, totalTasks);
+            com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.ALPHA), job.atlasDir.resolve("atlas_height_" + job.udim + ".png"));
+            reportProgress(progressCallback, completed, totalTasks);
+        }
+
+        BufferedImage spec = readImage(job.specPath);
+        if (spec != null) {
+            BufferedImage albedo = readImage(job.albedoPath);
+            if (albedo != null && (albedo.getWidth() != spec.getWidth() || albedo.getHeight() != spec.getHeight())) {
+                albedo = resizeTo(albedo, spec.getWidth(), spec.getHeight());
+            }
+            com.voxelbridge.core.texture.PngjWriter.write(decodeRoughness(spec), job.atlasDir.resolve("atlas_roughness_" + job.udim + ".png"));
+            reportProgress(progressCallback, completed, totalTasks);
+            com.voxelbridge.core.texture.PngjWriter.write(decodeMetallic(spec), job.atlasDir.resolve("atlas_metallic_" + job.udim + ".png"));
+            reportProgress(progressCallback, completed, totalTasks);
+            com.voxelbridge.core.texture.PngjWriter.write(decodeSss(spec), job.atlasDir.resolve("atlas_sss_" + job.udim + ".png"));
+            reportProgress(progressCallback, completed, totalTasks);
+            com.voxelbridge.core.texture.PngjWriter.write(decodeEmissive(albedo, spec), job.atlasDir.resolve("atlas_emissive_" + job.udim + ".png"));
+            reportProgress(progressCallback, completed, totalTasks);
+        }
+    }
+
+    private static void decodeStandardJob(DecodeJob job,
+                                          java.util.function.Consumer<Float> progressCallback,
+                                          java.util.concurrent.atomic.AtomicInteger completed,
+                                          int totalTasks) throws IOException {
+        Path dir = job.basePath.getParent();
+        String stem = job.basePath.getFileName().toString();
+        if (job.normalPath != null) {
+            BufferedImage normal = readImage(job.normalPath);
+            if (normal != null) {
+                com.voxelbridge.core.texture.PngjWriter.write(decodeNormal(normal), dir.resolve(stem + "_normal.png"));
+                reportProgress(progressCallback, completed, totalTasks);
+                com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.BLUE), dir.resolve(stem + "_ao.png"));
+                reportProgress(progressCallback, completed, totalTasks);
+                com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.ALPHA), dir.resolve(stem + "_height.png"));
+                reportProgress(progressCallback, completed, totalTasks);
+            }
+        }
+
+        if (job.specPath != null) {
+            BufferedImage spec = readImage(job.specPath);
+            if (spec != null) {
+                BufferedImage albedo = readImage(job.albedoPath);
+                if (albedo != null && (albedo.getWidth() != spec.getWidth() || albedo.getHeight() != spec.getHeight())) {
+                    albedo = resizeTo(albedo, spec.getWidth(), spec.getHeight());
+                }
+                com.voxelbridge.core.texture.PngjWriter.write(decodeRoughness(spec), dir.resolve(stem + "_roughness.png"));
+                reportProgress(progressCallback, completed, totalTasks);
+                com.voxelbridge.core.texture.PngjWriter.write(decodeMetallic(spec), dir.resolve(stem + "_metallic.png"));
+                reportProgress(progressCallback, completed, totalTasks);
+                com.voxelbridge.core.texture.PngjWriter.write(decodeSss(spec), dir.resolve(stem + "_sss.png"));
+                reportProgress(progressCallback, completed, totalTasks);
+                com.voxelbridge.core.texture.PngjWriter.write(decodeEmissive(albedo, spec), dir.resolve(stem + "_emissive.png"));
+                reportProgress(progressCallback, completed, totalTasks);
+            }
+        }
+    }
+
+    private static final class DecodeJob {
+        final boolean atlas;
+        final Path atlasDir;
+        final String udim;
+        final Path basePath;
+        Path albedoPath;
+        Path normalPath;
+        Path specPath;
+
+        private DecodeJob(boolean atlas, Path atlasDir, String udim, Path basePath) {
+            this.atlas = atlas;
+            this.atlasDir = atlasDir;
+            this.udim = udim;
+            this.basePath = basePath;
+        }
+
+        static DecodeJob atlas(Path atlasDir, String udim, Path albedo, Path normal, Path spec) {
+            DecodeJob job = new DecodeJob(true, atlasDir, udim, null);
+            job.albedoPath = albedo;
+            job.normalPath = normal;
+            job.specPath = spec;
+            return job;
+        }
+
+        static DecodeJob standard(Path basePath) {
+            return new DecodeJob(false, null, null, basePath);
         }
     }
 

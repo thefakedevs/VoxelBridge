@@ -251,7 +251,7 @@ public final class ProgressNotifier {
     private static int stageBarColor(ExportProgressTracker.Stage stage) {
         return switch (stage) {
             case SAMPLING -> 0xFF17E6E6;   // Cyan (#17E6E6)
-            case ATLAS -> 0xFFE61717;      // Red (#E61717)
+            case ATLAS -> 0xFFE617A1;      // Pink (#E617A1)
             case PBR_DECODE -> 0xFFE617E6; // Magenta (#E617E6)
             case FINALIZE -> 0xFFE6E617;   // Yellow (#E6E617)
             case COMPLETE -> 0xFF17E617;   // Green (#17E617)
