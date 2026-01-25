@@ -108,17 +108,29 @@ public final class ProgressNotifier {
                 && current.stage() != ExportProgressTracker.Stage.COMPLETE) {
                 lastProgress = current;
                 lastProgressNanos = System.nanoTime();
+                smoothedPercent = 0f; // Start new process from 0
             } else {
                 return;
             }
         } else {
-            boolean stageChanged = current.stage() != lastProgress.stage()
-                || !Objects.equals(current.stageDetail(), lastProgress.stageDetail())
-                || !Objects.equals(current.phasePercent(), lastProgress.phasePercent());
+            boolean stageChanged = current.stage() != lastProgress.stage();
+            boolean detailChanged = !Objects.equals(current.stageDetail(), lastProgress.stageDetail());
+            boolean percentChanged = !Objects.equals(current.phasePercent(), lastProgress.phasePercent());
+            
             if (stageChanged) {
-                lastProgress = current;
+                // When stage changes (e.g. Sampling -> Atlas), strictly reset visual progress to 0
+                // This ensures the user sees a "0 to 100" run for every stage, preventing "backward" movement
+                smoothedPercent = 0f;
                 lastProgressNanos = System.nanoTime();
                 lastRenderNanos = System.nanoTime();
+            } else if (detailChanged || percentChanged) {
+                 lastProgressNanos = System.nanoTime();
+                 lastRenderNanos = System.nanoTime();
+            }
+            
+            // Always update lastProgress
+            if (current.total() > 0 || current.stage() == ExportProgressTracker.Stage.COMPLETE) {
+                lastProgress = current;
             }
         }
         float fadeAlpha = 1.0f;
@@ -150,9 +162,16 @@ public final class ProgressNotifier {
         }
         float dt = (now - lastRenderNanos) / 1_000_000_000f;
         lastRenderNanos = now;
-        float speed = targetPct >= smoothedPercent ? 10f : 4f;
+        
+        // Lower speed means the bar lags behind the real progress more, creating a smoother "fill up" animation 
+        // even if the real task finishes instantly.
+        // Was 10f, now 2.0f for "fast" fill to ensure visibility.
+        float speed = targetPct >= smoothedPercent ? 2.0f : 10.0f; // Fast drop (reset), slow rise
+        
         float alpha = 1f - (float) Math.exp(-speed * Math.min(dt, 0.25f));
         smoothedPercent = smoothedPercent + (targetPct - smoothedPercent) * alpha;
+
+        // Visual clamp to ensure it doesn't look empty or overfilled
         float dispPct = Math.max(0f, Math.min(1f, smoothedPercent));
         int filled = Math.round(barWidth * dispPct);
 
@@ -211,6 +230,7 @@ public final class ProgressNotifier {
         return switch (stage) {
             case SAMPLING -> "Sampling";
             case ATLAS -> "Atlas";
+            case PBR_DECODE -> "PBR Decode";
             case FINALIZE -> "Finalize";
             case COMPLETE -> "Complete";
             default -> "Preparing";
@@ -221,6 +241,7 @@ public final class ProgressNotifier {
         return switch (stage) {
             case SAMPLING -> ChatFormatting.BLUE;
             case ATLAS -> ChatFormatting.LIGHT_PURPLE;
+            case PBR_DECODE -> ChatFormatting.LIGHT_PURPLE;
             case FINALIZE -> ChatFormatting.GOLD;
             case COMPLETE -> ChatFormatting.GREEN;
             default -> ChatFormatting.WHITE;
@@ -229,10 +250,11 @@ public final class ProgressNotifier {
 
     private static int stageBarColor(ExportProgressTracker.Stage stage) {
         return switch (stage) {
-            case SAMPLING -> 0xFF3B82F6;   // Deep Blue (Sampling)
-            case ATLAS -> 0xFFFF00FF;      // Magenta (Atlas)
-            case FINALIZE -> 0xFFFFFF55;   // Yellow (MC §e)
-            case COMPLETE -> 0xFF00D800;   // Green (00D800)
+            case SAMPLING -> 0xFF17E6E6;   // Cyan (#17E6E6)
+            case ATLAS -> 0xFFE61717;      // Red (#E61717)
+            case PBR_DECODE -> 0xFFE617E6; // Magenta (#E617E6)
+            case FINALIZE -> 0xFFE6E617;   // Yellow (#E6E617)
+            case COMPLETE -> 0xFF17E617;   // Green (#17E617)
             default -> 0xFFCCCCCC;
         };
     }

@@ -96,6 +96,9 @@ public final class GltfExportService {
 
         long tTotal = VoxelBridgeLogger.now();
 
+        // Reset progress notifier to clear stale state (fix "reversing" progress bar)
+        ProgressNotifier.reset();
+
         // Single-pass sampling: collect geometry and texture usage together
         ctx.setDiscoveryMode(false);
         ExportProgressTracker.setStage(ExportProgressTracker.Stage.SAMPLING, "Sampling blocks");

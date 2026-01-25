@@ -98,14 +98,45 @@ public final class ExportContext {
             }
             if (repo.hasAnimation(spriteKey)) {
                 String base = TexturePathResolver.animationBaseName(spriteKey);
-                if (fallbackMaterialKey != null && fallbackMaterialKey.endsWith("_emissive") && !base.endsWith("_emissive")) {
-                    base = base + "_emissive";
+                if (fallbackMaterialKey != null && fallbackMaterialKey.endsWith("_emissive")) {
+                    String animSuffix = "_animated";
+                    if (base.endsWith(animSuffix)) {
+                        String prefix = base.substring(0, base.length() - animSuffix.length());
+                        if (!prefix.endsWith("_emissive")) {
+                            prefix = prefix + "_emissive";
+                        }
+                        base = prefix + animSuffix;
+                    } else if (!base.endsWith("_emissive")) {
+                        base = base + "_emissive";
+                    }
                 }
                 return base;
             }
         }
         if (ExportRuntimeConfig.getAtlasMode() == ExportRuntimeConfig.AtlasMode.INDIVIDUAL && spriteKey != null) {
-            return spriteKey;
+            if (fallbackMaterialKey == null || fallbackMaterialKey.isEmpty()) {
+                return spriteKey;
+            }
+            String merged = spriteKey;
+            String base = fallbackMaterialKey;
+            boolean stripped;
+            do {
+                stripped = false;
+                if (base.endsWith("_overlay")) {
+                    merged = merged + "_overlay";
+                    base = base.substring(0, base.length() - "_overlay".length());
+                    stripped = true;
+                } else if (base.endsWith("_hilight")) {
+                    merged = merged + "_hilight";
+                    base = base.substring(0, base.length() - "_hilight".length());
+                    stripped = true;
+                } else if (base.endsWith("_emissive")) {
+                    merged = merged + "_emissive";
+                    base = base.substring(0, base.length() - "_emissive".length());
+                    stripped = true;
+                }
+            } while (stripped);
+            return merged;
         }
         return fallbackMaterialKey;
     }

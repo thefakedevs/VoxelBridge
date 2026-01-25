@@ -162,8 +162,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
                         float[] colors) {
         if (materialKey == null || spriteKey == null) return;
         int quadFlags = IrFlags.encode(renderLayer, tintMode, doubleSided, emissive);
-        String animName = resolveAnimationName(spriteKey);
-        String bucketKey = animName != null ? animName : materialKey;
+        String bucketKey = resolveBucketKey(materialKey, spriteKey);
 
         // Colormap mode: all quads must have TEXCOORD_1; non-tinted points to reserved white slot
         if (options.colorMode() != null && options.colorMode().usesColormap()) {
@@ -306,8 +305,7 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
                         int[] flags = bulk.quadFlags();
                         for (int i = 0; i < count; i++) {
                             String spriteKey = bulk.spriteKeys().get(i);
-                            String animName = resolveAnimationName(spriteKey);
-                            String bucketKey = animName != null ? animName : bulk.materialGroupKey();
+                            String bucketKey = resolveBucketKey(bulk.materialGroupKey(), spriteKey);
                             
                             // Determine UV1 source and offset
                             float[] currentUv1 = bulk.flatUv1s();
@@ -1048,6 +1046,52 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         var repo = state.getTextureRepository();
         if (!repo.hasAnimation(spriteKey)) return null;
         return com.voxelbridge.export.texture.TexturePathResolver.animationBaseName(spriteKey);
+    }
+
+    private String resolveBucketKey(String materialKey, String spriteKey) {
+        String animName = resolveAnimationName(spriteKey);
+        if (animName == null) {
+            return materialKey;
+        }
+        if (materialKey == null) {
+            return animName;
+        }
+        if (materialKey.endsWith("_animated")) {
+            return materialKey;
+        }
+
+        java.util.ArrayList<String> suffixes = new java.util.ArrayList<>(3);
+        String base = materialKey;
+        boolean stripped;
+        do {
+            stripped = false;
+            if (base.endsWith("_overlay")) {
+                suffixes.add("overlay");
+                base = base.substring(0, base.length() - "_overlay".length());
+                stripped = true;
+            } else if (base.endsWith("_hilight")) {
+                suffixes.add("hilight");
+                base = base.substring(0, base.length() - "_hilight".length());
+                stripped = true;
+            } else if (base.endsWith("_emissive")) {
+                suffixes.add("emissive");
+                base = base.substring(0, base.length() - "_emissive".length());
+                stripped = true;
+            }
+        } while (stripped);
+
+        if (suffixes.isEmpty()) {
+            return animName;
+        }
+
+        String animSuffix = "_animated";
+        String animBase = animName.endsWith(animSuffix)
+            ? animName.substring(0, animName.length() - animSuffix.length())
+            : animName;
+
+        java.util.Collections.reverse(suffixes);
+        String mergedSuffix = String.join("_", suffixes);
+        return animBase + "_" + mergedSuffix + animSuffix;
     }
 
     private static final class PhaseProgress {

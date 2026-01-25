@@ -203,11 +203,9 @@ public final class BlockExporter {
         }
 
         // Generate material key
-        String blockKey = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+        String baseKey = BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
         int lightLevel = state.getLightEmission();
-        if (lightLevel > 0) {
-            blockKey = blockKey + "_emissive";
-        }
+        String blockKey = lightLevel > 0 ? baseKey + "_emissive" : baseKey;
 
         ctx.registerSpriteMaterial(blockKey, blockKey);
 

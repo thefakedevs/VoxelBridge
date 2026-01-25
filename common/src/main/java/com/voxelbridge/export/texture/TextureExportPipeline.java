@@ -2,6 +2,7 @@ package com.voxelbridge.export.texture;
 
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.ExportProgressTracker;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -37,7 +38,12 @@ public final class TextureExportPipeline {
         }
 
         if (options.pbrDecodeEnabled()) {
-            LabPbrDecoder.exportDecoded(outDir, options, ExportRuntimeConfig.getExportThreadCount());
+            ExportProgressTracker.setStage(ExportProgressTracker.Stage.PBR_DECODE, "Decoding PBR");
+            // Reset phase percent so the atlas stage doesn't appear stuck at 100% before decode starts.
+            ExportProgressTracker.setPhasePercent(0f);
+            LabPbrDecoder.exportDecoded(outDir, options, ExportRuntimeConfig.getExportThreadCount(),
+                ExportProgressTracker::setPhasePercent);
+            ExportProgressTracker.setPhasePercent(1.0f);
         }
     }
 }

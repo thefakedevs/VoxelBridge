@@ -216,16 +216,22 @@ public final class OverlayManager {
      *
      * @param sceneSink the scene sink
      * @param state block state
-     * @param cullChecker function to check if a face should be culled
+     * @param cullChecker cull checker
      */
     public void outputOverlays(IrSink sceneSink, BlockState state, CullChecker cullChecker) {
         if (overlayCache.isEmpty()) return;
 
         for (OverlayQuadData overlay : overlayCache) {
             // Use suffix if provided (e.g., "_overlay", "_hilight"), otherwise use base materialKey
-            String overlayMaterialKey = overlay.materialSuffix != null
-                ? overlay.materialKey + overlay.materialSuffix
-                : overlay.materialKey;
+            // Logic updated: Append suffix to base key, ensuring we don't strip _emissive from base key
+            String overlayMaterialKey = overlay.materialKey;
+            
+            if (overlay.materialSuffix != null && !overlay.materialSuffix.isEmpty()) {
+                // e.g. "stone_emissive" + "_overlay" -> "stone_emissive_overlay"
+                // e.g. "stone" + "_overlay" -> "stone_overlay"
+                overlayMaterialKey += overlay.materialSuffix;
+            }
+            
             overlayMaterialKey = ctx.resolveMaterialKey(overlay.spriteKey, overlayMaterialKey);
             Direction dir = overlay.direction;
 

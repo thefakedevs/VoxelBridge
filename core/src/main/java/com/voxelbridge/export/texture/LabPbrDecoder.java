@@ -23,7 +23,7 @@ public final class LabPbrDecoder {
 
     private LabPbrDecoder() {}
 
-    public static void exportDecoded(Path outDir, ExportOptions options, int threadCount) throws IOException {
+    public static void exportDecoded(Path outDir, ExportOptions options, int threadCount, java.util.function.Consumer<Float> progressCallback) throws IOException {
         if (options == null || options.atlasMode() != ExportOptions.AtlasMode.ATLAS) {
             return;
         }
@@ -60,6 +60,21 @@ public final class LabPbrDecoder {
             return;
         }
 
+        int totalTasks = 0;
+        for (String udim : udimSet) {
+            if (normalPages.containsKey(udim)) {
+                totalTasks += 3; // normal, ao, height
+            }
+            if (specPages.containsKey(udim)) {
+                totalTasks += 4; // roughness, metallic, sss, emissive
+            }
+        }
+        if (totalTasks == 0) {
+            return;
+        }
+        final int totalTasksFinal = totalTasks;
+        java.util.concurrent.atomic.AtomicInteger completed = new java.util.concurrent.atomic.AtomicInteger(0);
+
         ExecutorService executor = Executors.newFixedThreadPool(Math.max(2, threadCount));
         try {
             java.util.List<Future<?>> futures = new ArrayList<>(udimSet.size());
@@ -69,8 +84,11 @@ public final class LabPbrDecoder {
                         BufferedImage normal = readImage(normalPages.get(udim));
                         if (normal != null) {
                             com.voxelbridge.core.texture.PngjWriter.write(decodeNormal(normal), atlasDir.resolve("atlas_normal_" + udim + ".png"));
+                            reportProgress(progressCallback, completed, totalTasksFinal);
                             com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.BLUE), atlasDir.resolve("atlas_ao_" + udim + ".png"));
+                            reportProgress(progressCallback, completed, totalTasksFinal);
                             com.voxelbridge.core.texture.PngjWriter.write(extractChannel(normal, Channel.ALPHA), atlasDir.resolve("atlas_height_" + udim + ".png"));
+                            reportProgress(progressCallback, completed, totalTasksFinal);
                         }
 
                         BufferedImage spec = readImage(specPages.get(udim));
@@ -80,9 +98,13 @@ public final class LabPbrDecoder {
                                 albedo = resizeTo(albedo, spec.getWidth(), spec.getHeight());
                             }
                             com.voxelbridge.core.texture.PngjWriter.write(decodeRoughness(spec), atlasDir.resolve("atlas_roughness_" + udim + ".png"));
+                            reportProgress(progressCallback, completed, totalTasksFinal);
                             com.voxelbridge.core.texture.PngjWriter.write(decodeMetallic(spec), atlasDir.resolve("atlas_metallic_" + udim + ".png"));
+                            reportProgress(progressCallback, completed, totalTasksFinal);
                             com.voxelbridge.core.texture.PngjWriter.write(decodeSss(spec), atlasDir.resolve("atlas_sss_" + udim + ".png"));
+                            reportProgress(progressCallback, completed, totalTasksFinal);
                             com.voxelbridge.core.texture.PngjWriter.write(decodeEmissive(albedo, spec), atlasDir.resolve("atlas_emissive_" + udim + ".png"));
+                            reportProgress(progressCallback, completed, totalTasksFinal);
                         }
                     } catch (IOException e) {
                         throw new RuntimeException(e);
@@ -101,6 +123,16 @@ public final class LabPbrDecoder {
         } finally {
             executor.shutdown();
         }
+    }
+
+    private static void reportProgress(java.util.function.Consumer<Float> progressCallback,
+                                       java.util.concurrent.atomic.AtomicInteger completed,
+                                       int totalTasks) {
+        if (progressCallback == null) {
+            return;
+        }
+        int done = completed.incrementAndGet();
+        progressCallback.accept((float) done / totalTasks);
     }
 
     private static final int[] ROUGHNESS_LUT = new int[256];

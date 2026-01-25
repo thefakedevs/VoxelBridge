@@ -24,6 +24,7 @@ public final class ExportProgressTracker {
         IDLE,
         SAMPLING,
         ATLAS,
+        PBR_DECODE,
         FINALIZE,
         COMPLETE
     }

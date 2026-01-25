@@ -459,14 +459,20 @@ public final class TextureAtlasManager {
      * Loads a texture for atlas generation (block + block entity).
      */
     private static BufferedImage loadTextureForAtlas(ExportContext ctx, String spriteKey) {
+        BufferedImage cached = ctx.getCachedSpriteImage(spriteKey);
+        if (cached != null) {
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
+                VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen][CACHE HIT] Loaded %s from cache (%dx%d)",
+                    spriteKey, cached.getWidth(), cached.getHeight()));
+            }
+            return cached;
+        }
+
         String resourceKey = ctx.getTextureAccess().spriteKeyToResourceKey(spriteKey);
         if (resourceKey == null) {
             return null;
         }
-        BufferedImage cached = ctx.getTextureRepository().get(resourceKey);
-        if (cached == null) {
-            cached = ctx.getCachedSpriteImage(spriteKey);
-        }
+        cached = ctx.getTextureRepository().get(resourceKey);
         if (cached != null) {
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.TEXTURE_ATLAS)) {
                 VoxelBridgeLogger.info(LogModule.TEXTURE_ATLAS, String.format("[AtlasGen][CACHE HIT] Loaded %s from cache (%dx%d)",
