@@ -100,6 +100,7 @@ public final class VoxelBridgeCommands {
             ctx.getSource().sendSystemMessage(Component.literal("§b  Animation export: " + (ExportRuntimeConfig.isAnimationEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendSystemMessage(Component.literal("§b  Fill cave (dark cave_air): " + (ExportRuntimeConfig.isFillCaveEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendSystemMessage(Component.literal("§b  LabPBR decode: " + (ExportRuntimeConfig.isPbrDecodeEnabled() ? "§aon" : "§coff")));
+            ctx.getSource().sendSystemMessage(Component.literal("§b  Logging: " + (ExportRuntimeConfig.isLoggingEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendSystemMessage(Component.literal("§b  Export threads: §f" + ExportRuntimeConfig.getExportThreadCount()));
             return 1;
         }));
@@ -347,6 +348,24 @@ public final class VoxelBridgeCommands {
             com.voxelbridge.platform.ConfigScreenBridge.openConfigScreen(mc);
             return 1;
         }));
+
+        root.then(Commands.literal("log")
+                .executes(ctx -> {
+                    ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Logging is currently " + (ExportRuntimeConfig.isLoggingEnabled() ? "§aon" : "§coff")));
+                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge log <on|off>"));
+                    return 1;
+                })
+                .then(Commands.literal("on").executes(ctx -> {
+                    ExportRuntimeConfig.setLoggingEnabled(true);
+                    ctx.getSource().sendSystemMessage(Component.literal("§a[VoxelBridge] Logging -> ON"));
+                    return 1;
+                }))
+                .then(Commands.literal("off").executes(ctx -> {
+                    ExportRuntimeConfig.setLoggingEnabled(false);
+                    ctx.getSource().sendSystemMessage(Component.literal("§c[VoxelBridge] Logging -> OFF"));
+                    return 1;
+                }))
+        );
 
         // Register the literal once and reuse the returned node for the "vb" shortcut.
         CommandNode<CommandSourceStack> rootNode = dispatcher.register(root);

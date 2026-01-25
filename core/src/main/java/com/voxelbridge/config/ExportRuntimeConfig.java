@@ -72,6 +72,8 @@ public final class ExportRuntimeConfig {
     private static boolean fillCaveEnabled = false;
     // Export decoded LabPBR channel maps from _n/_s.
     private static boolean pbrDecodeEnabled = false;
+    // Global log output toggle.
+    private static boolean loggingEnabled = false;
     private static Runnable changeListener;
 
     private static void notifyChanged() {
@@ -206,6 +208,17 @@ public final class ExportRuntimeConfig {
         }
     }
 
+    public static boolean isLoggingEnabled() {
+        return loggingEnabled;
+    }
+
+    public static void setLoggingEnabled(boolean enabled) {
+        if (loggingEnabled != enabled) {
+            loggingEnabled = enabled;
+            notifyChanged();
+        }
+    }
+
     public static void resetDefaults() {
         atlasMode = AtlasMode.ATLAS;
         atlasSize = AtlasSize.SIZE_8192;
@@ -217,6 +230,7 @@ public final class ExportRuntimeConfig {
         animationEnabled = false;
         fillCaveEnabled = false;
         pbrDecodeEnabled = false;
+        loggingEnabled = false;
         notifyChanged();
     }
 

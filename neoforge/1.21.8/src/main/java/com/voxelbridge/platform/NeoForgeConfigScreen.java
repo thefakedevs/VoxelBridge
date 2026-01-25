@@ -113,6 +113,14 @@ public final class NeoForgeConfigScreen {
                 .setTooltip(Component.translatable("config.voxelbridge.decodePBR.tooltip"))
                 .setSaveConsumer(ExportRuntimeConfig::setPbrDecodeEnabled)
                 .build());
+
+        general.addEntry(entries.startBooleanToggle(
+                        Component.translatable("config.voxelbridge.logging"),
+                        ExportRuntimeConfig.isLoggingEnabled())
+                .setDefaultValue(false)
+                .setTooltip(Component.translatable("config.voxelbridge.logging.tooltip"))
+                .setSaveConsumer(ExportRuntimeConfig::setLoggingEnabled)
+                .build());
     }
 
     private static void buildAtlasCategory(ConfigBuilder builder, ConfigEntryBuilder entries) {

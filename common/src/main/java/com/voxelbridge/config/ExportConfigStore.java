@@ -50,6 +50,7 @@ public final class ExportConfigStore {
         } finally {
             suppressSave = false;
         }
+        VoxelBridgeLogger.setEnabled(ExportRuntimeConfig.isLoggingEnabled());
     }
 
     public static void save() {
@@ -75,6 +76,7 @@ public final class ExportConfigStore {
         if (suppressSave) {
             return;
         }
+        VoxelBridgeLogger.setEnabled(ExportRuntimeConfig.isLoggingEnabled());
         save();
     }
 
@@ -90,6 +92,7 @@ public final class ExportConfigStore {
         data.animationEnabled = ExportRuntimeConfig.isAnimationEnabled();
         data.fillCaveEnabled = ExportRuntimeConfig.isFillCaveEnabled();
         data.pbrDecodeEnabled = ExportRuntimeConfig.isPbrDecodeEnabled();
+        data.loggingEnabled = ExportRuntimeConfig.isLoggingEnabled();
         return data;
     }
 
@@ -125,6 +128,7 @@ public final class ExportConfigStore {
         ExportRuntimeConfig.setAnimationEnabled(data.animationEnabled);
         ExportRuntimeConfig.setFillCaveEnabled(data.fillCaveEnabled);
         ExportRuntimeConfig.setPbrDecodeEnabled(data.pbrDecodeEnabled);
+        ExportRuntimeConfig.setLoggingEnabled(data.loggingEnabled);
     }
 
     private static Path getConfigPath() {
@@ -146,5 +150,6 @@ public final class ExportConfigStore {
         boolean animationEnabled;
         boolean fillCaveEnabled;
         boolean pbrDecodeEnabled;
+        boolean loggingEnabled;
     }
 }

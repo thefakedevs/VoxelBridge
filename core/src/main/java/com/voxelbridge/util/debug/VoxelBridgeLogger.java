@@ -29,11 +29,15 @@ public final class VoxelBridgeLogger {
     private static final Map<LogModule, String> APPENDER_NAMES = new EnumMap<>(LogModule.class);
 
     private static volatile boolean initialized = false;
+    private static volatile boolean enabled = false;
     private static Path outputDir;
 
     private VoxelBridgeLogger() {}
 
     public static synchronized void initialize(Path outDir) throws IOException {
+        if (!enabled) {
+            return;
+        }
         if (initialized) {
             if (outputDir != null && outputDir.equals(outDir)) {
                 return;
@@ -76,6 +80,13 @@ public final class VoxelBridgeLogger {
 
         ctx.updateLoggers();
         initialized = true;
+    }
+
+    public static synchronized void setEnabled(boolean value) {
+        enabled = value;
+        if (!enabled) {
+            close();
+        }
     }
 
     public static synchronized void close() {
@@ -193,16 +204,25 @@ public final class VoxelBridgeLogger {
     }
 
     public static boolean isDebugEnabled(LogModule module) {
+        if (!enabled) {
+            return false;
+        }
         Logger logger = getLogger(module);
         return logger != null && logger.isDebugEnabled();
     }
 
     public static boolean isTraceEnabled(LogModule module) {
+        if (!enabled) {
+            return false;
+        }
         Logger logger = getLogger(module);
         return logger != null && logger.isTraceEnabled();
     }
 
     private static void log(LogModule module, Level level, String message, Throwable throwable) {
+        if (!enabled) {
+            return;
+        }
         Logger logger = getLogger(module);
         if (logger == null) {
             return;

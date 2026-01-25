@@ -117,6 +117,7 @@ public final class FabricCommands {
             ctx.getSource().sendFeedback(Component.literal("§b  Animation export: " + (ExportRuntimeConfig.isAnimationEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendFeedback(Component.literal("§b  Fill cave (dark cave_air): " + (ExportRuntimeConfig.isFillCaveEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendFeedback(Component.literal("§b  LabPBR decode: " + (ExportRuntimeConfig.isPbrDecodeEnabled() ? "§aon" : "§coff")));
+            ctx.getSource().sendFeedback(Component.literal("§b  Logging: " + (ExportRuntimeConfig.isLoggingEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendFeedback(
                     Component.literal("§b  Export threads: §f" + ExportRuntimeConfig.getExportThreadCount()));
             return 1;
@@ -130,6 +131,24 @@ public final class FabricCommands {
             FabricConfigScreen.requestOpen(mc.screen);
             return 1;
         }));
+
+        root.then(ClientCommandManager.literal("log")
+                .executes(ctx -> {
+                    ctx.getSource().sendFeedback(Component.literal("§b[VoxelBridge] Logging is currently " + (ExportRuntimeConfig.isLoggingEnabled() ? "§aon" : "§coff")));
+                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge log <on|off>"));
+                    return 1;
+                })
+                .then(ClientCommandManager.literal("on").executes(ctx -> {
+                    ExportRuntimeConfig.setLoggingEnabled(true);
+                    ctx.getSource().sendFeedback(Component.literal("§a[VoxelBridge] Logging -> ON"));
+                    return 1;
+                }))
+                .then(ClientCommandManager.literal("off").executes(ctx -> {
+                    ExportRuntimeConfig.setLoggingEnabled(false);
+                    ctx.getSource().sendFeedback(Component.literal("§c[VoxelBridge] Logging -> OFF"));
+                    return 1;
+                }))
+        );
 
         root.then(ClientCommandManager.literal("clear").executes(ctx -> {
             ExportControl.clearSelection();
