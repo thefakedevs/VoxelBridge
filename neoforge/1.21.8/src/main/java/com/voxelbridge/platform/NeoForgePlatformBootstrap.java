@@ -38,7 +38,7 @@ public final class NeoForgePlatformBootstrap implements PlatformBootstrap {
         NeoForgeEventBusBridge.addListener(modBus, (RegisterKeyMappingsEvent event) -> KeyBindings.register(event::register));
         NeoForgeEventBusBridge.addListener(gameBus, (RegisterClientCommandsEvent event) -> VoxelBridgeCommands.register(event.getDispatcher()));
         NeoForgeEventBusBridge.addListener(gameBus, (ClientTickEvent.Post event) -> KeyInputHandler.onClientTick());
-        NeoForgeEventBusBridge.addListener(gameBus, (ClientPlayerNetworkEvent.LoggingOut event) -> ExportControl.resetAll());
+        NeoForgeEventBusBridge.addListener(gameBus, (ClientPlayerNetworkEvent.LoggingOut event) -> ExportControl.clearSelection());
         Adapters.getSelectionRender().register(gameBus);
         NeoForgeEventBusBridge.addListener(gameBus, (RenderGuiEvent.Post event) -> HudOverlayRenderer.render(event.getGuiGraphics()));
     }

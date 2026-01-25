@@ -63,7 +63,7 @@ public final class ExportRuntimeConfig {
     private static int atlasPadding = 0;
     private static ColorMode colorMode = ColorMode.BOTH;
     private static CoordinateMode coordinateMode = CoordinateMode.CENTERED;
-    private static int exportThreadCount = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
+    private static int exportThreadCount = 16;
     // Enable vanilla random transforms (e.g., grass offset, random model rotations).
     private static boolean vanillaRandomTransformEnabled = true;
     // Export animated textures (mcmeta-driven).
@@ -72,14 +72,26 @@ public final class ExportRuntimeConfig {
     private static boolean fillCaveEnabled = false;
     // Export decoded LabPBR channel maps from _n/_s.
     private static boolean pbrDecodeEnabled = false;
+    private static Runnable changeListener;
+
+    private static void notifyChanged() {
+        if (changeListener != null) {
+            changeListener.run();
+        }
+    }
+
+    public static void setChangeListener(Runnable listener) {
+        changeListener = listener;
+    }
 
     public static AtlasMode getAtlasMode() {
         return atlasMode;
     }
 
     public static void setAtlasMode(AtlasMode mode) {
-        if (mode != null) {
+        if (mode != null && mode != atlasMode) {
             atlasMode = mode;
+            notifyChanged();
         }
     }
 
@@ -88,8 +100,9 @@ public final class ExportRuntimeConfig {
     }
 
     public static void setAtlasSize(AtlasSize size) {
-        if (size != null) {
+        if (size != null && size != atlasSize) {
             atlasSize = size;
+            notifyChanged();
         }
     }
 
@@ -99,7 +112,10 @@ public final class ExportRuntimeConfig {
 
     public static boolean setAtlasPadding(int padding) {
         if (padding == 0 || padding == 4 || padding == 8 || padding == 12 || padding == 16) {
-            atlasPadding = padding;
+            if (atlasPadding != padding) {
+                atlasPadding = padding;
+                notifyChanged();
+            }
             return true;
         }
         return false;
@@ -110,8 +126,9 @@ public final class ExportRuntimeConfig {
     }
 
     public static void setCoordinateMode(CoordinateMode mode) {
-        if (mode != null) {
+        if (mode != null && mode != coordinateMode) {
             coordinateMode = mode;
+            notifyChanged();
         }
     }
 
@@ -120,12 +137,17 @@ public final class ExportRuntimeConfig {
     }
 
     public static void setExportThreadCount(int count) {
+        int next;
         if (count < 1) {
-            exportThreadCount = 1;
-        } else if (count > 32) {
-            exportThreadCount = 32;
+            next = 1;
+        } else if (count > 128) {
+            next = 128;
         } else {
-            exportThreadCount = count;
+            next = count;
+        }
+        if (exportThreadCount != next) {
+            exportThreadCount = next;
+            notifyChanged();
         }
     }
 
@@ -134,7 +156,10 @@ public final class ExportRuntimeConfig {
     }
 
     public static void setVanillaRandomTransformEnabled(boolean enabled) {
-        vanillaRandomTransformEnabled = enabled;
+        if (vanillaRandomTransformEnabled != enabled) {
+            vanillaRandomTransformEnabled = enabled;
+            notifyChanged();
+        }
     }
 
     public static ColorMode getColorMode() {
@@ -142,8 +167,9 @@ public final class ExportRuntimeConfig {
     }
 
     public static void setColorMode(ColorMode mode) {
-        if (mode != null) {
+        if (mode != null && mode != colorMode) {
             colorMode = mode;
+            notifyChanged();
         }
     }
 
@@ -152,7 +178,10 @@ public final class ExportRuntimeConfig {
     }
 
     public static void setAnimationEnabled(boolean enabled) {
-        animationEnabled = enabled;
+        if (animationEnabled != enabled) {
+            animationEnabled = enabled;
+            notifyChanged();
+        }
     }
 
     public static boolean isFillCaveEnabled() {
@@ -160,7 +189,10 @@ public final class ExportRuntimeConfig {
     }
 
     public static void setFillCaveEnabled(boolean enabled) {
-        fillCaveEnabled = enabled;
+        if (fillCaveEnabled != enabled) {
+            fillCaveEnabled = enabled;
+            notifyChanged();
+        }
     }
 
     public static boolean isPbrDecodeEnabled() {
@@ -168,7 +200,10 @@ public final class ExportRuntimeConfig {
     }
 
     public static void setPbrDecodeEnabled(boolean enabled) {
-        pbrDecodeEnabled = enabled;
+        if (pbrDecodeEnabled != enabled) {
+            pbrDecodeEnabled = enabled;
+            notifyChanged();
+        }
     }
 
     public static void resetDefaults() {
@@ -177,11 +212,12 @@ public final class ExportRuntimeConfig {
         atlasPadding = 0;
         colorMode = ColorMode.BOTH;
         coordinateMode = CoordinateMode.CENTERED;
-        exportThreadCount = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
+        exportThreadCount = 16;
         vanillaRandomTransformEnabled = true;
         animationEnabled = false;
         fillCaveEnabled = false;
         pbrDecodeEnabled = false;
+        notifyChanged();
     }
 
 }

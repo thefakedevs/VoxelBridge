@@ -122,6 +122,15 @@ public final class FabricCommands {
             return 1;
         }));
 
+        root.then(ClientCommandManager.literal("config").executes(ctx -> {
+            var mc = ClientAccessHolder.get().getMinecraft();
+            if (mc == null) {
+                return 0;
+            }
+            mc.execute(() -> mc.setScreen(FabricConfigScreen.create(mc.screen)));
+            return 1;
+        }));
+
         root.then(ClientCommandManager.literal("clear").executes(ctx -> {
             ExportControl.clearSelection();
             ctx.getSource().sendFeedback(Component.literal("§b[VoxelBridge] Selection cleared."));

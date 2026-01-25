@@ -13,6 +13,8 @@ version = "1.0.2"
 displayName = "VoxelBridge"        
 authors = "Gluten King"    
 logoFile = "assets/voxelbridge/logo.png"
+displayURL = "https://modrinth.com/mod/voxelbridge"
+issueTrackerURL = "https://github.com/Gluten-King/VoxelBridge/issues"
 description = '''Exports Minecraft and modded content into glTF: blocks, fluids, connected textures, entities, and block entities.
 '''
 
