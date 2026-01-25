@@ -110,7 +110,7 @@ public final class VoxelBridgeCommands {
             return 1;
         }));
 
-        root.then(Commands.literal("atlas")
+        root.then(Commands.literal("texturePacking")
                 .executes(ctx -> {
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Current atlas mode: §f" + ExportRuntimeConfig.getAtlasMode().getDescription()));
                     ctx.getSource().sendSystemMessage(Component.literal("§7   individual: one texture per sprite"));
@@ -147,10 +147,10 @@ public final class VoxelBridgeCommands {
                 }))
         );
 
-        root.then(Commands.literal("fillcave")
+        root.then(Commands.literal("fillCave")
                 .executes(ctx -> {
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Fill cave is currently " + (ExportRuntimeConfig.isFillCaveEnabled() ? "§aon" : "§coff")));
-                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge fillcave <on|off>"));
+                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge fillCave <on|off>"));
                     ctx.getSource().sendSystemMessage(Component.literal("§7   on : Treat dark cave_air (skylight=0) as solid for culling"));
                     ctx.getSource().sendSystemMessage(Component.literal("§7   off: Normal culling behavior"));
                     return 1;
@@ -167,7 +167,7 @@ public final class VoxelBridgeCommands {
                 }))
         );
 
-        root.then(Commands.literal("atlassize")
+        root.then(Commands.literal("atlasSize")
                 .executes(ctx -> {
                     ExportRuntimeConfig.AtlasSize current = ExportRuntimeConfig.getAtlasSize();
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Current atlas size: §f" + current.getDescription()));
@@ -176,7 +176,7 @@ public final class VoxelBridgeCommands {
                         String marker = size == current ? "§a> " : "§7  ";
                         ctx.getSource().sendSystemMessage(Component.literal(marker + size.getSize() + ": " + size.getDescription()));
                     }
-                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge atlassize <size>"));
+                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge atlasSize <size>"));
                     return 1;
                 })
                 .then(Commands.literal("128").executes(ctx -> {
@@ -216,12 +216,12 @@ public final class VoxelBridgeCommands {
                 }))
         );
 
-        root.then(Commands.literal("atlaspad")
+        root.then(Commands.literal("texturePadding")
                 .executes(ctx -> {
                     int current = ExportRuntimeConfig.getAtlasPadding();
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Current atlas padding: §f" + current + "px"));
                     ctx.getSource().sendSystemMessage(Component.literal("§7   Allowed values: 0, 4, 8, 12, 16"));
-                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge atlaspad <pixels>"));
+                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge texturePadding <pixels>"));
                     return 1;
                 })
                 .then(Commands.argument("pixels", IntegerArgumentType.integer(0, 64)).executes(ctx -> {
@@ -255,10 +255,10 @@ public final class VoxelBridgeCommands {
                 }))
         );
 
-        root.then(Commands.literal("poshash")
+        root.then(Commands.literal("randomModel")
                 .executes(ctx -> {
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Vanilla random transform is currently " + (ExportRuntimeConfig.isVanillaRandomTransformEnabled() ? "§aon" : "§coff")));
-                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge poshash <on|off>"));
+                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge randomModel <on|off>"));
                     ctx.getSource().sendSystemMessage(Component.literal("§7   on : Apply vanilla position-hash random offsets/variants"));
                     ctx.getSource().sendSystemMessage(Component.literal("§7   off: Disable offsets and keep legacy behavior"));
                     return 1;
@@ -275,7 +275,7 @@ public final class VoxelBridgeCommands {
                 }))
         );
 
-        root.then(Commands.literal("colormode")
+        root.then(Commands.literal("colorMode")
                 .executes(ctx -> {
                     ColorMode current = ExportRuntimeConfig.getColorMode();
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Current color mode: §f" + current.getDescription()));
@@ -317,10 +317,10 @@ public final class VoxelBridgeCommands {
                 }))
         );
 
-        root.then(Commands.literal("pbrdecode")
+        root.then(Commands.literal("decodePBR")
                 .executes(ctx -> {
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] LabPBR decode is currently " + (ExportRuntimeConfig.isPbrDecodeEnabled() ? "§aon" : "§coff")));
-                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge pbrdecode <on|off>"));
+                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge decodePBR <on|off>"));
                     return 1;
                 })
                 .then(Commands.literal("on").executes(ctx -> {

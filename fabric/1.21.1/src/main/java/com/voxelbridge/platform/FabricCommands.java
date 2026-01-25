@@ -128,7 +128,7 @@ public final class FabricCommands {
             return 1;
         }));
 
-        root.then(ClientCommandManager.literal("atlas")
+        root.then(ClientCommandManager.literal("texturePacking")
                 .executes(ctx -> {
                     ctx.getSource().sendFeedback(Component.literal("§b[VoxelBridge] Current atlas mode: §f"
                             + ExportRuntimeConfig.getAtlasMode().getDescription()));
@@ -165,10 +165,10 @@ public final class FabricCommands {
                     return 1;
                 })));
 
-        root.then(ClientCommandManager.literal("fillcave")
+        root.then(ClientCommandManager.literal("fillCave")
                 .executes(ctx -> {
                     ctx.getSource().sendFeedback(Component.literal("§b[VoxelBridge] Fill cave is currently " + (ExportRuntimeConfig.isFillCaveEnabled() ? "§aon" : "§coff")));
-                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge fillcave <on|off>"));
+                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge fillCave <on|off>"));
                     ctx.getSource().sendFeedback(
                             Component.literal("§7   on : Treat dark cave_air (skylight=0) as solid for culling"));
                     ctx.getSource().sendFeedback(Component.literal("§7   off: Normal culling behavior"));
@@ -186,7 +186,7 @@ public final class FabricCommands {
                     return 1;
                 })));
 
-        root.then(ClientCommandManager.literal("atlassize")
+        root.then(ClientCommandManager.literal("atlasSize")
                 .executes(ctx -> {
                     ExportRuntimeConfig.AtlasSize current = ExportRuntimeConfig.getAtlasSize();
                     ctx.getSource().sendFeedback(
@@ -197,7 +197,7 @@ public final class FabricCommands {
                         ctx.getSource()
                                 .sendFeedback(Component.literal(marker + size.getSize() + ": " + size.getDescription()));
                     }
-                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge atlassize <size>"));
+                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge atlasSize <size>"));
                     return 1;
                 })
                 .then(ClientCommandManager.literal("128").executes(ctx -> {
@@ -236,13 +236,13 @@ public final class FabricCommands {
                     return 1;
                 })));
 
-        root.then(ClientCommandManager.literal("atlaspad")
+        root.then(ClientCommandManager.literal("texturePadding")
                 .executes(ctx -> {
                     int current = ExportRuntimeConfig.getAtlasPadding();
                     ctx.getSource()
                             .sendFeedback(Component.literal("§b[VoxelBridge] Current atlas padding: §f" + current + "px"));
                     ctx.getSource().sendFeedback(Component.literal("§7   Allowed values: 0, 4, 8, 12, 16"));
-                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge atlaspad <pixels>"));
+                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge texturePadding <pixels>"));
                     return 1;
                 })
                 .then(ClientCommandManager.argument("pixels", IntegerArgumentType.integer(0, 64))
@@ -277,10 +277,10 @@ public final class FabricCommands {
                     return 1;
                 })));
 
-        root.then(ClientCommandManager.literal("poshash")
+        root.then(ClientCommandManager.literal("randomModel")
                 .executes(ctx -> {
                     ctx.getSource().sendFeedback(Component.literal("§b[VoxelBridge] Vanilla random transform is currently " + (ExportRuntimeConfig.isVanillaRandomTransformEnabled() ? "§aon" : "§coff")));
-                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge poshash <on|off>"));
+                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge randomModel <on|off>"));
                     ctx.getSource()
                             .sendFeedback(Component.literal("§7   on : Apply vanilla position-hash random offsets/variants"));
                     ctx.getSource().sendFeedback(Component.literal("§7   off: Disable offsets and keep legacy behavior"));
@@ -297,7 +297,7 @@ public final class FabricCommands {
                     return 1;
                 })));
 
-        root.then(ClientCommandManager.literal("colormode")
+        root.then(ClientCommandManager.literal("colorMode")
                 .executes(ctx -> {
                     ColorMode current = ExportRuntimeConfig.getColorMode();
                     ctx.getSource().sendFeedback(
@@ -340,10 +340,10 @@ public final class FabricCommands {
                             return 1;
                         })));
 
-        root.then(ClientCommandManager.literal("pbrdecode")
+        root.then(ClientCommandManager.literal("decodePBR")
                 .executes(ctx -> {
                     ctx.getSource().sendFeedback(Component.literal("§b[VoxelBridge] LabPBR decode is currently " + (ExportRuntimeConfig.isPbrDecodeEnabled() ? "§aon" : "§coff")));
-                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge pbrdecode <on|off>"));
+                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge decodePBR <on|off>"));
                     return 1;
                 })
                 .then(ClientCommandManager.literal("on").executes(ctx -> {
