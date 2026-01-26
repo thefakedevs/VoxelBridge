@@ -1,6 +1,5 @@
 package com.voxelbridge.compat;
 
-import com.voxelbridge.mixin.HttpTextureAccessor;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -19,15 +18,7 @@ public final class FabricTextureAccess {
      * Gets the file from an HttpTexture.
      */
     public static File getHttpTextureFile(AbstractTexture texture) {
-        if (texture == null)
-            return null;
-        try {
-            if (texture instanceof HttpTextureAccessor accessor) {
-                return accessor.voxelbridge$getFile();
-            }
-        } catch (Throwable t) {
-            // Not an HttpTexture or accessor failed
-        }
+        // HttpTexture is removed in 1.21.4, no public replacement.
         return null;
     }
 
@@ -35,13 +26,7 @@ public final class FabricTextureAccess {
      * Checks if a texture is an HttpTexture.
      */
     public static boolean isHttpTexture(AbstractTexture texture) {
-        if (texture == null)
-            return false;
-        try {
-            return texture instanceof HttpTextureAccessor;
-        } catch (Throwable t) {
-            return false;
-        }
+        return false;
     }
 
     /**

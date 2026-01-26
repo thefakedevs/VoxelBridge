@@ -2,7 +2,6 @@ package com.voxelbridge.adapter;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.compat.FabricAtlasAccess;
-import com.voxelbridge.compat.FabricPaintingAccess;
 import com.voxelbridge.compat.FabricSpriteAccess;
 import com.voxelbridge.compat.FabricTextureAccess;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;

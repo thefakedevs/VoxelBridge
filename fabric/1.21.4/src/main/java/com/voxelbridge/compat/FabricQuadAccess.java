@@ -1,12 +1,11 @@
 package com.voxelbridge.compat;
 
-import com.voxelbridge.mixin.BakedQuadAccessor;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 
 /**
- * Fabric-specific BakedQuad access using Mixin accessor.
+ * Fabric-specific BakedQuad access using public API.
  */
 public final class FabricQuadAccess {
 
@@ -17,7 +16,7 @@ public final class FabricQuadAccess {
         if (quad == null)
             return null;
         try {
-            return ((BakedQuadAccessor) quad).voxelbridge$getSprite();
+            return quad.getSprite();
         } catch (Throwable t) {
             return null;
         }
@@ -27,7 +26,7 @@ public final class FabricQuadAccess {
         if (quad == null)
             return null;
         try {
-            return ((BakedQuadAccessor) quad).voxelbridge$getDirection();
+            return quad.getDirection();
         } catch (Throwable t) {
             return null;
         }
@@ -37,7 +36,7 @@ public final class FabricQuadAccess {
         if (quad == null)
             return new int[0];
         try {
-            int[] v = ((BakedQuadAccessor) quad).voxelbridge$getVertices();
+            int[] v = quad.getVertices();
             return v != null ? v : new int[0];
         } catch (Throwable t) {
             return new int[0];
@@ -48,7 +47,7 @@ public final class FabricQuadAccess {
         if (quad == null)
             return -1;
         try {
-            return ((BakedQuadAccessor) quad).voxelbridge$getTintIndex();
+            return quad.getTintIndex();
         } catch (Throwable t) {
             return -1;
         }
