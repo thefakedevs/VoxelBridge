@@ -114,6 +114,10 @@ public final class PlaneOffsetTrackerCore {
             }
         }
 
+        float ox = nx;
+        float oy = ny;
+        float oz = nz;
+
         // Canonicalize normal so parallel (opposite) faces share the same plane hash.
         if (nx < 0f || (nx == 0f && ny < 0f) || (nx == 0f && ny == 0f && nz < 0f)) {
             nx = -nx;
@@ -218,9 +222,9 @@ public final class PlaneOffsetTrackerCore {
 
         float offset = OFFSET_STEP * overlapCount;
         for (int i = 0; i < 4; i++) {
-            positions[i * 3] += nx * offset;
-            positions[i * 3 + 1] += ny * offset;
-            positions[i * 3 + 2] += nz * offset;
+            positions[i * 3] += ox * offset;
+            positions[i * 3 + 1] += oy * offset;
+            positions[i * 3 + 2] += oz * offset;
         }
     }
 

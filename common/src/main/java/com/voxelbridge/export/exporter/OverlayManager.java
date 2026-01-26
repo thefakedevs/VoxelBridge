@@ -180,6 +180,9 @@ public final class OverlayManager {
             int overlayColor = extractOverlayColor(state, pos, quad, vertexColors);
             float[] normal = GeometryUtil.computeFaceNormal(positions);
 
+            if (dir == null) {
+                dir = inferLocalOutwardDirection(localPos);
+            }
             OverlayQuadData data = new OverlayQuadData(
                 positions.clone(), normal, uv0.clone(),
                 spriteKey, overlayColor, dir, baseMaterialKey, effectiveSuffix
@@ -278,6 +281,37 @@ public final class OverlayManager {
         }
 
         return 0xFFFFFFFF;
+    }
+
+    private static Direction inferLocalOutwardDirection(float[] localPos) {
+        if (localPos == null || localPos.length < 12) {
+            return null;
+        }
+        float cx = 0f, cy = 0f, cz = 0f;
+        for (int i = 0; i < 4; i++) {
+            cx += localPos[i * 3];
+            cy += localPos[i * 3 + 1];
+            cz += localPos[i * 3 + 2];
+        }
+        cx *= 0.25f;
+        cy *= 0.25f;
+        cz *= 0.25f;
+
+        float dx = cx - 0.5f;
+        float dy = cy - 0.5f;
+        float dz = cz - 0.5f;
+
+        float adx = Math.abs(dx);
+        float ady = Math.abs(dy);
+        float adz = Math.abs(dz);
+
+        if (adx >= ady && adx >= adz) {
+            return dx >= 0f ? Direction.EAST : Direction.WEST;
+        }
+        if (ady >= adx && ady >= adz) {
+            return dy >= 0f ? Direction.UP : Direction.DOWN;
+        }
+        return dz >= 0f ? Direction.SOUTH : Direction.NORTH;
     }
 
     /**

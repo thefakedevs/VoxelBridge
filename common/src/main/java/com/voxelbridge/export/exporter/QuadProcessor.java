@@ -210,7 +210,8 @@ public final class QuadProcessor {
             applyInsetAgainstNonSolid(quad.state, quad.pos, quad.quad, quad.dir, quad.positions);
             ctx.registerSpriteMaterial(quad.spriteKey, quad.materialKey);
             if (planeOffset != null) {
-                planeOffset.applyOffset(quad.positions, quad.normal, quad.dir);
+                Direction offsetDir = quad.dir != null ? quad.dir : inferOutwardDirection(quad.positions, quad.pos);
+                planeOffset.applyOffset(quad.positions, quad.normal, offsetDir);
             }
             TintMode tintMode = ctx.getColorMode() != null && ctx.getColorMode().usesColormap()
                 ? TintMode.COLORMAP
@@ -512,6 +513,35 @@ public final class QuadProcessor {
             && a[0] - AABB_EPS < b[1]
             && a[3] + AABB_EPS > b[2]
             && a[2] - AABB_EPS < b[3];
+    }
+
+    private Direction inferOutwardDirection(float[] positions, BlockPos pos) {
+        if (positions == null || positions.length < 12 || pos == null) {
+            return null;
+        }
+        float cx = (positions[0] + positions[3] + positions[6] + positions[9]) * 0.25f;
+        float cy = (positions[1] + positions[4] + positions[7] + positions[10]) * 0.25f;
+        float cz = (positions[2] + positions[5] + positions[8] + positions[11]) * 0.25f;
+
+        float bx = (float) (pos.getX() + 0.5 + offsetX);
+        float by = (float) (pos.getY() + 0.5 + offsetY);
+        float bz = (float) (pos.getZ() + 0.5 + offsetZ);
+
+        float dx = cx - bx;
+        float dy = cy - by;
+        float dz = cz - bz;
+
+        float adx = Math.abs(dx);
+        float ady = Math.abs(dy);
+        float adz = Math.abs(dz);
+
+        if (adx >= ady && adx >= adz) {
+            return dx >= 0f ? Direction.EAST : Direction.WEST;
+        }
+        if (ady >= adx && ady >= adz) {
+            return dy >= 0f ? Direction.UP : Direction.DOWN;
+        }
+        return dz >= 0f ? Direction.SOUTH : Direction.NORTH;
     }
 
     private boolean getNeighborFaceAabb(BlockState state, BlockPos pos, Direction face, float[] out) {

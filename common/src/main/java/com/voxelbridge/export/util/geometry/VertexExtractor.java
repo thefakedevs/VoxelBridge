@@ -172,36 +172,6 @@ public final class VertexExtractor {
     }
 
     /**
-     * Applies overlay z-offset in local coordinate system to prevent z-fighting.
-     * Operates on local coordinates (0-1 range) for better float precision.
-     *
-     * @param localPositions local vertex positions (modified in-place)
-     * @param overlayIndex overlay layer index (0-based, 0 = first overlay)
-     */
-    public static void applyOverlayOffset(float[] localPositions, int overlayIndex) {
-        applyOverlayOffset(localPositions, overlayIndex, 1f, null);
-    }
-
-    /**
-     * Applies overlay z-offset with an extra multiplier (e.g., hilight uses a larger offset).
-     */
-    public static void applyOverlayOffset(float[] localPositions, int overlayIndex, float multiplier) {
-        applyOverlayOffset(localPositions, overlayIndex, multiplier, null);
-    }
-
-    /**
-     * Applies overlay z-offset using explicit face direction when available.
-     */
-    public static void applyOverlayOffset(float[] localPositions, int overlayIndex, float multiplier, net.minecraft.core.Direction dir) {
-        if (dir != null) {
-            GeometryUtil.applyOverlayOffset(localPositions, overlayIndex, multiplier,
-                dir.getStepX(), dir.getStepY(), dir.getStepZ(), true);
-            return;
-        }
-        GeometryUtil.applyOverlayOffset(localPositions, overlayIndex, multiplier);
-    }
-
-    /**
      * Converts local positions to world positions with offsets.
      *
      * @param localPos local positions (0-1 range)
