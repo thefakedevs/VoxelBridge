@@ -882,7 +882,8 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         pbr.setMetallicFactor(0.0f);
         pbr.setRoughnessFactor(1.0f);
         material.setPbrMetallicRoughness(pbr);
-        material.setDoubleSided(doubleSided);
+        boolean forceDoubleSided = com.voxelbridge.config.ExportRuntimeConfig.isExportDoubleSidedEnabled();
+        material.setDoubleSided(forceDoubleSided || doubleSided);
 
         Map<String, Object> extras = new HashMap<>();
         if (!colorMapIndices.isEmpty()) {
