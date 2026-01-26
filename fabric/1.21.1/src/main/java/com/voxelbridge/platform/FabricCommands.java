@@ -118,6 +118,8 @@ public final class FabricCommands {
             ctx.getSource().sendFeedback(Component.literal("§b  Fill cave (dark cave_air): " + (ExportRuntimeConfig.isFillCaveEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendFeedback(Component.literal("§b  LabPBR decode: " + (ExportRuntimeConfig.isPbrDecodeEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendFeedback(Component.literal("§b  Logging: " + (ExportRuntimeConfig.isLoggingEnabled() ? "§aon" : "§coff")));
+            ctx.getSource().sendFeedback(Component.literal("§b  Collapse double-sided: " + (ExportRuntimeConfig.isExportDoubleSidedEnabled() ? "§aon" : "§coff")));
+            ctx.getSource().sendFeedback(Component.literal("\u00a7b  Nonsolid culling: " + (ExportRuntimeConfig.isNonsolidCullingEnabled() ? "\u00a7aon" : "\u00a7coff")));
             ctx.getSource().sendFeedback(
                     Component.literal("§b  Export threads: §f" + ExportRuntimeConfig.getExportThreadCount()));
             return 1;
@@ -211,6 +213,23 @@ public final class FabricCommands {
                 .then(ClientCommandManager.literal("off").executes(ctx -> {
                     ExportRuntimeConfig.setFillCaveEnabled(false);
                     ctx.getSource().sendFeedback(Component.literal("§c[VoxelBridge] Fill cave -> OFF"));
+                    return 1;
+                })));
+
+        root.then(ClientCommandManager.literal("collapseDoubleSided")
+                .executes(ctx -> {
+                    ctx.getSource().sendFeedback(Component.literal("§b[VoxelBridge] Collapse double-sided is currently " + (ExportRuntimeConfig.isExportDoubleSidedEnabled() ? "§aon" : "§coff")));
+                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge collapseDoubleSided <on|off>"));
+                    return 1;
+                })
+                .then(ClientCommandManager.literal("on").executes(ctx -> {
+                    ExportRuntimeConfig.setExportDoubleSidedEnabled(true);
+                    ctx.getSource().sendFeedback(Component.literal("§a[VoxelBridge] Collapse double-sided -> ON"));
+                    return 1;
+                }))
+                .then(ClientCommandManager.literal("off").executes(ctx -> {
+                    ExportRuntimeConfig.setExportDoubleSidedEnabled(false);
+                    ctx.getSource().sendFeedback(Component.literal("§c[VoxelBridge] Collapse double-sided -> OFF"));
                     return 1;
                 })));
 
@@ -392,6 +411,23 @@ public final class FabricCommands {
             return result.started() ? 1 : 0;
         }));
 
+        root.then(ClientCommandManager.literal("nonsolidCulling")
+                .executes(ctx -> {
+                    ctx.getSource().sendFeedback(Component.literal("\u00a7b[VoxelBridge] Nonsolid culling is currently " + (ExportRuntimeConfig.isNonsolidCullingEnabled() ? "\u00a7aon" : "\u00a7coff")));
+                    ctx.getSource().sendFeedback(Component.literal("\u00a77   Usage: /voxelbridge nonsolidCulling <on|off>"));
+                    return 1;
+                })
+                .then(ClientCommandManager.literal("on").executes(ctx -> {
+                    ExportRuntimeConfig.setNonsolidCullingEnabled(true);
+                    ctx.getSource().sendFeedback(Component.literal("\u00a7a[VoxelBridge] Nonsolid culling -> ON"));
+                    return 1;
+                }))
+                .then(ClientCommandManager.literal("off").executes(ctx -> {
+                    ExportRuntimeConfig.setNonsolidCullingEnabled(false);
+                    ctx.getSource().sendFeedback(Component.literal("\u00a7c[VoxelBridge] Nonsolid culling -> OFF (will inset instead)"));
+                    return 1;
+                })));
+
         // Register the literal and create shortcut
         CommandNode<FabricClientCommandSource> rootNode = dispatcher.register(root);
         dispatcher.register(ClientCommandManager.literal("vb").redirect(rootNode));
@@ -437,3 +473,5 @@ public final class FabricCommands {
         return (int) Math.floor(value);
     }
 }
+
+

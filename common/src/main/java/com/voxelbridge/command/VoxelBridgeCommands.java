@@ -101,6 +101,8 @@ public final class VoxelBridgeCommands {
             ctx.getSource().sendSystemMessage(Component.literal("§b  Fill cave (dark cave_air): " + (ExportRuntimeConfig.isFillCaveEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendSystemMessage(Component.literal("§b  LabPBR decode: " + (ExportRuntimeConfig.isPbrDecodeEnabled() ? "§aon" : "§coff")));
             ctx.getSource().sendSystemMessage(Component.literal("§b  Logging: " + (ExportRuntimeConfig.isLoggingEnabled() ? "§aon" : "§coff")));
+            ctx.getSource().sendSystemMessage(Component.literal("§b  Collapse double-sided: " + (ExportRuntimeConfig.isExportDoubleSidedEnabled() ? "§aon" : "§coff")));
+            ctx.getSource().sendSystemMessage(Component.literal("\u00a7b  Nonsolid culling: " + (ExportRuntimeConfig.isNonsolidCullingEnabled() ? "\u00a7aon" : "\u00a7coff")));
             ctx.getSource().sendSystemMessage(Component.literal("§b  Export threads: §f" + ExportRuntimeConfig.getExportThreadCount()));
             return 1;
         }));
@@ -167,6 +169,41 @@ public final class VoxelBridgeCommands {
                     return 1;
                 }))
         );
+
+        var collapseDoubleSided = Commands.literal("collapseDoubleSided")
+                .executes(ctx -> {
+                    ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Collapse double-sided is currently " + (ExportRuntimeConfig.isExportDoubleSidedEnabled() ? "§aon" : "§coff")));
+                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge collapseDoubleSided <on|off>"));
+                    return 1;
+                })
+                .then(Commands.literal("on").executes(ctx -> {
+                    ExportRuntimeConfig.setExportDoubleSidedEnabled(true);
+                    ctx.getSource().sendSystemMessage(Component.literal("§a[VoxelBridge] Collapse double-sided -> ON"));
+                    return 1;
+                }))
+                .then(Commands.literal("off").executes(ctx -> {
+                    ExportRuntimeConfig.setExportDoubleSidedEnabled(false);
+                    ctx.getSource().sendSystemMessage(Component.literal("§c[VoxelBridge] Collapse double-sided -> OFF"));
+                    return 1;
+                }));
+        root.then(collapseDoubleSided);
+
+        root.then(Commands.literal("nonsolidCulling")
+                .executes(ctx -> {
+                    ctx.getSource().sendSystemMessage(Component.literal("\u00a7b[VoxelBridge] Nonsolid culling is currently " + (ExportRuntimeConfig.isNonsolidCullingEnabled() ? "\u00a7aon" : "\u00a7coff")));
+                    ctx.getSource().sendSystemMessage(Component.literal("\u00a77   Usage: /voxelbridge nonsolidCulling <on|off>"));
+                    return 1;
+                })
+                .then(Commands.literal("on").executes(ctx -> {
+                    ExportRuntimeConfig.setNonsolidCullingEnabled(true);
+                    ctx.getSource().sendSystemMessage(Component.literal("\u00a7a[VoxelBridge] Nonsolid culling -> ON"));
+                    return 1;
+                }))
+                .then(Commands.literal("off").executes(ctx -> {
+                    ExportRuntimeConfig.setNonsolidCullingEnabled(false);
+                    ctx.getSource().sendSystemMessage(Component.literal("\u00a7c[VoxelBridge] Nonsolid culling -> OFF (will inset instead)"));
+                    return 1;
+                })));
 
         root.then(Commands.literal("atlasSize")
                 .executes(ctx -> {
@@ -372,3 +409,5 @@ public final class VoxelBridgeCommands {
         dispatcher.register(Commands.literal("vb").redirect(rootNode));
     }
 }
+
+

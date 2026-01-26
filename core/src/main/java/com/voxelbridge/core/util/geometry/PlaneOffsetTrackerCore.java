@@ -1,5 +1,6 @@
 package com.voxelbridge.core.util.geometry;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
@@ -12,28 +13,81 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
  * and their projected 2D AABBs overlap with positive area.
  */
 public final class PlaneOffsetTrackerCore {
-    // Increased precision to 1e6 (0.001mm) to further prevent false positives
     // "EPS" in this context is effectively 1/QUANT. Higher QUANT = Smaller EPS = Stricter check.
-    private static final float NORMAL_QUANT = 1000000f;
-    private static final float DIST_QUANT = 1000000f;
-    private static final float POS_QUANT = 1000000f; 
+    private static final float DEFAULT_NORMAL_QUANT = 1000000f;
+    private static final float DEFAULT_DIST_QUANT = 1000000f;
+    private static final float DEFAULT_POS_QUANT = 1000000f;
     private static final float OFFSET_STEP = 2e-4f;
 
-    private final Long2ObjectOpenHashMap<ObjectArrayList<float[]>> buckets = new Long2ObjectOpenHashMap<>();
+    private static final float DEFAULT_BUCKET_EPS = 1e-3f;
+    private static final float DEFAULT_CELL_SIZE = 3.0f;
+    private static final float DEFAULT_OVERLAP_EPS = 1e-3f;
+
+    private final float cellSize;
+    private final float bucketEps;
+    private final float overlapEps;
+    private final float normalQuant;
+    private final float distQuant;
+    private final float posQuant;
+
+    private static final class Entry {
+        final int id;
+        final float[] aabb2d;
+
+        private Entry(int id, float[] aabb2d) {
+            this.id = id;
+            this.aabb2d = aabb2d;
+        }
+    }
+
+    private final Long2ObjectOpenHashMap<ObjectArrayList<Entry>> buckets = new Long2ObjectOpenHashMap<>();
+    private int nextEntryId = 1;
 
     public PlaneOffsetTrackerCore() {
+        this(DEFAULT_CELL_SIZE, DEFAULT_BUCKET_EPS, DEFAULT_OVERLAP_EPS, DEFAULT_NORMAL_QUANT, DEFAULT_DIST_QUANT, DEFAULT_POS_QUANT);
+    }
+
+    public PlaneOffsetTrackerCore(float cellSize, float bucketEps, float overlapEps) {
+        this(cellSize, bucketEps, overlapEps, DEFAULT_NORMAL_QUANT, DEFAULT_DIST_QUANT, DEFAULT_POS_QUANT);
+    }
+
+    public PlaneOffsetTrackerCore(float cellSize, float bucketEps, float overlapEps, float normalQuant, float distQuant, float posQuant) {
         buckets.defaultReturnValue(null);
+        this.cellSize = cellSize;
+        this.bucketEps = bucketEps;
+        this.overlapEps = overlapEps;
+        this.normalQuant = normalQuant;
+        this.distQuant = distQuant;
+        this.posQuant = posQuant;
     }
 
     public void clear() {
         buckets.clear();
+        nextEntryId = 1;
     }
 
     public void applyOffset(float[] positions, float[] normal) {
-        applyOffset(positions, normal, 0f, 0f, 0f, false);
+        applyOffsetInternal(positions, normal, 0f, 0f, 0f, false, 0L, false);
     }
 
     public void applyOffset(float[] positions, float[] normal, float dirX, float dirY, float dirZ, boolean hasDir) {
+        applyOffsetInternal(positions, normal, dirX, dirY, dirZ, hasDir, 0L, false);
+    }
+
+    public void applyOffsetWithBucketKey(float[] positions, float[] normal, float dirX, float dirY, float dirZ, boolean hasDir, long bucketKey) {
+        applyOffsetInternal(positions, normal, dirX, dirY, dirZ, hasDir, bucketKey, true);
+    }
+
+    private void applyOffsetInternal(
+        float[] positions,
+        float[] normal,
+        float dirX,
+        float dirY,
+        float dirZ,
+        boolean hasDir,
+        long bucketKey,
+        boolean useBucketKey
+    ) {
         if (positions == null || positions.length < 12 || normal == null || normal.length < 3) {
             return;
         }
@@ -60,6 +114,13 @@ public final class PlaneOffsetTrackerCore {
             }
         }
 
+        // Canonicalize normal so parallel (opposite) faces share the same plane hash.
+        if (nx < 0f || (nx == 0f && ny < 0f) || (nx == 0f && ny == 0f && nz < 0f)) {
+            nx = -nx;
+            ny = -ny;
+            nz = -nz;
+        }
+
         // Plane Distance D
         // d = nx*x + ny*y + nz*z
         // Use first vertex for plane D calculation
@@ -68,41 +129,89 @@ public final class PlaneOffsetTrackerCore {
         // SPATIAL BUCKETING
         // To prevent infinite offset accumulation across the world for coplanar faces (e.g. floor),
         // we bucket faces into coarse spatial cells.
-        // Cell Size = 2.0 ensures that faces within a ~2 block radius interact, but far faces do not.
+        // Cell Size = 3.0 groups faces within a 3x3x3 block region into the same bucket.
         float cx = (positions[0] + positions[3] + positions[6] + positions[9]) * 0.25f;
         float cy = (positions[1] + positions[4] + positions[7] + positions[10]) * 0.25f;
         float cz = (positions[2] + positions[5] + positions[8] + positions[11]) * 0.25f;
         
         // Quantize centroid to spatial buckets
-        int gridX = Math.round(cx / 2.0f);
-        int gridY = Math.round(cy / 2.0f);
-        int gridZ = Math.round(cz / 2.0f);
+        int gridX = Math.round(cx / 3.0f);
+        int gridY = Math.round(cy / 3.0f);
+        int gridZ = Math.round(cz / 3.0f);
 
-        int qnx = Math.round(nx * NORMAL_QUANT);
-        int qny = Math.round(ny * NORMAL_QUANT);
-        int qnz = Math.round(nz * NORMAL_QUANT);
-        int qd = Math.round(d * DIST_QUANT);
+        int qnx = Math.round(nx * normalQuant);
+        int qny = Math.round(ny * normalQuant);
+        int qnz = Math.round(nz * normalQuant);
+        int qd = Math.round(d * distQuant);
 
         long planeHash = hash4(qnx, qny, qnz, qd);
-        long gridHash = hash3(gridX, gridY, gridZ);
-        
-        // Combine plane hash and grid hash
-        long key = planeHash ^ (gridHash * 31);
-        
-        float[] aabb2d = projectAabb2d(positions, nx, ny, nz);
-        ObjectArrayList<float[]> list = buckets.get(key);
+        float[] aabb2d = new float[4];
+        projectAabb2d(positions, nx, ny, nz, aabb2d);
+
         int overlapCount = 0;
-        if (list == null) {
-            list = new ObjectArrayList<>();
-            buckets.put(key, list);
+        if (useBucketKey) {
+            long key = planeHash ^ (bucketKey * 31);
+            ObjectArrayList<Entry> list = buckets.get(key);
+            if (list != null) {
+                for (int i = 0; i < list.size(); i++) {
+                    Entry entry = list.get(i);
+                    if (overlaps2d(aabb2d, entry.aabb2d)) {
+                        overlapCount++;
+                    }
+                }
+            }
+            Entry entry = new Entry(nextEntryId++, aabb2d);
+            if (list == null) {
+                list = new ObjectArrayList<>();
+                buckets.put(key, list);
+            }
+            list.add(entry);
         } else {
-            for (int i = 0; i < list.size(); i++) {
-                if (overlaps2d(aabb2d, list.get(i))) {
-                    overlapCount++;
+            float minU = aabb2d[0] - bucketEps;
+            float maxU = aabb2d[1] + bucketEps;
+            float minV = aabb2d[2] - bucketEps;
+            float maxV = aabb2d[3] + bucketEps;
+
+            int minUIdx = (int) Math.floor(minU / cellSize);
+            int maxUIdx = (int) Math.floor(maxU / cellSize);
+            int minVIdx = (int) Math.floor(minV / cellSize);
+            int maxVIdx = (int) Math.floor(maxV / cellSize);
+
+            IntOpenHashSet visited = new IntOpenHashSet();
+            for (int u = minUIdx; u <= maxUIdx; u++) {
+                for (int v = minVIdx; v <= maxVIdx; v++) {
+                    long gridHash = hash3(u, v, 0);
+                    long key = planeHash ^ (gridHash * 31);
+                    ObjectArrayList<Entry> list = buckets.get(key);
+                    if (list == null) {
+                        continue;
+                    }
+                    for (int i = 0; i < list.size(); i++) {
+                        Entry entry = list.get(i);
+                        if (!visited.add(entry.id)) {
+                            continue;
+                        }
+                        if (overlaps2d(aabb2d, entry.aabb2d)) {
+                            overlapCount++;
+                        }
+                    }
+                }
+            }
+
+            Entry entry = new Entry(nextEntryId++, aabb2d);
+            for (int u = minUIdx; u <= maxUIdx; u++) {
+                for (int v = minVIdx; v <= maxVIdx; v++) {
+                    long gridHash = hash3(u, v, 0);
+                    long key = planeHash ^ (gridHash * 31);
+                    ObjectArrayList<Entry> list = buckets.get(key);
+                    if (list == null) {
+                        list = new ObjectArrayList<>();
+                        buckets.put(key, list);
+                    }
+                    list.add(entry);
                 }
             }
         }
-        list.add(aabb2d);
         if (overlapCount == 0) {
             return;
         }
@@ -132,7 +241,7 @@ public final class PlaneOffsetTrackerCore {
         return h;
     }
 
-    private static float[] projectAabb2d(float[] positions, float nx, float ny, float nz) {
+    private static void projectAabb2d(float[] positions, float nx, float ny, float nz, float[] out) {
         float anx = Math.abs(nx);
         float any = Math.abs(ny);
         float anz = Math.abs(nz);
@@ -170,10 +279,14 @@ public final class PlaneOffsetTrackerCore {
             if (v < minV) minV = v;
             if (v > maxV) maxV = v;
         }
-        return new float[]{minU, maxU, minV, maxV};
+        out[0] = minU;
+        out[1] = maxU;
+        out[2] = minV;
+        out[3] = maxV;
     }
 
-    private static boolean overlaps2d(float[] a, float[] b) {
-        return a[1] > b[0] && a[0] < b[1] && a[3] > b[2] && a[2] < b[3];
+    private boolean overlaps2d(float[] a, float[] b) {
+        float eps = overlapEps;
+        return a[1] + eps > b[0] && a[0] - eps < b[1] && a[3] + eps > b[2] && a[2] - eps < b[3];
     }
 }

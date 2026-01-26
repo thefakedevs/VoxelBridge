@@ -30,6 +30,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.AABB;
 
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -149,7 +150,10 @@ public final class EntityRenderer {
 
             poseStack.translate(finalX, finalY, finalZ);
 
-            CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, offsetX, offsetY, offsetZ, entity);
+            double deltaX = finalX - entity.getX();
+            double deltaY = finalY - entity.getY();
+            double deltaZ = finalZ - entity.getZ();
+            CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, offsetX, offsetY, offsetZ, entity, deltaX, deltaY, deltaZ);
             float partial = 0f;
             float yaw = entity.getYRot();
             if (VoxelBridgeLogger.isDebugEnabled(LogModule.ENTITY)) {
@@ -173,6 +177,9 @@ public final class EntityRenderer {
                         Adapters.getEntityRender().getRenderOffset(renderer, entity, partial, renderState);
                     if (renderOffset != null) {
                         poseStack.translate(renderOffset.x(), renderOffset.y(), renderOffset.z());
+                        captureBuffer.setRenderOffset(renderOffset);
+                    } else {
+                        captureBuffer.setRenderOffset(null);
                     }
                     Adapters.getEntityRender().render(renderer, renderState, entity, yaw, partial, poseStack, captureBuffer, packedLight);
                 } catch (Exception e) {
@@ -230,17 +237,27 @@ public final class EntityRenderer {
     private static class CaptureBuffer extends CaptureBufferBase {
         private final double offsetX, offsetY, offsetZ;
         private final Entity entity;
-        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker();
+        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker(3.0f, 1e-3f, 1e-3f, 1000f, 1000f, 1000f);
+        private final double baseDeltaX;
+        private final double baseDeltaY;
+        private final double baseDeltaZ;
+        private net.minecraft.world.phys.Vec3 renderOffset;
+        private long bucketKey;
+        private boolean bucketKeyReady;
         private int quadCount = 0;
         private float minX = Float.POSITIVE_INFINITY, minY = Float.POSITIVE_INFINITY, minZ = Float.POSITIVE_INFINITY;
         private float maxX = Float.NEGATIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
 
-        CaptureBuffer(ExportContext ctx, IrSink sceneSink, double offsetX, double offsetY, double offsetZ, Entity entity) {
+        CaptureBuffer(ExportContext ctx, IrSink sceneSink, double offsetX, double offsetY, double offsetZ, Entity entity,
+                      double baseDeltaX, double baseDeltaY, double baseDeltaZ) {
             super(ctx, sceneSink, null);
             this.offsetX = offsetX;
             this.offsetY = offsetY;
             this.offsetZ = offsetZ;
             this.entity = entity;
+            this.baseDeltaX = baseDeltaX;
+            this.baseDeltaY = baseDeltaY;
+            this.baseDeltaZ = baseDeltaZ;
         }
 
         void flush() {
@@ -297,6 +314,7 @@ public final class EntityRenderer {
             }
             RenderCaptureUtil.UvStats uvStats = RenderCaptureUtil.computeUvStats(verts);
             String materialGroupKey = MaterialGroupKey.entity(entity);
+            updateBucketKey();
             CapturedQuadProcessor.process(
                 ctx,
                 sceneSink,
@@ -312,9 +330,35 @@ public final class EntityRenderer {
                 this::resolveTexture,
                 this::writeUvs,
                 (tracker, quadPositions, faceNormal) ->
-                    tracker.applyOffset(quadPositions, faceNormal, approximateDirection(faceNormal)),
+                    tracker.applyOffsetWithBucketKey(quadPositions, faceNormal, approximateDirection(faceNormal), bucketKey),
                 RENDER_TYPE_RESOLVER
             );
+        }
+
+        void setRenderOffset(net.minecraft.world.phys.Vec3 renderOffset) {
+            this.renderOffset = renderOffset;
+            this.bucketKeyReady = false;
+        }
+
+        private void updateBucketKey() {
+            if (bucketKeyReady) {
+                return;
+            }
+            AABB bounds = entity.getBoundingBox();
+            double dx = baseDeltaX;
+            double dy = baseDeltaY;
+            double dz = baseDeltaZ;
+            if (renderOffset != null) {
+                dx += renderOffset.x();
+                dy += renderOffset.y();
+                dz += renderOffset.z();
+            }
+            bounds = bounds.move(dx, dy, dz);
+            bucketKey = PlaneOffsetTracker.hashAabb(
+                (float) bounds.minX, (float) bounds.minY, (float) bounds.minZ,
+                (float) bounds.maxX, (float) bounds.maxY, (float) bounds.maxZ
+            );
+            bucketKeyReady = true;
         }
 
         private CapturedQuadProcessor.TextureResult resolveTexture(

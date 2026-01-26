@@ -93,6 +93,8 @@ public final class ExportConfigStore {
         data.fillCaveEnabled = ExportRuntimeConfig.isFillCaveEnabled();
         data.pbrDecodeEnabled = ExportRuntimeConfig.isPbrDecodeEnabled();
         data.loggingEnabled = ExportRuntimeConfig.isLoggingEnabled();
+        data.exportDoubleSidedEnabled = ExportRuntimeConfig.isExportDoubleSidedEnabled();
+        data.nonsolidCullingEnabled = ExportRuntimeConfig.isNonsolidCullingEnabled();
         return data;
     }
 
@@ -129,6 +131,14 @@ public final class ExportConfigStore {
         ExportRuntimeConfig.setFillCaveEnabled(data.fillCaveEnabled);
         ExportRuntimeConfig.setPbrDecodeEnabled(data.pbrDecodeEnabled);
         ExportRuntimeConfig.setLoggingEnabled(data.loggingEnabled);
+        if (data.exportDoubleSidedEnabled != null) {
+            ExportRuntimeConfig.setExportDoubleSidedEnabled(data.exportDoubleSidedEnabled);
+        }
+        if (data.nonsolidCullingEnabled != null) {
+            ExportRuntimeConfig.setNonsolidCullingEnabled(data.nonsolidCullingEnabled);
+        } else if (data.cullNonsolidAgainstSolidEnabled != null) {
+            ExportRuntimeConfig.setNonsolidCullingEnabled(data.cullNonsolidAgainstSolidEnabled);
+        }
     }
 
     private static Path getConfigPath() {
@@ -151,5 +161,11 @@ public final class ExportConfigStore {
         boolean fillCaveEnabled;
         boolean pbrDecodeEnabled;
         boolean loggingEnabled;
+        Boolean exportDoubleSidedEnabled;
+        Boolean nonsolidCullingEnabled;
+        // Backward compatibility for older config key.
+        Boolean cullNonsolidAgainstSolidEnabled;
     }
 }
+
+

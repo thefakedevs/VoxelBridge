@@ -24,6 +24,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 
@@ -242,7 +243,7 @@ public final class BlockEntityRenderer {
         private static final Set<String> LOGGED_TEXT_TYPES = ConcurrentHashMap.newKeySet();
         private final BlockEntity blockEntity;
         private final TextureOverrideMap overrides;
-        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker();
+        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker(3.0f, 1e-3f, 1e-3f, 1000f, 1000f, 1000f);
 
         CaptureBuffer(ExportContext ctx, IrSink sceneSink, BlockEntity blockEntity) {
             super(ctx, sceneSink, (renderType, queuedVertices) -> {
@@ -316,9 +317,22 @@ public final class BlockEntityRenderer {
                 materialGroupKey,
                 this::resolveTexture,
                 this::writeUvs,
-                (tracker, quadPositions, faceNormal) -> tracker.applyOffset(quadPositions, faceNormal),
+                (tracker, quadPositions, faceNormal) -> tracker.applyOffset(quadPositions, faceNormal, approximateDirection(faceNormal)),
                 RENDER_TYPE_RESOLVER
             );
+        }
+
+        private Direction approximateDirection(float[] normal) {
+            int axis = GeometryUtil.dominantAxisSigned(normal);
+            return switch (axis) {
+                case 1 -> Direction.EAST;
+                case -1 -> Direction.WEST;
+                case 2 -> Direction.UP;
+                case -2 -> Direction.DOWN;
+                case 3 -> Direction.SOUTH;
+                case -3 -> Direction.NORTH;
+                default -> null;
+            };
         }
 
         private CapturedQuadProcessor.TextureResult resolveTexture(

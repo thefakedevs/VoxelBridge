@@ -45,7 +45,7 @@ public final class BlockExporter {
     private final ClientChunkCache chunkCache;
     private final boolean vanillaRandomTransformEnabled;
     private final BlockEntityRenderBatch blockEntityBatch;
-    private final PlaneOffsetTracker planeOffsetTracker = new PlaneOffsetTracker();
+    private final PlaneOffsetTracker planeOffsetTracker = new PlaneOffsetTracker(3.0f, 1e-3f, 1e-3f);
 
     private BlockPos regionMin;
     private BlockPos regionMax;
@@ -255,6 +255,9 @@ public final class BlockExporter {
             // Process quad
             quadProcessor.processQuad(state, pos, quad, blockKey, randomOffset);
         }
+
+        // Flush cached quads (dedup/cull) before overlays
+        quadProcessor.flush();
 
         // PASS 3: Output overlays with culling
         final boolean ctmCompact = isCtmCompact;

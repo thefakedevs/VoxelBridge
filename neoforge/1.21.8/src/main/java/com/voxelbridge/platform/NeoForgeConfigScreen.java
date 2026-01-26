@@ -121,6 +121,22 @@ public final class NeoForgeConfigScreen {
                 .setTooltip(Component.translatable("config.voxelbridge.logging.tooltip"))
                 .setSaveConsumer(ExportRuntimeConfig::setLoggingEnabled)
                 .build());
+
+        general.addEntry(entries.startBooleanToggle(
+                        Component.translatable("config.voxelbridge.exportDoubleSided"),
+                        ExportRuntimeConfig.isExportDoubleSidedEnabled())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.voxelbridge.exportDoubleSided.tooltip"))
+                .setSaveConsumer(ExportRuntimeConfig::setExportDoubleSidedEnabled)
+                .build());
+
+        general.addEntry(entries.startBooleanToggle(
+                        Component.translatable("config.voxelbridge.nonsolidCulling"),
+                        ExportRuntimeConfig.isNonsolidCullingEnabled())
+                .setDefaultValue(true)
+                .setTooltip(Component.translatable("config.voxelbridge.nonsolidCulling.tooltip"))
+                .setSaveConsumer(ExportRuntimeConfig::setNonsolidCullingEnabled)
+                .build());
     }
 
     private static void buildAtlasCategory(ConfigBuilder builder, ConfigEntryBuilder entries) {
@@ -250,3 +266,5 @@ public final class NeoForgeConfigScreen {
         }
     }
 }
+
+

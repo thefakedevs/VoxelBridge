@@ -74,6 +74,10 @@ public final class ExportRuntimeConfig {
     private static boolean pbrDecodeEnabled = false;
     // Global log output toggle.
     private static boolean loggingEnabled = false;
+    // Export double-sided by collapsing back-to-back faces for certain blocks.
+    private static boolean exportDoubleSidedEnabled = true;
+    // Cull nonsolid faces fully covered by solid neighbors.
+    private static boolean nonsolidCullingEnabled = true;
     private static Runnable changeListener;
 
     private static void notifyChanged() {
@@ -219,6 +223,28 @@ public final class ExportRuntimeConfig {
         }
     }
 
+    public static boolean isExportDoubleSidedEnabled() {
+        return exportDoubleSidedEnabled;
+    }
+
+    public static void setExportDoubleSidedEnabled(boolean enabled) {
+        if (exportDoubleSidedEnabled != enabled) {
+            exportDoubleSidedEnabled = enabled;
+            notifyChanged();
+        }
+    }
+
+    public static boolean isNonsolidCullingEnabled() {
+        return nonsolidCullingEnabled;
+    }
+
+    public static void setNonsolidCullingEnabled(boolean enabled) {
+        if (nonsolidCullingEnabled != enabled) {
+            nonsolidCullingEnabled = enabled;
+            notifyChanged();
+        }
+    }
+
     public static void resetDefaults() {
         atlasMode = AtlasMode.ATLAS;
         atlasSize = AtlasSize.SIZE_8192;
@@ -231,7 +257,10 @@ public final class ExportRuntimeConfig {
         fillCaveEnabled = false;
         pbrDecodeEnabled = false;
         loggingEnabled = false;
+        exportDoubleSidedEnabled = true;
+        nonsolidCullingEnabled = true;
         notifyChanged();
     }
 
 }
+
