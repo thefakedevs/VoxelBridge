@@ -4,10 +4,10 @@ plugins {
 }
 
 ext {
-    active_fabric_mc = "1.21.1"
+    active_fabric_mc = "1.21.4"
 }
 
-def activeFabricMc = (project.findProperty('active_fabric_mc') ?: '1.21.1').toString()
+def activeFabricMc = (project.findProperty('active_fabric_mc') ?: '1.21.4').toString()
 def platform = "fabric"
 def mcProjectDir = rootProject.file("fabric/${activeFabricMc}")
 
