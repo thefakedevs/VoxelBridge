@@ -19,6 +19,8 @@ public final class EntityExporter {
         ExportContext ctx,
         IrSink sceneSink,
         Level level,
+        int chunkX,
+        int chunkZ,
         AABB bounds,
         double offsetX,
         double offsetY,
@@ -46,6 +48,7 @@ public final class EntityExporter {
         }
 
         ctx.getMc().executeBlocking(() -> {
+            EntityRenderer.clearChunkTracker(chunkX, chunkZ);
             for (Entity entity : candidates) {
                 Vec3 pos = entity.position();
                 VoxelBridgeLogger.info(LogModule.ENTITY, String.format("Exporting entity: %s (%s) at [%.2f, %.2f, %.2f]",

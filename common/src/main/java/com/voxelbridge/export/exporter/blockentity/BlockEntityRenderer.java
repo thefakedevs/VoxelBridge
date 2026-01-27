@@ -43,6 +43,7 @@ public final class BlockEntityRenderer {
     private static final ThreadLocal<TextureOverrideMap> OVERRIDES = new ThreadLocal<>();
     private static TextureResolver<BlockEntity> TEXTURE_RESOLVER = BlockEntityTextureResolver.INSTANCE;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
+    private static final ConcurrentHashMap<Long, PlaneOffsetTracker> CHUNK_PLANE_OFFSETS = new ConcurrentHashMap<>();
 
     private BlockEntityRenderer() {}
 
@@ -62,6 +63,10 @@ public final class BlockEntityRenderer {
         if (resolver != null) {
             RENDER_TYPE_RESOLVER = resolver;
         }
+    }
+
+    public static void clearChunkTracker(int chunkX, int chunkZ) {
+        CHUNK_PLANE_OFFSETS.remove(chunkKey(chunkX, chunkZ));
     }
 
     /**
@@ -143,7 +148,9 @@ public final class BlockEntityRenderer {
         double offsetY,
         double offsetZ,
         TextureOverrideMap overrides,
-        net.minecraft.client.renderer.blockentity.BlockEntityRenderer<BlockEntity> renderer
+        net.minecraft.client.renderer.blockentity.BlockEntityRenderer<BlockEntity> renderer,
+        int chunkX,
+        int chunkZ
     ) {
         try {
             com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderer][renderDirect] Starting render for " + blockEntity.getClass().getSimpleName());
@@ -153,7 +160,7 @@ public final class BlockEntityRenderer {
             PoseStack poseStack = new PoseStack();
             poseStack.translate(offsetX, offsetY, offsetZ);
 
-            CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, blockEntity);
+            CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, blockEntity, chunkX, chunkZ);
 
             com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderer][renderDirect] Calling renderer.render()...");
             Vec3 camera = Vec3.ZERO;
@@ -225,7 +232,7 @@ public final class BlockEntityRenderer {
         public void run() {
             sceneSink.onChunkStart(chunkX, chunkZ);
             try {
-                this.success = renderDirect(ctx, blockEntity, sceneSink, offsetX, offsetY, offsetZ, overrides, renderer);
+                this.success = renderDirect(ctx, blockEntity, sceneSink, offsetX, offsetY, offsetZ, overrides, renderer, chunkX, chunkZ);
             } finally {
                 sceneSink.onChunkEnd(chunkX, chunkZ, this.success);
             }
@@ -243,9 +250,9 @@ public final class BlockEntityRenderer {
         private static final Set<String> LOGGED_TEXT_TYPES = ConcurrentHashMap.newKeySet();
         private final BlockEntity blockEntity;
         private final TextureOverrideMap overrides;
-        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker(3.0f, 1e-3f, 1e-3f, 1000f, 1000f, 1000f);
+        private final PlaneOffsetTracker planeOffset;
 
-        CaptureBuffer(ExportContext ctx, IrSink sceneSink, BlockEntity blockEntity) {
+        CaptureBuffer(ExportContext ctx, IrSink sceneSink, BlockEntity blockEntity, int chunkX, int chunkZ) {
             super(ctx, sceneSink, (renderType, queuedVertices) -> {
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.BLOCKENTITY)) {
                     VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[VertexCollector] setNormal called, vertices.size=" + queuedVertices);
@@ -253,6 +260,10 @@ public final class BlockEntityRenderer {
             });
             this.blockEntity = blockEntity;
             this.overrides = OVERRIDES.get();
+            this.planeOffset = CHUNK_PLANE_OFFSETS.computeIfAbsent(
+                chunkKey(chunkX, chunkZ),
+                key -> new PlaneOffsetTracker(3.0f, 1e-3f, 1e-3f, 1000f, 1000f, 1000f)
+            );
         }
 
         void flush() {
@@ -455,6 +466,9 @@ public final class BlockEntityRenderer {
 
     }
 
+    private static long chunkKey(int chunkX, int chunkZ) {
+        return (((long) chunkX) << 32) ^ (chunkZ & 0xFFFFFFFFL);
+    }
 }
 
 

@@ -1,7 +1,6 @@
 package com.voxelbridge.core.util.geometry;
 
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 /**
@@ -40,7 +39,7 @@ public final class PlaneOffsetTrackerCore {
         }
     }
 
-    private final Long2ObjectOpenHashMap<ObjectArrayList<Entry>> buckets = new Long2ObjectOpenHashMap<>();
+    private final Int2ObjectOpenHashMap<ObjectArrayList<Entry>> buckets = new Int2ObjectOpenHashMap<>();
     private int nextEntryId = 1;
 
     public PlaneOffsetTrackerCore() {
@@ -139,22 +138,22 @@ public final class PlaneOffsetTrackerCore {
         float cz = (positions[2] + positions[5] + positions[8] + positions[11]) * 0.25f;
         
         // Quantize centroid to spatial buckets
-        int gridX = Math.round(cx / 3.0f);
-        int gridY = Math.round(cy / 3.0f);
-        int gridZ = Math.round(cz / 3.0f);
+        int gridX = Math.round(cx / cellSize);
+        int gridY = Math.round(cy / cellSize);
+        int gridZ = Math.round(cz / cellSize);
 
         int qnx = Math.round(nx * normalQuant);
         int qny = Math.round(ny * normalQuant);
         int qnz = Math.round(nz * normalQuant);
         int qd = Math.round(d * distQuant);
 
-        long planeHash = hash4(qnx, qny, qnz, qd);
+        int planeHash = hash4(qnx, qny, qnz, qd);
         float[] aabb2d = new float[4];
         projectAabb2d(positions, nx, ny, nz, aabb2d);
 
         int overlapCount = 0;
         if (useBucketKey) {
-            long key = planeHash ^ (bucketKey * 31);
+            int key = planeHash ^ (foldLongToInt(bucketKey) * 31);
             ObjectArrayList<Entry> list = buckets.get(key);
             if (list != null) {
                 for (int i = 0; i < list.size(); i++) {
@@ -171,50 +170,34 @@ public final class PlaneOffsetTrackerCore {
             }
             list.add(entry);
         } else {
-            float minU = aabb2d[0] - bucketEps;
-            float maxU = aabb2d[1] + bucketEps;
-            float minV = aabb2d[2] - bucketEps;
-            float maxV = aabb2d[3] + bucketEps;
-
-            int minUIdx = (int) Math.floor(minU / cellSize);
-            int maxUIdx = (int) Math.floor(maxU / cellSize);
-            int minVIdx = (int) Math.floor(minV / cellSize);
-            int maxVIdx = (int) Math.floor(maxV / cellSize);
-
-            IntOpenHashSet visited = new IntOpenHashSet();
-            for (int u = minUIdx; u <= maxUIdx; u++) {
-                for (int v = minVIdx; v <= maxVIdx; v++) {
-                    long gridHash = hash3(u, v, 0);
-                    long key = planeHash ^ (gridHash * 31);
-                    ObjectArrayList<Entry> list = buckets.get(key);
-                    if (list == null) {
-                        continue;
-                    }
-                    for (int i = 0; i < list.size(); i++) {
-                        Entry entry = list.get(i);
-                        if (!visited.add(entry.id)) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        int gridHash = foldLongToInt(packInt3(gridX + dx, gridY + dy, gridZ + dz));
+                        int key = planeHash ^ (gridHash * 31);
+                        ObjectArrayList<Entry> list = buckets.get(key);
+                        if (list == null) {
                             continue;
                         }
-                        if (overlaps2d(aabb2d, entry.aabb2d)) {
-                            overlapCount++;
+                        for (int i = 0; i < list.size(); i++) {
+                            Entry entry = list.get(i);
+                            if (overlaps2d(aabb2d, entry.aabb2d)) {
+                                overlapCount++;
+                            }
                         }
                     }
                 }
             }
 
+            int gridHash = foldLongToInt(packInt3(gridX, gridY, gridZ));
+            int key = planeHash ^ (gridHash * 31);
+            ObjectArrayList<Entry> list = buckets.get(key);
             Entry entry = new Entry(nextEntryId++, aabb2d);
-            for (int u = minUIdx; u <= maxUIdx; u++) {
-                for (int v = minVIdx; v <= maxVIdx; v++) {
-                    long gridHash = hash3(u, v, 0);
-                    long key = planeHash ^ (gridHash * 31);
-                    ObjectArrayList<Entry> list = buckets.get(key);
-                    if (list == null) {
-                        list = new ObjectArrayList<>();
-                        buckets.put(key, list);
-                    }
-                    list.add(entry);
-                }
+            if (list == null) {
+                list = new ObjectArrayList<>();
+                buckets.put(key, list);
             }
+            list.add(entry);
         }
         if (overlapCount == 0) {
             return;
@@ -228,21 +211,24 @@ public final class PlaneOffsetTrackerCore {
         }
     }
 
-    private static long hash4(int a, int b, int c, int d) {
-        long h = 1469598103934665603L;
-        h = (h ^ a) * 1099511628211L;
-        h = (h ^ b) * 1099511628211L;
-        h = (h ^ c) * 1099511628211L;
-        h = (h ^ d) * 1099511628211L;
+    private static int hash4(int a, int b, int c, int d) {
+        int h = 0x811c9dc5;
+        h = (h ^ a) * 0x01000193;
+        h = (h ^ b) * 0x01000193;
+        h = (h ^ c) * 0x01000193;
+        h = (h ^ d) * 0x01000193;
         return h;
     }
 
-    private static long hash3(int a, int b, int c) {
-        long h = 1469598103934665603L;
-        h = (h ^ a) * 1099511628211L;
-        h = (h ^ b) * 1099511628211L;
-        h = (h ^ c) * 1099511628211L;
-        return h;
+    private static long packInt3(int x, int y, int z) {
+        long lx = ((long) x) & 0x1FFFFF;
+        long ly = ((long) y) & 0x1FFFFF;
+        long lz = ((long) z) & 0x1FFFFF;
+        return (lx << 42) | (ly << 21) | lz;
+    }
+
+    private static int foldLongToInt(long value) {
+        return (int) (value ^ (value >>> 32));
     }
 
     private static void projectAabb2d(float[] positions, float nx, float ny, float nz, float[] out) {

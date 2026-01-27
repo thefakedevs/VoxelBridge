@@ -6,6 +6,7 @@ import com.voxelbridge.core.ir.TintMode;
 import com.voxelbridge.core.util.color.ColorUtil;
 import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.core.util.color.ColorModeHandler;
+import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.compat.BlockStateCompat;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
@@ -24,6 +25,9 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.awt.image.BufferedImage;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,9 +49,15 @@ public final class QuadProcessor {
 
     // Placeholder to ensure tool reads the file first
     private final Set<String> pbrLoadedSprites = new HashSet<>();
+    private final Object2IntOpenHashMap<String> stringIds = new Object2IntOpenHashMap<>();
+    private int nextStringId = 1;
 
     // Pending quads for per-block dedup/cull decisions.
+    private static final float SAME_FACE_QUANT = 1000f;
+    private static final float SAME_FACE_CELL = 3.0f;
+
     private final List<PendingQuad> pendingQuads = new ArrayList<>();
+    private final Int2ObjectOpenHashMap<LongOpenHashSet> sameFaceBuckets = new Int2ObjectOpenHashMap<>();
 
     private static final float CENTER_QUANT = 10000f;
     private static final float AABB_EPS = 1e-3f;
@@ -62,7 +72,6 @@ public final class QuadProcessor {
                                QuadData quad, Direction dir, String materialKey, String spriteKey,
                                float[] positions, float[] uvs, float[] normal,
                                ColorModeHandler.ColorData colorData, boolean doubleSided) {}
-
     public QuadProcessor(ExportContext ctx, Level level, IrSink sceneSink,
                          double offsetX, double offsetY, double offsetZ,
                          PlaneOffsetTracker planeOffset) {
@@ -73,6 +82,7 @@ public final class QuadProcessor {
         this.offsetY = offsetY;
         this.offsetZ = offsetZ;
         this.planeOffset = planeOffset;
+        stringIds.defaultReturnValue(-1);
     }
 
     /**
@@ -81,6 +91,10 @@ public final class QuadProcessor {
     public void clear() {
         pendingQuads.clear();
         // Note: pbrLoadedSprites is intentionally NOT cleared to avoid redundant loads
+    }
+
+    public void clearBuckets() {
+        sameFaceBuckets.clear();
     }
 
     /**
@@ -94,6 +108,12 @@ public final class QuadProcessor {
      */
     public void processQuad(BlockState state, BlockPos pos, QuadData quad,
                             String blockKey, Vec3 randomOffset) {
+        processQuad(state, pos, quad, blockKey, randomOffset, null);
+    }
+
+    public void processQuad(BlockState state, BlockPos pos, QuadData quad,
+                            String blockKey, Vec3 randomOffset,
+                            VertexExtractor.VertexData vertexData) {
         TextureAtlasSprite sprite = quad.sprite();
         if (sprite == null) return;
 
@@ -118,16 +138,21 @@ public final class QuadProcessor {
         }
 
         // Extract vertex data
-        VertexExtractor.VertexData vertexData = VertexExtractor.extractFromQuad(
-            quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset
-        );
+        VertexExtractor.VertexData data = vertexData != null
+            ? vertexData
+            : VertexExtractor.extractFromQuad(quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset);
 
-        boolean hasBaked = ColorUtil.hasBakedColors(vertexData.colors());
+        boolean hasBaked = ColorUtil.hasBakedColors(data.colors());
         boolean doubleSided = state.getBlock() instanceof BushBlock;
         boolean exportDoubleSided = ExportRuntimeConfig.isExportDoubleSidedEnabled();
         Direction dir = quad.direction();
-        if (exportDoubleSided && dir != null && shouldCullSameNonSolidFace(state, pos, quad, dir)) {
-            return;
+        if (exportDoubleSided && !BlockStateCompat.isSolidRender(state, level, pos)) {
+            if (dir != null && isSameNonSolidNeighborFace(state, pos, quad, dir) && shouldCullSameNonSolidFace(dir)) {
+                return;
+            }
+            if (!registerSameFaceKey(blockKey, spriteKey, data.positions(), data.uvs(), data.normal())) {
+                return;
+            }
         }
 
         ColorModeHandler.ColorData colorData;
@@ -137,18 +162,18 @@ public final class QuadProcessor {
         }
 
         int dedupTint = hasBaked
-            ? ColorUtil.extractBakedTintArgb(vertexData.colors())
+            ? ColorUtil.extractBakedTintArgb(data.colors())
             : (tintColor != -1 ? tintColor : 0xFFFFFFFF);
 
         if (hasBaked) {
             // Prefer baked vertex colors (e.g., FRAPI-provided tint) over vanilla tint.
             ColorMode mode = ctx.getColorMode();
             if (mode != null && mode.usesColormap()) {
-                int bakedTint = ColorUtil.extractBakedTintArgb(vertexData.colors());
+                int bakedTint = ColorUtil.extractBakedTintArgb(data.colors());
                 colorData = ColorModeHandler.prepareColors(
                     ctx.getColorMode(), ctx.getColorMapAccess(), bakedTint, true);
             } else {
-                float[] linearColors = ColorUtil.convertArgbToLinearRgba(vertexData.colors());
+                float[] linearColors = ColorUtil.convertArgbToLinearRgba(data.colors());
                 colorData = new ColorModeHandler.ColorData(null, linearColors);
             }
         } else {
@@ -165,9 +190,9 @@ public final class QuadProcessor {
         }
 
         String materialKey = ctx.resolveMaterialKey(spriteKey, blockKey);
-        QuadDedupKey key = buildDedupKey(spriteKey.hashCode(), dedupTint, vertexData.positions(), vertexData.normal());
+        QuadDedupKey key = buildDedupKey(spriteKey.hashCode(), dedupTint, data.positions(), data.normal());
         pendingQuads.add(new PendingQuad(key, state, pos, quad, dir, materialKey, spriteKey,
-            vertexData.positions(), vertexData.uvs(), vertexData.normal(), colorData, doubleSided));
+            data.positions(), data.uvs(), data.normal(), colorData, doubleSided));
     }
 
     /**
@@ -245,10 +270,7 @@ public final class QuadProcessor {
         return dir == Direction.EAST || dir == Direction.SOUTH || dir == Direction.UP;
     }
 
-    private boolean shouldCullSameNonSolidFace(BlockState state, BlockPos pos, QuadData quad, Direction dir) {
-        if (!shouldCullSameNonSolidFace(dir)) {
-            return false;
-        }
+    private boolean isSameNonSolidNeighborFace(BlockState state, BlockPos pos, QuadData quad, Direction dir) {
         BlockPos neighbor = pos.relative(dir);
         BlockState neighborState = level.getBlockState(neighbor);
         if (neighborState.getBlock() != state.getBlock()) {
@@ -266,6 +288,179 @@ public final class QuadProcessor {
             return false;
         }
         return aabbApproxEqual(quadAabb, neighborAabb);
+    }
+
+    private boolean registerSameFaceKey(String blockKey, String spriteKey, float[] positions, float[] uv, float[] normal) {
+        if (blockKey == null || spriteKey == null || positions == null || positions.length < 12) {
+            return true;
+        }
+        float[] uvAabb = new float[4];
+        if (!GeometryUtil.computeUvBounds(uv, uvAabb)) {
+            uvAabb[0] = 0f;
+            uvAabb[1] = 0f;
+            uvAabb[2] = 0f;
+            uvAabb[3] = 0f;
+        }
+        float[] n = normalizeCanonical(normal);
+        int[] nKey = quantizeNormalSigned(n);
+        int plane = quantizePlane(positions, n);
+        float[] faceAabb = projectAabb2d(positions, n);
+        int cx = Math.round((positions[0] + positions[3] + positions[6] + positions[9]) * 0.25f * SAME_FACE_QUANT);
+        int cy = Math.round((positions[1] + positions[4] + positions[7] + positions[10]) * 0.25f * SAME_FACE_QUANT);
+        int cz = Math.round((positions[2] + positions[5] + positions[8] + positions[11]) * 0.25f * SAME_FACE_QUANT);
+        long key = hashSameFaceKey(
+            getStringId(blockKey),
+            getStringId(spriteKey),
+            nKey[0], nKey[1], nKey[2],
+            plane,
+            cx, cy, cz,
+            Math.round(faceAabb[0] * SAME_FACE_QUANT),
+            Math.round(faceAabb[1] * SAME_FACE_QUANT),
+            Math.round(faceAabb[2] * SAME_FACE_QUANT),
+            Math.round(faceAabb[3] * SAME_FACE_QUANT),
+            Math.round(uvAabb[0] * SAME_FACE_QUANT),
+            Math.round(uvAabb[1] * SAME_FACE_QUANT),
+            Math.round(uvAabb[2] * SAME_FACE_QUANT),
+            Math.round(uvAabb[3] * SAME_FACE_QUANT)
+        );
+        int[] bucket = bucketFor(positions);
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    int neighborKey = bucketKeyFor(bucket[0] + dx, bucket[1] + dy, bucket[2] + dz);
+                    LongOpenHashSet set = sameFaceBuckets.get(neighborKey);
+                    if (set != null && set.contains(key)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        int bucketKey = bucketKeyFor(bucket[0], bucket[1], bucket[2]);
+        LongOpenHashSet bucketSet = sameFaceBuckets.get(bucketKey);
+        if (bucketSet == null) {
+            bucketSet = new LongOpenHashSet();
+            sameFaceBuckets.put(bucketKey, bucketSet);
+        }
+        bucketSet.add(key);
+        return true;
+    }
+
+    private static int quantizePlane(float[] positions, float[] normal) {
+        float cx = (positions[0] + positions[3] + positions[6] + positions[9]) * 0.25f;
+        float cy = (positions[1] + positions[4] + positions[7] + positions[10]) * 0.25f;
+        float cz = (positions[2] + positions[5] + positions[8] + positions[11]) * 0.25f;
+        float nx = normal[0];
+        float ny = normal[1];
+        float nz = normal[2];
+        float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (len < 1e-6f) {
+            return 0;
+        }
+        nx /= len;
+        ny /= len;
+        nz /= len;
+        float d = nx * cx + ny * cy + nz * cz;
+        return Math.round(d * SAME_FACE_QUANT);
+    }
+
+    private static int[] quantizeNormalSigned(float[] normal) {
+        float nx = normal[0];
+        float ny = normal[1];
+        float nz = normal[2];
+        return new int[] {
+            Math.round(nx * 1000f),
+            Math.round(ny * 1000f),
+            Math.round(nz * 1000f)
+        };
+    }
+
+    private static float[] normalizeCanonical(float[] normal) {
+        if (normal == null || normal.length < 3) {
+            return new float[] {0f, 1f, 0f};
+        }
+        float lenSq = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2];
+        if (lenSq < 1e-8f) {
+            return new float[] {0f, 1f, 0f};
+        }
+        float inv = 1f / (float) Math.sqrt(lenSq);
+        float nx = normal[0] * inv;
+        float ny = normal[1] * inv;
+        float nz = normal[2] * inv;
+        if (nx < 0f || (nx == 0f && ny < 0f) || (nx == 0f && ny == 0f && nz < 0f)) {
+            nx = -nx;
+            ny = -ny;
+            nz = -nz;
+        }
+        return new float[] {nx, ny, nz};
+    }
+
+    private static int[] bucketFor(float[] positions) {
+        float cx = (positions[0] + positions[3] + positions[6] + positions[9]) * 0.25f;
+        float cy = (positions[1] + positions[4] + positions[7] + positions[10]) * 0.25f;
+        float cz = (positions[2] + positions[5] + positions[8] + positions[11]) * 0.25f;
+        int bx = floorDiv(cx, SAME_FACE_CELL);
+        int by = floorDiv(cy, SAME_FACE_CELL);
+        int bz = floorDiv(cz, SAME_FACE_CELL);
+        return new int[] { bx, by, bz };
+    }
+
+    private static int bucketKeyFor(int bx, int by, int bz) {
+        long packed = packInt3(bx, by, bz);
+        return foldLongToInt(packed);
+    }
+
+    private static long packInt3(int x, int y, int z) {
+        long lx = ((long) x) & 0x1FFFFF;
+        long ly = ((long) y) & 0x1FFFFF;
+        long lz = ((long) z) & 0x1FFFFF;
+        return (lx << 42) | (ly << 21) | lz;
+    }
+
+    private static int foldLongToInt(long value) {
+        return (int) (value ^ (value >>> 32));
+    }
+
+    private int getStringId(String value) {
+        if (value == null) {
+            return 0;
+        }
+        int id = stringIds.getInt(value);
+        if (id != -1) {
+            return id;
+        }
+        id = nextStringId++;
+        stringIds.put(value, id);
+        return id;
+    }
+
+    private static long hashSameFaceKey(int blockId, int spriteId,
+                                        int nx, int ny, int nz, int plane,
+                                        int cx, int cy, int cz,
+                                        int minU, int maxU, int minV, int maxV,
+                                        int uvMinU, int uvMaxU, int uvMinV, int uvMaxV) {
+        long h = 1469598103934665603L;
+        h = (h ^ blockId) * 1099511628211L;
+        h = (h ^ spriteId) * 1099511628211L;
+        h = (h ^ nx) * 1099511628211L;
+        h = (h ^ ny) * 1099511628211L;
+        h = (h ^ nz) * 1099511628211L;
+        h = (h ^ plane) * 1099511628211L;
+        h = (h ^ cx) * 1099511628211L;
+        h = (h ^ cy) * 1099511628211L;
+        h = (h ^ cz) * 1099511628211L;
+        h = (h ^ minU) * 1099511628211L;
+        h = (h ^ maxU) * 1099511628211L;
+        h = (h ^ minV) * 1099511628211L;
+        h = (h ^ maxV) * 1099511628211L;
+        h = (h ^ uvMinU) * 1099511628211L;
+        h = (h ^ uvMaxU) * 1099511628211L;
+        h = (h ^ uvMinV) * 1099511628211L;
+        h = (h ^ uvMaxV) * 1099511628211L;
+        return h;
+    }
+
+    private static int floorDiv(float value, float size) {
+        return (int) Math.floor(value / size);
     }
 
     private QuadDedupKey buildDedupKey(int spriteHash, int tintArgb, float[] positions, float[] normal) {
@@ -359,6 +554,9 @@ public final class QuadProcessor {
 
     private boolean shouldCullAgainstSolid(BlockState state, BlockPos pos, QuadData quad, Direction dir) {
         if (state == null || quad == null || dir == null) {
+            return false;
+        }
+        if (!isBoundaryFaceLocal(quad, dir)) {
             return false;
         }
         if (BlockStateCompat.isSolidRender(state, level, pos)) {

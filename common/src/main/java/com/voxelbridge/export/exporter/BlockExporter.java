@@ -97,6 +97,12 @@ public final class BlockExporter {
         this.quadProcessor = new QuadProcessor(ctx, level, sceneSink, offsetX, offsetY, offsetZ, planeOffsetTracker);
     }
 
+    public void onChunkStart() {
+        if (quadProcessor != null) {
+            quadProcessor.clearBuckets();
+        }
+    }
+
     /**
      * Samples a single block and outputs its geometry.
      */
@@ -190,6 +196,8 @@ public final class BlockExporter {
 
         int quadCount = quads.size();
         String[] spriteKeys = new String[quadCount];
+        com.voxelbridge.export.util.geometry.VertexExtractor.VertexData[] vertexCache =
+            new com.voxelbridge.export.util.geometry.VertexExtractor.VertexData[quadCount];
         boolean isCtmCompact = false;
         for (int i = 0; i < quadCount; i++) {
             QuadData quad = quads.get(i);
@@ -200,6 +208,9 @@ public final class BlockExporter {
             if (!isCtmCompact && isContinuitySprite(spriteKey)) {
                 isCtmCompact = true;
             }
+            vertexCache[i] = com.voxelbridge.export.util.geometry.VertexExtractor.extractFromQuad(
+                quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset
+            );
         }
 
         // Generate material key
@@ -211,7 +222,7 @@ public final class BlockExporter {
 
         // PASS 1: Detect and cache overlays (position-based; avoids CTM compact splitting)
         boolean[] isOverlay = new boolean[quadCount];
-        detectOverlaysByPosition(quads, spriteKeys, isOverlay, state, pos, blockKey, randomOffset);
+        detectOverlaysByPosition(quads, spriteKeys, vertexCache, isOverlay, state, pos, blockKey, randomOffset);
 
         // PASS 2: Process base quads
         byte[] sameBlockOcclusionCache = null;
@@ -253,7 +264,7 @@ public final class BlockExporter {
             }
 
             // Process quad
-            quadProcessor.processQuad(state, pos, quad, blockKey, randomOffset);
+            quadProcessor.processQuad(state, pos, quad, blockKey, randomOffset, vertexCache[i]);
         }
 
         // Flush cached quads (dedup/cull) before overlays
@@ -307,6 +318,7 @@ public final class BlockExporter {
 
     private void detectOverlaysByPosition(List<QuadData> quads,
                                           String[] spriteKeys,
+                                          com.voxelbridge.export.util.geometry.VertexExtractor.VertexData[] vertexCache,
                                           boolean[] isOverlay,
                                           BlockState state,
                                           BlockPos pos,
@@ -322,12 +334,17 @@ public final class BlockExporter {
             QuadData quad = quads.get(i);
             String spriteKey = spriteKeys[i];
             if (quad == null || spriteKey == null) continue;
-            var sprite = quad.sprite();
-            if (sprite == null) continue;
-
-            var vertexData = com.voxelbridge.export.util.geometry.VertexExtractor.extractFromQuad(
-                quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset
-            );
+            var vertexData = (vertexCache != null && i < vertexCache.length) ? vertexCache[i] : null;
+            if (vertexData == null) {
+                var sprite = quad.sprite();
+                if (sprite == null) continue;
+                vertexData = com.voxelbridge.export.util.geometry.VertexExtractor.extractFromQuad(
+                    quad, pos, sprite, offsetX, offsetY, offsetZ, randomOffset
+                );
+                if (vertexCache != null && i < vertexCache.length) {
+                    vertexCache[i] = vertexData;
+                }
+            }
             float[] uv = vertexData.uvs();
             float uMin = Math.min(Math.min(uv[0], uv[2]), Math.min(uv[4], uv[6]));
             float uMax = Math.max(Math.max(uv[0], uv[2]), Math.max(uv[4], uv[6]));

@@ -320,6 +320,9 @@ public final class StreamingRegionSampler {
             // OPTIMIZATION: Use shared BlockEntityRenderBatch instead of per-chunk instance
             BlockExporter localSampler = new BlockExporter(ctx, buffer, level, sharedBeBatch, finalSink);
             localSampler.setRegionBounds(regionMin, regionMax);
+            localSampler.onChunkStart();
+            com.voxelbridge.export.exporter.blockentity.BlockEntityRenderer.clearChunkTracker(chunkPos.x, chunkPos.z);
+            com.voxelbridge.export.exporter.entity.EntityRenderer.clearChunkTracker(chunkPos.x, chunkPos.z);
 
             // OPTIMIZATION: Reuse MutableBlockPos to avoid 98,304 object allocations per chunk
             // Memory savings: ~2.4MB temporary objects per chunk + reduced GC pressure
@@ -405,6 +408,8 @@ public final class StreamingRegionSampler {
                 ctx,
                 buffer,
                 level,
+                chunkPos.x,
+                chunkPos.z,
                 new net.minecraft.world.phys.AABB(
                     minX, minY, minZ,
                     maxX + 1, maxY + 1, maxZ + 1
@@ -483,6 +488,9 @@ public final class StreamingRegionSampler {
             started = true;
             BlockExporter localSampler = new BlockExporter(ctx, buffer, level, sharedBeBatch, finalSink);
             localSampler.setRegionBounds(regionMin, regionMax);
+            localSampler.onChunkStart();
+            com.voxelbridge.export.exporter.blockentity.BlockEntityRenderer.clearChunkTracker(chunkPos.x, chunkPos.z);
+            com.voxelbridge.export.exporter.entity.EntityRenderer.clearChunkTracker(chunkPos.x, chunkPos.z);
 
             BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
             int blockCount = 0;
@@ -549,6 +557,8 @@ public final class StreamingRegionSampler {
                 ctx,
                 buffer,
                 level,
+                chunkPos.x,
+                chunkPos.z,
                 new net.minecraft.world.phys.AABB(
                     minX, minY, minZ,
                     maxX + 1, maxY + 1, maxZ + 1

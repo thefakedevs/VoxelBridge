@@ -35,6 +35,7 @@ import net.minecraft.world.phys.AABB;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Captures entity renderer output into an IR sink.
@@ -44,6 +45,7 @@ public final class EntityRenderer {
     private static AtlasLocator ATLAS_LOCATOR = new DefaultAtlasLocator(ClientAccessHolder.get());
     private static volatile TextureResolver<Entity> OVERRIDE_RESOLVER;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
+    private static final ConcurrentHashMap<Long, PlaneOffsetTracker> CHUNK_PLANE_OFFSETS = new ConcurrentHashMap<>();
 
     private EntityRenderer() {}
 
@@ -61,6 +63,10 @@ public final class EntityRenderer {
         if (resolver != null) {
             RENDER_TYPE_RESOLVER = resolver;
         }
+    }
+
+    public static void clearChunkTracker(int chunkX, int chunkZ) {
+        CHUNK_PLANE_OFFSETS.remove(chunkKey(chunkX, chunkZ));
     }
 
     public static boolean render(
@@ -237,7 +243,7 @@ public final class EntityRenderer {
     private static class CaptureBuffer extends CaptureBufferBase {
         private final double offsetX, offsetY, offsetZ;
         private final Entity entity;
-        private final PlaneOffsetTracker planeOffset = new PlaneOffsetTracker(3.0f, 1e-3f, 1e-3f, 1000f, 1000f, 1000f);
+        private final PlaneOffsetTracker planeOffset;
         private final double baseDeltaX;
         private final double baseDeltaY;
         private final double baseDeltaZ;
@@ -258,6 +264,12 @@ public final class EntityRenderer {
             this.baseDeltaX = baseDeltaX;
             this.baseDeltaY = baseDeltaY;
             this.baseDeltaZ = baseDeltaZ;
+            int chunkX = entity.blockPosition().getX() >> 4;
+            int chunkZ = entity.blockPosition().getZ() >> 4;
+            this.planeOffset = CHUNK_PLANE_OFFSETS.computeIfAbsent(
+                chunkKey(chunkX, chunkZ),
+                key -> new PlaneOffsetTracker(3.0f, 1e-3f, 1e-3f, 1000f, 1000f, 1000f)
+            );
         }
 
         void flush() {
@@ -647,6 +659,10 @@ public final class EntityRenderer {
             out.append(ok ? c : '_');
         }
         return out.toString();
+    }
+
+    private static long chunkKey(int chunkX, int chunkZ) {
+        return (((long) chunkX) << 32) ^ (chunkZ & 0xFFFFFFFFL);
     }
 }
 
