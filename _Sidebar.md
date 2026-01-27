@@ -1,6 +1,0 @@
-- [[Home]]
-- [[Installation]]
-- [[Usage]]
-- [[Settings]]
-- [[Configuration]]
-- [[Commands]]
