@@ -35,3 +35,10 @@ if (file('fabric/1.21.4/mod').exists()) {
 
     // Fabric version sources live under fabric/<version>/src
 }
+
+if (file('fabric/1.21.8/mod').exists()) {
+    include 'fabric:1.21.8:mod'
+    project(':fabric:1.21.8:mod').projectDir = file('fabric/1.21.8/mod')
+
+    // Fabric version sources live under fabric/<version>/src
+}
