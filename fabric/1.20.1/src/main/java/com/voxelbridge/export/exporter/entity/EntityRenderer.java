@@ -15,6 +15,8 @@ import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.export.texture.EntityTextureManager;
+import com.voxelbridge.export.texture.ExportOptions;
+import com.voxelbridge.export.texture.TexturePathResolver;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import com.voxelbridge.platform.render.capture.CaptureBufferBase;
@@ -430,7 +432,7 @@ public final class EntityRenderer {
                     }
                 }
             } else {
-                spriteKey = "entity:minecraft/white";
+                spriteKey = ensureWhiteEntityFallback(ctx);
                 VoxelBridgeLogger.debug(LogModule.ENTITY, "[Quad#" + quadCount + "] No texture resolved, using white fallback");
             }
 
@@ -584,6 +586,24 @@ public final class EntityRenderer {
             return sprite.contents().name().toString().contains("missingno");
         }
 
+    }
+
+    private static String ensureWhiteEntityFallback(ExportContext ctx) {
+        final String spriteKey = "entity:minecraft/white";
+        if (ctx.getMaterialPaths().containsKey(spriteKey)) {
+            return spriteKey;
+        }
+        final int size = 16;
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        int white = 0xFFFFFFFF;
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                img.setRGB(x, y, white);
+            }
+        }
+        String rel = TexturePathResolver.ensureEntityLikePath(ctx.getMaterialPaths(), spriteKey, ExportOptions.fromRuntimeConfig());
+        EntityTextureManager.registerGenerated(ctx, spriteKey, rel, img);
+        return spriteKey;
     }
 
     private static EntityTextureManager.TextureHandle tryRegisterPlayerAttachmentTexture(

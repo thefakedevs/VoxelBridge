@@ -4,6 +4,7 @@ import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.texture.EntityTextureManager;
 import com.voxelbridge.core.util.color.ColorUtil;
 import com.voxelbridge.core.util.image.ImageUtil;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.resources.ResourceLocation;
@@ -31,6 +32,9 @@ final class BannerTextureBaker {
     static BannerTextures bake(ExportContext ctx, BannerBlockEntity banner) {
         String key = BannerTextureBaker.buildKey(banner);
         String bakedPath = resolveOutputDir(ctx) + "/" + BannerTextureBaker.safe(key) + ".png";
+        if (VoxelBridgeLogger.isDebugEnabled(com.voxelbridge.util.debug.LogModule.BLOCKENTITY)) {
+            VoxelBridgeLogger.debug(com.voxelbridge.util.debug.LogModule.BLOCKENTITY, "[BannerBake] key=" + key + " path=" + bakedPath);
+        }
         BufferedImage bakedImage = ctx.getGeneratedEntityTextures().computeIfAbsent(key, k -> BannerTextureBaker.composeTexture(ctx, banner));
         EntityTextureManager.TextureHandle bakedHandle = EntityTextureManager.registerGenerated(ctx, key, bakedPath, bakedImage);
 
@@ -39,22 +43,43 @@ final class BannerTextureBaker {
         ResourceLocation bannerBaseTexture = ModelBakery.BANNER_BASE.texture();
         overrides.map(bannerBaseTexture, bakedHandle);
         overrides.map(BASE_WITH_POLE_TEXTURE, bakedHandle);
+        ResourceLocation sheetsBannerBaseTexture = getSheetsBannerBaseTexture();
+        if (sheetsBannerBaseTexture != null) {
+            overrides.map(sheetsBannerBaseTexture, bakedHandle);
+        }
         ResourceLocation altBase1 = new ResourceLocation("minecraft", "entity/banner_base");
         ResourceLocation altBase2 = new ResourceLocation("minecraft", "entity/banner/base");
         overrides.map(altBase1, bakedHandle);
-        overrides.mapAndSkip(altBase2, bakedHandle);
-        overrides.skipSprite(FLAG_ONLY_TEXTURE);
-        for (Layer layer : getLayers(banner)) {
+        overrides.map(altBase2, bakedHandle);
+        List<Layer> layers = getLayers(banner);
+        if (VoxelBridgeLogger.isDebugEnabled(com.voxelbridge.util.debug.LogModule.BLOCKENTITY)) {
+            VoxelBridgeLogger.debug(com.voxelbridge.util.debug.LogModule.BLOCKENTITY, "[BannerBake] layers=" + layers.size());
+        }
+        for (Layer layer : layers) {
             ResourceLocation sprite = resolveBannerSprite(layer.pattern);
             if (sprite == null) {
+                if (VoxelBridgeLogger.isDebugEnabled(com.voxelbridge.util.debug.LogModule.BLOCKENTITY)) {
+                    VoxelBridgeLogger.debug(com.voxelbridge.util.debug.LogModule.BLOCKENTITY, "[BannerBake] sprite=null pattern=" + debugPattern(layer.pattern));
+                }
                 continue;
             }
-            overrides.mapAndSkip(sprite, bakedHandle);
+            if (VoxelBridgeLogger.isDebugEnabled(com.voxelbridge.util.debug.LogModule.BLOCKENTITY)) {
+                VoxelBridgeLogger.debug(com.voxelbridge.util.debug.LogModule.BLOCKENTITY, "[BannerBake] sprite=" + sprite + " color=" + (layer.color != null ? layer.color.getSerializedName() : "none"));
+            }
+            if (isBaseSprite(sprite)) {
+                overrides.map(sprite, bakedHandle);
+            } else {
+                overrides.mapAndSkip(sprite, bakedHandle);
+            }
             String patternPath = sprite.getPath();
             if (patternPath.contains("/")) {
                 String altPath = patternPath.replace("entity/banner/", "entity/banner_");
                 ResourceLocation altSprite = new ResourceLocation(sprite.getNamespace(), altPath);
-                overrides.mapAndSkip(altSprite, bakedHandle);
+                if (isBaseSprite(altSprite)) {
+                    overrides.map(altSprite, bakedHandle);
+                } else {
+                    overrides.mapAndSkip(altSprite, bakedHandle);
+                }
             }
         }
         return new BannerTextures(bakedHandle, overrides);
@@ -64,7 +89,8 @@ final class BannerTextureBaker {
         BufferedImage base = ImageUtil.copyOrBlank(BannerTextureBaker.loadSprite(ctx, BASE_WITH_POLE_TEXTURE), 64, 64);
         BufferedImage result = ImageUtil.copy(base);
         BannerTextureBaker.applyTinted(ctx, result, FLAG_ONLY_TEXTURE, banner.getBaseColor());
-        for (Layer layer : getLayers(banner)) {
+        List<Layer> layers = getLayers(banner);
+        for (Layer layer : layers) {
             ResourceLocation sprite = resolveBannerSprite(layer.pattern);
             if (sprite == null) {
                 continue;
@@ -229,6 +255,19 @@ final class BannerTextureBaker {
         } catch (Exception ignored) {
             return layers;
         }
+        Object maybeLayers = tryInvoke(raw, "layers");
+        if (maybeLayers instanceof Iterable<?> iterableLayers) {
+            for (Object entry : iterableLayers) {
+                Object pattern = tryInvoke(entry, "pattern");
+                DyeColor color = (DyeColor) tryInvoke(entry, "color");
+                if (pattern == null && color == null) {
+                    pattern = tryInvoke(entry, "getFirst");
+                    color = (DyeColor) tryInvoke(entry, "getSecond");
+                }
+                layers.add(new Layer(pattern, color));
+            }
+            return layers;
+        }
         if (raw instanceof Iterable<?> iterable) {
             for (Object entry : iterable) {
                 Object pattern = tryInvoke(entry, "getFirst");
@@ -247,14 +286,28 @@ final class BannerTextureBaker {
         if (pattern == null) {
             return null;
         }
-        try {
-            var method = Sheets.class.getMethod("getBannerMaterial", pattern.getClass());
-            Object material = method.invoke(null, pattern);
-            Object texture = tryInvoke(material, "texture");
-            return texture instanceof ResourceLocation ? (ResourceLocation) texture : null;
-        } catch (Exception ignored) {
-            return null;
+        if (VoxelBridgeLogger.isDebugEnabled(com.voxelbridge.util.debug.LogModule.BLOCKENTITY)) {
+            VoxelBridgeLogger.debug(com.voxelbridge.util.debug.LogModule.BLOCKENTITY, "[BannerBake] resolve sprite for pattern=" + debugPattern(pattern));
         }
+        ResourceLocation texture = resolveBannerSpriteFromPattern(pattern);
+        if (texture != null) {
+            return texture;
+        }
+        Object unwrapped = unwrapPattern(pattern);
+        if (unwrapped != null && unwrapped != pattern) {
+            if (VoxelBridgeLogger.isDebugEnabled(com.voxelbridge.util.debug.LogModule.BLOCKENTITY)) {
+                VoxelBridgeLogger.debug(com.voxelbridge.util.debug.LogModule.BLOCKENTITY, "[BannerBake] unwrapped pattern=" + debugPattern(unwrapped));
+            }
+            texture = resolveBannerSpriteFromPattern(unwrapped);
+            if (texture != null) {
+                return texture;
+            }
+        }
+        ResourceLocation id = resolvePatternId(pattern);
+        if (id != null) {
+            return new ResourceLocation(id.getNamespace(), "entity/banner/" + id.getPath());
+        }
+        return null;
     }
 
     private static ResourceLocation resolvePatternId(Object pattern) {
@@ -277,7 +330,82 @@ final class BannerTextureBaker {
         if (keyLoc instanceof ResourceLocation rl) {
             return rl;
         }
+        Object unwrapKey = tryInvoke(pattern, "unwrapKey");
+        Object unwrapLoc = tryInvoke(unwrapKey, "location");
+        if (unwrapLoc instanceof ResourceLocation rl) {
+            return rl;
+        }
+        Object registryKey = tryInvoke(pattern, "registryKey");
+        Object registryLoc = tryInvoke(registryKey, "location");
+        if (registryLoc instanceof ResourceLocation rl) {
+            return rl;
+        }
+        Object holderKey = tryInvoke(pattern, "key");
+        Object holderLoc = tryInvoke(holderKey, "location");
+        if (holderLoc instanceof ResourceLocation rl) {
+            return rl;
+        }
+        ResourceLocation parsed = parsePatternIdFromToString(pattern);
+        if (parsed != null) {
+            return parsed;
+        }
         return new ResourceLocation("minecraft", "unknown");
+    }
+
+    private static ResourceLocation getSheetsBannerBaseTexture() {
+        try {
+            java.lang.reflect.Field field = Sheets.class.getDeclaredField("BANNER_BASE");
+            field.setAccessible(true);
+            Object material = field.get(null);
+            Object texture = tryInvoke(material, "texture");
+            return texture instanceof ResourceLocation ? (ResourceLocation) texture : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static ResourceLocation resolveBannerSpriteFromPattern(Object pattern) {
+        try {
+            java.lang.reflect.Method[] methods = Sheets.class.getMethods();
+            for (java.lang.reflect.Method method : methods) {
+                if (!"getBannerMaterial".equals(method.getName())) {
+                    continue;
+                }
+                Class<?>[] params = method.getParameterTypes();
+                if (params.length != 1) {
+                    continue;
+                }
+                if (!params[0].isInstance(pattern)) {
+                    continue;
+                }
+                Object material = method.invoke(null, pattern);
+                Object texture = tryInvoke(material, "texture");
+                return texture instanceof ResourceLocation ? (ResourceLocation) texture : null;
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private static Object unwrapPattern(Object pattern) {
+        Object viaOptional = unwrapOptional(pattern);
+        if (viaOptional != null) {
+            return viaOptional;
+        }
+        Object value = tryInvoke(pattern, "value");
+        if (value != null) {
+            return value;
+        }
+        value = tryInvoke(pattern, "get");
+        if (value != null) {
+            return value;
+        }
+        Object holder = tryInvoke(pattern, "unwrap");
+        if (holder != null) {
+            return holder;
+        }
+        return pattern;
     }
 
     private static Object tryInvoke(Object target, String methodName) {
@@ -291,5 +419,55 @@ final class BannerTextureBaker {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static String debugPattern(Object pattern) {
+        if (pattern == null) {
+            return "null";
+        }
+        return pattern.getClass().getName() + ":" + pattern;
+    }
+
+    private static boolean isBaseSprite(ResourceLocation sprite) {
+        if (sprite == null) {
+            return false;
+        }
+        return sprite.getPath().endsWith("entity/banner/base")
+            || sprite.getPath().endsWith("entity/banner_base");
+    }
+
+    private static Object unwrapOptional(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof java.util.Optional<?> optional) {
+            return optional.orElse(null);
+        }
+        return null;
+    }
+
+    private static ResourceLocation parsePatternIdFromToString(Object pattern) {
+        if (pattern == null) {
+            return null;
+        }
+        String s = pattern.toString();
+        int keyStart = s.indexOf("ResourceKey[");
+        if (keyStart < 0) {
+            return null;
+        }
+        int slash = s.indexOf(" / ", keyStart);
+        int end = s.indexOf("]", keyStart);
+        if (slash < 0 || end < 0 || end <= slash + 3) {
+            return null;
+        }
+        String id = s.substring(slash + 3, end).trim();
+        if (id.isEmpty()) {
+            return null;
+        }
+        int colon = id.indexOf(':');
+        if (colon > 0) {
+            return new ResourceLocation(id.substring(0, colon), id.substring(colon + 1));
+        }
+        return new ResourceLocation("minecraft", id);
     }
 }

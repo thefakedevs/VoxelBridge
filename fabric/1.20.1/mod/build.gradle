@@ -87,8 +87,11 @@ sourceSets {
             from("${rootProject.projectDir}/common/src/main/java") {
                 exclude(
                     "com/voxelbridge/export/exporter/blockentity/BannerTextureBaker.java",
+                    "com/voxelbridge/export/exporter/blockentity/BannerBlockEntityHandler.java",
+                    "com/voxelbridge/export/exporter/blockentity/BlockEntityExporter.java",
                     "com/voxelbridge/export/exporter/blockentity/BlockEntityTextureResolver.java",
                     "com/voxelbridge/export/exporter/blockentity/SignBlockEntityHandler.java",
+                    "com/voxelbridge/export/exporter/blockentity/BlockEntityRenderer.java",
                     "com/voxelbridge/export/exporter/entity/EntityRenderer.java",
                     "com/voxelbridge/export/exporter/entity/EntityTextureResolver.java",
                     "com/voxelbridge/export/exporter/FluidExporter.java",
