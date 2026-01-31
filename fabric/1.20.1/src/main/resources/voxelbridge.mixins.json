@@ -1,0 +1,15 @@
+{
+    "required": true,
+    "package": "com.voxelbridge.mixin",
+    "compatibilityLevel": "JAVA_17",
+    "client": [
+        "TextureAtlasAccessor",
+        "SpriteContentsAccessor",
+        "BakedQuadAccessor",
+        "HttpTextureAccessor",
+        "TextureAtlasHolderAccessor"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    }
+}
