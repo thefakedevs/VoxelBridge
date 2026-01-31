@@ -58,7 +58,6 @@ public final class FabricSelectionRenderBridge implements SelectionRenderBridge 
         if (pos1 != null && pos2 != null) {
             renderSelectionBox(poseStack, consumer, pos1, pos2, 0.0f, 1.0f, 1.0f, 0.5f);
             renderChunkStatus(poseStack, consumer, pos1, pos2);
-            renderProgressLabel(poseStack, mc, pos1, pos2, consumers);
         }
 
         poseStack.popPose();
@@ -142,35 +141,5 @@ public final class FabricSelectionRenderBridge implements SelectionRenderBridge 
         }
     }
 
-    private static void renderProgressLabel(PoseStack poseStack, Minecraft mc,
-            BlockPos pos1, BlockPos pos2,
-            MultiBufferSource bufferSource) {
-        ExportProgressTracker.Progress p = ExportProgressTracker.progress();
-        if (p.total() <= 0) {
-            return;
-        }
-        String text = String.format("Export: %d/%d (%.1f%%)", p.done(), p.total(), p.percent());
-
-        double cx = (pos1.getX() + pos2.getX() + 1) * 0.5;
-        double cy = (pos1.getY() + pos2.getY() + 1) * 0.5 + 1.5;
-        double cz = (pos1.getZ() + pos2.getZ() + 1) * 0.5;
-
-        poseStack.pushPose();
-        poseStack.translate(cx, cy, cz);
-        poseStack.mulPose(mc.getEntityRenderDispatcher().cameraOrientation());
-        poseStack.scale(-0.02f, -0.02f, 0.02f);
-        float x = -mc.font.width(text) / 2.0f;
-        mc.font.drawInBatch(
-                text,
-                x,
-                0,
-                0xFFFFFFFF,
-                false,
-                poseStack.last().pose(),
-                bufferSource,
-                net.minecraft.client.gui.Font.DisplayMode.NORMAL,
-                0,
-                0x00F000F0);
-        poseStack.popPose();
-    }
+    // Progress text is handled via HUD overlay (ProgressNotifier) to avoid world-space labels.
 }

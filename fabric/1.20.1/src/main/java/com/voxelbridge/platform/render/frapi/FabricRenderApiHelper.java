@@ -3,13 +3,15 @@ package com.voxelbridge.platform.render.frapi;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
-import net.fabricmc.fabric.api.renderer.v1.mesh.Mesh;
-import net.fabricmc.fabric.api.renderer.v1.mesh.MeshBuilder;
-import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
 import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
-import net.fabricmc.fabric.api.renderer.v1.render.RenderContext;
+import net.fabricmc.fabric.impl.client.indigo.renderer.aocalc.AoCalculator;
+import net.fabricmc.fabric.impl.client.indigo.renderer.aocalc.AoLuminanceFix;
+import net.fabricmc.fabric.impl.client.indigo.renderer.mesh.MutableQuadViewImpl;
+import net.fabricmc.fabric.impl.client.indigo.renderer.render.AbstractBlockRenderContext;
+import net.fabricmc.fabric.impl.client.indigo.renderer.render.BlockRenderInfo;
+import com.voxelbridge.mixin.BlockRenderInfoAccessor;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
@@ -18,10 +20,13 @@ import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.renderer.RenderType;
 
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
+import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
 
 /**
  * Fabric Rendering API helper for extracting quads from FabricBakedModel.
@@ -35,93 +40,24 @@ public final class FabricRenderApiHelper {
         BlockState state,
         BlockPos pos,
         RandomSource rand,
+        long seed,
         SpriteFinder spriteFinder
     ) {
         try {
             Renderer renderer = RendererAccess.INSTANCE.getRenderer();
-            if (renderer == null) return new ArrayList<>();
+            if (renderer == null) {
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.EXPORT)) {
+                    VoxelBridgeLogger.debug(LogModule.EXPORT, "[FRAPI] RendererAccess returned null");
+                }
+                return new ArrayList<>();
+            }
 
             List<BakedQuad> fabricQuads = new ArrayList<>();
-
-            final LinkedList<MeshBuilder> builders = new LinkedList<>();
-            final LinkedList<QuadEmitter> emitters = new LinkedList<>();
-            final LinkedList<RenderContext.QuadTransform> transforms = new LinkedList<>();
-
-            MeshBuilder baseBuilder = renderer.meshBuilder();
-            builders.push(baseBuilder);
-            emitters.push(baseBuilder.getEmitter());
-            transforms.push(null);
-
-            RenderContext context = new RenderContext() {
-                @Override
-                public QuadEmitter getEmitter() {
-                    return emitters.peek();
-                }
-
-                @Override
-                public boolean isFaceCulled(Direction face) {
-                    return false;
-                }
-
-                @Override
-                public void pushTransform(RenderContext.QuadTransform transform) {
-                    MeshBuilder layerBuilder = renderer.meshBuilder();
-                    builders.push(layerBuilder);
-                    emitters.push(layerBuilder.getEmitter());
-                    transforms.push(transform);
-                }
-
-                @Override
-                public void popTransform() {
-                    if (emitters.size() <= 1) {
-                        return;
-                    }
-
-                    MeshBuilder topBuilder = builders.pop();
-                    emitters.pop();
-                    RenderContext.QuadTransform transform = transforms.pop();
-                    QuadEmitter target = emitters.peek();
-
-                    Mesh mesh = topBuilder.build();
-                    mesh.forEach(q -> {
-                        target.copyFrom(q);
-                        if (transform.transform(target)) {
-                            target.emit();
-                        }
-                    });
-                }
-
-                @Override
-                public RenderContext.BakedModelConsumer bakedModelConsumer() {
-                    RenderContext current = this;
-                    return new RenderContext.BakedModelConsumer() {
-                        @Override
-                        public void accept(BakedModel bakedModel) {
-                            if (bakedModel instanceof FabricBakedModel) {
-                                FabricBakedModel fbm = (FabricBakedModel) bakedModel;
-                                fbm.emitBlockQuads(level, state, pos, () -> rand, current);
-                            }
-                        }
-
-                        @Override
-                        public void accept(BakedModel bakedModel, BlockState modelState) {
-                            if (bakedModel instanceof FabricBakedModel) {
-                                FabricBakedModel fbm = (FabricBakedModel) bakedModel;
-                                BlockState targetState = (modelState != null) ? modelState : state;
-                                fbm.emitBlockQuads(level, targetState, pos, () -> rand, current);
-                            }
-                        }
-                    };
-                }
-            };
-
-            model.emitBlockQuads(level, state, pos, () -> rand, context);
-
-            Mesh mesh = baseBuilder.build();
-            mesh.forEach(q -> fabricQuads.add(toBakedQuad(q, spriteFinder)));
-
+            IndigoCaptureContext indigoContext = new IndigoCaptureContext(spriteFinder, fabricQuads);
+            indigoContext.emitQuads(level, state, pos, model, rand, seed);
             return fabricQuads;
         } catch (Throwable t) {
+            VoxelBridgeLogger.error(LogModule.EXPORT, "[FRAPI] extractQuads failed: " + t.getClass().getName() + ": " + t.getMessage(), t);
             return new ArrayList<>();
         }
     }
@@ -174,5 +110,73 @@ public final class FabricRenderApiHelper {
         int ny = (int) (y * 127.0f) & 0xFF;
         int nz = (int) (z * 127.0f) & 0xFF;
         return nx | (ny << 8) | (nz << 16);
+    }
+
+    private static final class IndigoCaptureContext extends AbstractBlockRenderContext {
+        private final SpriteFinder spriteFinder;
+        private final List<BakedQuad> out;
+
+        private IndigoCaptureContext(SpriteFinder spriteFinder, List<BakedQuad> out) {
+            this.spriteFinder = spriteFinder;
+            this.out = out;
+        }
+
+        void emitQuads(
+            BlockAndTintGetter level,
+            BlockState state,
+            BlockPos pos,
+            FabricBakedModel model,
+            RandomSource rand,
+            long seed
+        ) {
+            try {
+                BlockRenderInfoAccessor accessor = (BlockRenderInfoAccessor) (Object) blockInfo;
+                accessor.voxelbridge$setRandom(rand);
+                accessor.voxelbridge$setSeed(seed);
+                accessor.voxelbridge$setRecomputeSeed(false);
+
+                aoCalc.clear();
+                blockInfo.prepareForWorld(level, false);
+                blockInfo.prepareForBlock(state, pos, ((BakedModel) model).useAmbientOcclusion());
+                accessor.voxelbridge$setUseAo(false);
+                accessor.voxelbridge$setDefaultAo(false);
+
+                model.emitBlockQuads(level, state, pos, blockInfo.randomSupplier, this);
+            } finally {
+                blockInfo.release();
+                BlockRenderInfoAccessor accessor = (BlockRenderInfoAccessor) (Object) blockInfo;
+                accessor.voxelbridge$setRandom(null);
+            }
+        }
+
+        @Override
+        protected AoCalculator createAoCalc(BlockRenderInfo blockInfo) {
+            return new AoCalculator(blockInfo) {
+                @Override
+                public int light(BlockPos pos, BlockState state) {
+                    return AoCalculator.getLightmapCoordinates(blockInfo.blockView, state, pos);
+                }
+
+                @Override
+                public float ao(BlockPos pos, BlockState state) {
+                    return AoLuminanceFix.INSTANCE.apply(blockInfo.blockView, pos, state);
+                }
+            };
+        }
+
+        @Override
+        protected VertexConsumer getVertexConsumer(RenderType layer) {
+            return null;
+        }
+
+        @Override
+        public boolean isFaceCulled(Direction face) {
+            return false;
+        }
+
+        @Override
+        protected void bufferQuad(MutableQuadViewImpl quad, VertexConsumer vertexConsumer) {
+            out.add(toBakedQuad(quad, spriteFinder));
+        }
     }
 }

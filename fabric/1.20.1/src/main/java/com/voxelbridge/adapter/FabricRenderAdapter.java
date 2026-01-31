@@ -6,6 +6,9 @@ import com.voxelbridge.export.texture.SpriteKeyResolver;
 import com.voxelbridge.export.quad.QuadDataUtil;
 import com.voxelbridge.platform.render.frapi.FabricRenderApiHelper;
 import com.voxelbridge.platform.client.ClientAccessHolder;
+import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
+import net.fabricmc.fabric.api.renderer.v1.RendererAccess;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBakedModel;
 import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -41,25 +44,50 @@ public class FabricRenderAdapter implements RenderAdapter {
         if (!(model instanceof BakedModel bakedModel)) {
             return quads;
         }
-        RandomSource rand = RandomSource.create(seed);
         SpriteFinder spriteFinder = getSpriteFinder();
-        List<BakedQuad> vanillaQuads = new ArrayList<>();
-        for (Direction dir : Direction.values()) {
-            vanillaQuads.addAll(bakedModel.getQuads(state, dir, rand));
-        }
-        vanillaQuads.addAll(bakedModel.getQuads(state, null, rand));
-
         List<BakedQuad> frapiQuads = new ArrayList<>();
         if (spriteFinder != null && bakedModel instanceof FabricBakedModel) {
             FabricBakedModel fabricModel = (FabricBakedModel) bakedModel;
-            frapiQuads = FabricRenderApiHelper.extractQuads(fabricModel, level, state, pos, rand, spriteFinder);
+            RandomSource frapiRand = RandomSource.create(seed);
+            frapiQuads = FabricRenderApiHelper.extractQuads(fabricModel, level, state, pos, frapiRand, seed, spriteFinder);
+        } else if (VoxelBridgeLogger.isDebugEnabled(LogModule.EXPORT)) {
+            VoxelBridgeLogger.debug(LogModule.EXPORT, String.format(
+                "[FRAPI] Skipped: spriteFinder=%s fabricModel=%s",
+                spriteFinder != null,
+                bakedModel instanceof FabricBakedModel
+            ));
         }
 
-        if (!vanillaQuads.isEmpty()) {
-            return vanillaQuads;
+        boolean logStats = VoxelBridgeLogger.isDebugEnabled(LogModule.EXPORT);
+        List<BakedQuad> vanillaQuads = new ArrayList<>();
+        if (frapiQuads.isEmpty() || logStats) {
+            RandomSource vanillaRand = RandomSource.create(seed);
+            for (Direction dir : Direction.values()) {
+                vanillaQuads.addAll(bakedModel.getQuads(state, dir, vanillaRand));
+            }
+            vanillaQuads.addAll(bakedModel.getQuads(state, null, vanillaRand));
         }
+
+        if (logStats) {
+            boolean rendererPresent = RendererAccess.INSTANCE.getRenderer() != null;
+            String used = !frapiQuads.isEmpty() ? "frapi" : (!vanillaQuads.isEmpty() ? "vanilla" : "none");
+            VoxelBridgeLogger.debug(LogModule.EXPORT, String.format(
+                "[QuadStats] model=%s state=%s pos=%s vanilla=%d frapi=%d renderer=%s used=%s",
+                bakedModel.getClass().getSimpleName(),
+                state != null ? state.toString() : "null",
+                pos != null ? pos.toShortString() : "null",
+                vanillaQuads.size(),
+                frapiQuads.size(),
+                rendererPresent,
+                used
+            ));
+        }
+
         if (!frapiQuads.isEmpty()) {
             return frapiQuads;
+        }
+        if (!vanillaQuads.isEmpty()) {
+            return vanillaQuads;
         }
         return vanillaQuads;
     }

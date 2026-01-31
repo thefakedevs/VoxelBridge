@@ -199,17 +199,7 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         if (holder == null) {
             return null;
         }
-        try {
-            var unwrap = holder.getClass().getMethod("unwrapKey");
-            Object opt = unwrap.invoke(holder);
-            if (opt instanceof java.util.Optional<?> optional && optional.isPresent()) {
-                Object key = optional.get();
-                Object loc = key.getClass().getMethod("location").invoke(key);
-                return loc instanceof ResourceLocation ? (ResourceLocation) loc : null;
-            }
-        } catch (Exception ignored) {
-        }
-        return null;
+        return holder.unwrapKey().map(key -> key.location()).orElse(null);
     }
 }
 
