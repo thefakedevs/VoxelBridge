@@ -8,7 +8,10 @@
         "BakedQuadAccessor",
         "HttpTextureAccessor",
         "TextureAtlasHolderAccessor",
-        "BlockRenderInfoAccessor"
+        "BlockRenderInfoAccessor",
+        "MapRendererAccessor",
+        "MapInstanceAccessor",
+        "MapInstanceInvoker"
     ],
     "injectors": {
         "defaultRequire": 1

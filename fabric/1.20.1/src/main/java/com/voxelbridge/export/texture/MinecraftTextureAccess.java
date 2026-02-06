@@ -41,6 +41,10 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
         }
         try {
             ResourceLocation loc = new ResourceLocation(resourceKey);
+            ResourceLocation normalized = normalizeDynamicMapLocation(loc);
+            if (normalized != null) {
+                loc = normalized;
+            }
             return TextureLoader.readTexture(loc, preserveAnimationStrip);
         } catch (Exception ignored) {
             return null;
@@ -138,5 +142,70 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static ResourceLocation normalizeDynamicMapLocation(ResourceLocation loc) {
+        if (loc == null) {
+            return null;
+        }
+        String path = loc.getPath();
+        if (path == null) {
+            return null;
+        }
+        // normalize textures/maps/<id>.png -> map/<id>
+        if (path.startsWith("textures/maps/")) {
+            String file = path.substring("textures/maps/".length());
+            int dot = file.indexOf('.');
+            if (dot > 0) {
+                file = file.substring(0, dot);
+            }
+            try {
+                int id = Integer.parseInt(file);
+                return new ResourceLocation(loc.getNamespace(), "map/" + id);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        // normalize textures/map/<id>.png -> map/<id>
+        if (path.startsWith("textures/map/")) {
+            String file = path.substring("textures/map/".length());
+            int dot = file.indexOf('.');
+            if (dot > 0) {
+                file = file.substring(0, dot);
+            }
+            try {
+                int id = Integer.parseInt(file);
+                return new ResourceLocation(loc.getNamespace(), "map/" + id);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        // normalize textures/dynamic/map/<id>_<frame>.png -> maps/<id>
+        if (path.startsWith("textures/dynamic/map/")) {
+            String file = path.substring("textures/dynamic/map/".length());
+            int dot = file.indexOf('.');
+            if (dot > 0) {
+                file = file.substring(0, dot);
+            }
+            int underscore = file.indexOf('_');
+            String idStr = underscore > 0 ? file.substring(0, underscore) : file;
+            try {
+                int id = Integer.parseInt(idStr);
+                return new ResourceLocation(loc.getNamespace(), "map/" + id);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        // normalize maps/<id> -> map/<id>
+        if (path.startsWith("maps/")) {
+            String idStr = path.substring("maps/".length());
+            try {
+                int id = Integer.parseInt(idStr);
+                return new ResourceLocation(loc.getNamespace(), "map/" + id);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 }

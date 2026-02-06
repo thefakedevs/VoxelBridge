@@ -43,6 +43,10 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
 
     private static ResolvedTexture resolveEntitySpecific(Entity entity, RenderType renderType) {
         if (entity instanceof ItemFrame) {
+            ResolvedTexture helper = Adapters.getTextureHelper().resolveEntityTexture(entity, renderType);
+            if (helper != null) {
+                return helper;
+            }
             ResourceLocation base = RenderTypeTextureResolver.INSTANCE.resolve(renderType);
             if (base != null) {
                 if (base.getPath().contains(":")) {
@@ -50,7 +54,7 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
                 }
                 return resolveTextureWithAtlasDetection(base);
             }
-            return Adapters.getTextureHelper().resolveEntityTexture(entity, renderType);
+            return null;
         }
         return Adapters.getTextureHelper().resolveEntityTexture(entity, renderType);
     }

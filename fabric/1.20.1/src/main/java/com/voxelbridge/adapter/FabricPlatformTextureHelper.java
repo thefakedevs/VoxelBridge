@@ -14,13 +14,13 @@ import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.MapItem;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.decoration.Painting;
 import net.minecraft.world.entity.decoration.PaintingVariant;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
@@ -60,23 +60,21 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
             return Optional.empty();
         }
 
+        ResourceLocation normalized = normalizeDynamicLocation(location);
+        NativeImage cached = DynamicTextureCache.get(normalized);
+        if (cached != null) {
+            return Optional.of(copyNativeImage(cached));
+        }
+
         // 1) Dynamic / HTTP textures (render thread)
         if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
-            var tm = Minecraft.getInstance().getTextureManager();
-            var texture = tm.getTexture(location);
-
-            NativeImage pixels = FabricTextureAccess.getDynamicTexturePixels(texture);
-            if (pixels != null) {
-                return Optional.of(copyNativeImage(pixels));
+            Optional<NativeImage> loaded = DynamicTextureCache.loadOnRenderThread(normalized);
+            if (loaded.isPresent()) {
+                return Optional.of(copyNativeImage(loaded.get()));
             }
-
-            File file = FabricTextureAccess.getHttpTextureFile(texture);
-            if (file != null && file.exists()) {
-                try {
-                    return Optional.of(NativeImage.read(new FileInputStream(file)));
-                } catch (Exception ignored) {
-                }
-            }
+        } else {
+            // Non-blocking preheat for dynamic/HTTP textures.
+            DynamicTextureCache.preheat(normalized);
         }
 
         // 2) Resource manager fallback
@@ -112,7 +110,7 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
             return resolvePainting(painting);
         }
         if (entity instanceof ItemFrame frame) {
-            return resolveItemFrame(frame);
+            return resolveItemFrame(frame, type);
         }
         return null;
     }
@@ -158,7 +156,20 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         }
     }
 
-    private ResolvedTexture resolveItemFrame(ItemFrame frame) {
+    private ResolvedTexture resolveItemFrame(ItemFrame frame, RenderType type) {
+        ResolvedTexture map = resolveItemFrameMap(frame, type);
+        if (map != null) {
+            return map;
+        }
+        if (type != null) {
+            // Let the caller fall back to RenderType-based resolution for normal item frame layers.
+            return null;
+        }
+        // If render type is unavailable, use a conservative fallback.
+        return resolveItemFrameFallback(frame);
+    }
+
+    private ResolvedTexture resolveItemFrameFallback(ItemFrame frame) {
         try {
             ResourceLocation woodLoc = new ResourceLocation("minecraft", "block/birch_planks");
             TextureAtlasSprite sprite = Minecraft.getInstance()
@@ -182,6 +193,83 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         String path = isGlow ? "textures/entity/glow_item_frame.png" : "textures/entity/item_frame.png";
         ResourceLocation loc = new ResourceLocation("minecraft", path);
         return new ResolvedTexture(loc, 0f, 1f, 0f, 1f, false, null, null);
+    }
+
+    private ResolvedTexture resolveItemFrameMap(ItemFrame frame, RenderType type) {
+        if (frame == null) {
+            return null;
+        }
+        ItemStack stack = frame.getItem();
+        if (stack == null || !(stack.getItem() instanceof MapItem)) {
+            return null;
+        }
+        if (!isMapRenderType(type)) {
+            return null;
+        }
+        int mapId = getMapIdFromStack(stack);
+        if (mapId < 0) {
+            return null;
+        }
+        ResourceLocation mapLoc = new ResourceLocation("minecraft", "map/" + mapId);
+        return new ResolvedTexture(mapLoc, 0f, 1f, 0f, 1f, false, null, null);
+    }
+
+    private static boolean isMapRenderType(RenderType type) {
+        if (type == null) {
+            return false;
+        }
+        try {
+            ResourceLocation tex = Adapters.getPlatformRenderHelper().getRenderTypeTexture(type);
+            if (tex == null) {
+                return false;
+            }
+            String path = tex.getPath();
+            return path.startsWith("textures/dynamic/map/") || path.startsWith("maps/");
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static int getMapIdFromStack(ItemStack stack) {
+        try {
+            var tag = stack.getTag();
+            if (tag != null && tag.contains("map", 3)) {
+                return tag.getInt("map");
+            }
+        } catch (Exception ignored) {
+        }
+        return -1;
+    }
+
+    private static ResourceLocation normalizeDynamicLocation(ResourceLocation location) {
+        if (location == null) {
+            return null;
+        }
+        String path = location.getPath();
+        // Some render types expose dynamic map textures as textures/dynamic/map/<id>_<frame>.png
+        if (path != null && path.startsWith("textures/dynamic/map/")) {
+            String file = path.substring("textures/dynamic/map/".length());
+            int dot = file.indexOf('.');
+            if (dot > 0) {
+                file = file.substring(0, dot);
+            }
+            int underscore = file.indexOf('_');
+            String idStr = underscore > 0 ? file.substring(0, underscore) : file;
+            try {
+                int id = Integer.parseInt(idStr);
+                return new ResourceLocation(location.getNamespace(), "map/" + id);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (path != null && path.startsWith("maps/")) {
+            String idStr = path.substring("maps/".length());
+            try {
+                int id = Integer.parseInt(idStr);
+                return new ResourceLocation(location.getNamespace(), "map/" + id);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return location;
     }
 
     private static ResourceLocation normalizePaintingSpriteName(ResourceLocation spriteName) {
