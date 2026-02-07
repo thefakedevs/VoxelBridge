@@ -74,6 +74,10 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
         // preferred
         if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
             preheatMapTexture(location);
+            Optional<NativeImage> mapImage = loadMapTexture(location);
+            if (mapImage.isPresent()) {
+                return Optional.of(copyNativeImage(mapImage.get()));
+            }
             net.minecraft.client.renderer.texture.TextureManager tm = net.minecraft.client.Minecraft.getInstance()
                     .getTextureManager();
             net.minecraft.client.renderer.texture.AbstractTexture texture = tm.getTexture(location);
@@ -243,6 +247,55 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
                 mapRenderer.update(id, data);
             }
         } catch (Exception ignored) {
+        }
+    }
+
+    private static Optional<NativeImage> loadMapTexture(ResourceLocation location) {
+        int mapId = MapTextureUtil.parseMapId(location);
+        if (mapId < 0) {
+            return Optional.empty();
+        }
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.level == null) {
+            return Optional.empty();
+        }
+        var mapRenderer = mc.gameRenderer.getMapRenderer();
+        if (mapRenderer == null) {
+            return Optional.empty();
+        }
+        try {
+            it.unimi.dsi.fastutil.ints.Int2ObjectMap<?> maps =
+                ((com.voxelbridge.mixin.MapRendererAccessor) (Object) mapRenderer).voxelbridge$getMaps();
+            if (maps == null) {
+                return Optional.empty();
+            }
+            Object instance = maps.get(mapId);
+            if (instance == null) {
+                return Optional.empty();
+            }
+
+            try {
+                ((com.voxelbridge.mixin.MapInstanceInvoker) (Object) instance).voxelbridge$forceUpload();
+            } catch (Exception ignored) {
+            }
+
+            net.minecraft.client.renderer.texture.DynamicTexture tex =
+                ((com.voxelbridge.mixin.MapInstanceAccessor) (Object) instance).voxelbridge$getTexture();
+            if (tex == null) {
+                return Optional.empty();
+            }
+            NativeImage pixels = tex.getPixels();
+            if (pixels == null) {
+                return Optional.empty();
+            }
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
+                    "[NeoForgeTextureHelper/1.21.1] Map pixels captured: id=" + mapId
+                        + " size=" + pixels.getWidth() + "x" + pixels.getHeight());
+            }
+            return Optional.of(pixels);
+        } catch (Exception ignored) {
+            return Optional.empty();
         }
     }
 

@@ -8,6 +8,9 @@
     "CompositeStateAccessor",
     "EmptyTextureStateShardAccessor",
     "HttpTextureAccessor",
+    "MapInstanceAccessor",
+    "MapInstanceInvoker",
+    "MapRendererAccessor",
     "SpriteContentsAccessor",
     "TextureAtlasAccessor"
   ]

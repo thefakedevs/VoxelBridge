@@ -223,17 +223,17 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
         if (mc.level == null) {
             return;
         }
-        var mapRenderer = mc.gameRenderer.getMapRenderer();
-        if (mapRenderer == null) {
+        var mapTextureManager = mc.getMapTextureManager();
+        if (mapTextureManager == null) {
             return;
         }
         try {
             MapItemSavedData data = MapItem.getSavedData(id, mc.level);
             if (data != null) {
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[NeoForgeTextureHelper/1.21.4] MapRenderer.update: " + id);
+                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[NeoForgeTextureHelper/1.21.4] MapTextureManager.update: " + id);
                 }
-                mapRenderer.update(id, data);
+                mapTextureManager.update(id, data);
             }
         } catch (Exception ignored) {
         }
