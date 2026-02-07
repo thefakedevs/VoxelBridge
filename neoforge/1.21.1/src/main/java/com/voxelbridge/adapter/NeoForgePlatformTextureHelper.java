@@ -2,6 +2,7 @@ package com.voxelbridge.adapter;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
+import com.voxelbridge.export.texture.MapTextureUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.RenderType;
@@ -14,6 +15,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.decoration.Painting;
 import net.minecraft.world.entity.decoration.PaintingVariant;
+import net.minecraft.world.item.MapItem;
+import net.minecraft.world.level.saveddata.maps.MapId;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -58,10 +62,18 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
     public Optional<NativeImage> readTexture(ResourceLocation location) {
         if (location == null)
             return Optional.empty();
+        ResourceLocation normalized = MapTextureUtil.normalizeDynamicMapLocation(location);
+        if (normalized != null) {
+            location = normalized;
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[NeoForgeTextureHelper/1.21.1] Normalized map location: " + location);
+            }
+        }
 
         // 1. Try Memory (DynamicTexture / HttpTexture) - Main Thread Operation
         // preferred
         if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
+            preheatMapTexture(location);
             net.minecraft.client.renderer.texture.TextureManager tm = net.minecraft.client.Minecraft.getInstance()
                     .getTextureManager();
             net.minecraft.client.renderer.texture.AbstractTexture texture = tm.getTexture(location);
@@ -69,6 +81,9 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
             if (texture instanceof net.minecraft.client.renderer.texture.DynamicTexture dt) {
                 NativeImage pixels = dt.getPixels();
                 if (pixels != null) {
+                    if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                        VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[NeoForgeTextureHelper/1.21.1] DynamicTexture pixels loaded: " + location);
+                    }
                     return Optional.of(copyNativeImage(pixels));
                 }
             }
@@ -203,6 +218,32 @@ public class NeoForgePlatformTextureHelper implements PlatformTextureHelper {
             return spriteName;
         }
         return ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), "painting/" + path);
+    }
+
+    private static void preheatMapTexture(ResourceLocation location) {
+        int mapId = MapTextureUtil.parseMapId(location);
+        if (mapId < 0) {
+            return;
+        }
+        MapId id = new MapId(mapId);
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.level == null) {
+            return;
+        }
+        var mapRenderer = mc.gameRenderer.getMapRenderer();
+        if (mapRenderer == null) {
+            return;
+        }
+        try {
+            MapItemSavedData data = MapItem.getSavedData(id, mc.level);
+            if (data != null) {
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[NeoForgeTextureHelper/1.21.1] MapRenderer.update: " + id);
+                }
+                mapRenderer.update(id, data);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     // HttpTexture file access is handled via mixin accessor.

@@ -3,6 +3,7 @@ package com.voxelbridge.export.exporter.entity;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.adapter.Adapters;
+import com.voxelbridge.export.texture.MapTextureUtil;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
 import net.minecraft.client.renderer.RenderType;
@@ -42,7 +43,11 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
     }
 
     private static ResolvedTexture resolveEntitySpecific(Entity entity, RenderType renderType) {
-        if (entity instanceof ItemFrame) {
+        if (entity instanceof ItemFrame frame) {
+            ResolvedTexture map = MapTextureUtil.resolveItemFrameMap(frame, renderType);
+            if (map != null) {
+                return map;
+            }
             ResourceLocation base = RenderTypeTextureResolver.INSTANCE.resolve(renderType);
             if (base != null) {
                 if (base.getPath().contains(":")) {
@@ -62,6 +67,7 @@ public final class EntityTextureResolver implements TextureResolver<Entity> {
             Sheets.BED_SHEET,
             Sheets.SIGN_SHEET,
             ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/decorated_pot.png"),
+            ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/map_decorations.png"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/shulker_boxes.png"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/banner_patterns.png"),
             ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/shield_patterns.png")

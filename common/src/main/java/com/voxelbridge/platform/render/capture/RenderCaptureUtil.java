@@ -56,6 +56,34 @@ public final class RenderCaptureUtil {
         return new UvStats(rawU, rawV, minU, maxU, minV, maxV, wrappedU, wrappedV);
     }
 
+    public static UvStats normalizeUvStatsPixels(UvStats uvStats, int width, int height) {
+        if (uvStats == null) {
+            return null;
+        }
+        float invW = width <= 0 ? 1f : 1f / width;
+        float invH = height <= 0 ? 1f : 1f / height;
+        int count = uvStats.rawU().length;
+        float[] rawU = new float[count];
+        float[] rawV = new float[count];
+        float minU = Float.POSITIVE_INFINITY, maxU = Float.NEGATIVE_INFINITY;
+        float minV = Float.POSITIVE_INFINITY, maxV = Float.NEGATIVE_INFINITY;
+        for (int i = 0; i < count; i++) {
+            rawU[i] = uvStats.rawU()[i] * invW;
+            rawV[i] = uvStats.rawV()[i] * invH;
+            minU = Math.min(minU, rawU[i]);
+            maxU = Math.max(maxU, rawU[i]);
+            minV = Math.min(minV, rawV[i]);
+            maxV = Math.max(maxV, rawV[i]);
+        }
+        float[] wrappedU = new float[count];
+        float[] wrappedV = new float[count];
+        for (int i = 0; i < count; i++) {
+            wrappedU[i] = wrap01(rawU[i]);
+            wrappedV[i] = wrap01(rawV[i]);
+        }
+        return new UvStats(rawU, rawV, minU, maxU, minV, maxV, wrappedU, wrappedV);
+    }
+
     public static ResolvedTexture resolveAtlasSprite(ResolvedTexture textureRes,
                                                      AtlasLocator locator,
                                                      UvStats uvStats,

@@ -97,6 +97,7 @@ sourceSets {
                     "com/voxelbridge/export/exporter/FluidExporter.java",
                     "com/voxelbridge/export/exporter/QuadCollector.java",
                     "com/voxelbridge/export/texture/AnimatedTextureHelper.java",
+                    "com/voxelbridge/export/texture/MapTextureUtil.java",
                     "com/voxelbridge/export/texture/MinecraftTextureAccess.java",
                     "com/voxelbridge/export/texture/PbrTextureHelper.java",
                     "com/voxelbridge/export/texture/SpriteKeyResolver.java",

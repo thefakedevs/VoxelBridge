@@ -14,6 +14,7 @@ import com.voxelbridge.export.exporter.resolve.DefaultAtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
+import com.voxelbridge.compat.AtlasCompat;
 import com.voxelbridge.export.texture.EntityTextureManager;
 import com.voxelbridge.platform.client.ClientAccessHolder;
 import com.voxelbridge.platform.render.RenderTypeTextureResolver;
@@ -46,6 +47,9 @@ public final class EntityRenderer {
     private static volatile TextureResolver<Entity> OVERRIDE_RESOLVER;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
     private static final ConcurrentHashMap<Long, PlaneOffsetTracker> CHUNK_PLANE_OFFSETS = new ConcurrentHashMap<>();
+    private static final Object MAP_DECOR_ATLAS_LOCK = new Object();
+    private static volatile int MAP_DECOR_ATLAS_W;
+    private static volatile int MAP_DECOR_ATLAS_H;
 
     private EntityRenderer() {}
 
@@ -325,6 +329,7 @@ public final class EntityRenderer {
                     renderType != null ? renderType.toString() : "null"));
             }
             RenderCaptureUtil.UvStats uvStats = RenderCaptureUtil.computeUvStats(verts);
+            uvStats = normalizeMapDecorUvStats(uvStats, renderType);
             String materialGroupKey = MaterialGroupKey.entity(entity);
             updateBucketKey();
             CapturedQuadProcessor.process(
@@ -380,11 +385,21 @@ public final class EntityRenderer {
             RenderCaptureUtil.UvStats uvStats,
             float[] positions
         ) {
+            ResourceLocation rtTexture = renderType != null ? RENDER_TYPE_RESOLVER.resolve(renderType) : null;
+            if (rtTexture != null && rtTexture.getPath() != null && rtTexture.getPath().contains("map_decorations")) {
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
+                        "[MapDecor] Skipping map decoration quad for " + source.getType()
+                            + " renderType=" + renderType + " texture=" + rtTexture);
+                }
+                return new CapturedQuadProcessor.TextureResult(null, null, false, 0f, 0f, 0f, 0f, true);
+            }
             TextureResolver<Entity> resolver = resolveTextureResolver();
             ResolvedTexture textureRes = resolver != null ? resolver.resolve(source, renderType) : null;
 
+            RenderCaptureUtil.UvStats atlasUvStats = uvStats;
             if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
-                textureRes = RenderCaptureUtil.resolveAtlasSprite(textureRes, ATLAS_LOCATOR, uvStats, textureRes.atlasLocation());
+                textureRes = RenderCaptureUtil.resolveAtlasSprite(textureRes, ATLAS_LOCATOR, atlasUvStats, textureRes.atlasLocation());
             }
 
             if (source instanceof net.minecraft.world.entity.decoration.Painting painting
@@ -481,7 +496,10 @@ public final class EntityRenderer {
                               float[] uv0) {
             if (useAtlasUv) {
                 // Atlas texture: normalize UV within sprite bounds
-                RenderCaptureUtil.fillUvsAtlas(verts, uv0, u0, u1, v0, v1);
+                boolean usedPixels = false;
+                if (!usedPixels) {
+                    RenderCaptureUtil.fillUvsAtlas(verts, uv0, u0, u1, v0, v1);
+                }
             } else {
                 // Non-atlas texture: find actual UV bounds and normalize
                 // This is important for entities like paintings where UV may not be in [0,1]
@@ -584,6 +602,96 @@ public final class EntityRenderer {
             return sprite.contents().name().toString().contains("missingno");
         }
 
+    }
+
+    private static RenderCaptureUtil.UvStats normalizeMapDecorUvStats(RenderCaptureUtil.UvStats uvStats, RenderType renderType) {
+        if (uvStats == null || renderType == null) {
+            return uvStats;
+        }
+        ResourceLocation texture = RENDER_TYPE_RESOLVER.resolve(renderType);
+        if (texture == null || texture.getPath() == null || !texture.getPath().contains("map_decorations")) {
+            return uvStats;
+        }
+        boolean looksPixelUv =
+            uvStats.maxU() > 1.1f || uvStats.maxV() > 1.1f ||
+            uvStats.minU() < -0.1f || uvStats.minV() < -0.1f;
+        if (!looksPixelUv) {
+            return uvStats;
+        }
+        int[] size = getMapDecorAtlasSize(texture);
+        if (size == null) {
+            return uvStats;
+        }
+        RenderCaptureUtil.UvStats normalized = RenderCaptureUtil.normalizeUvStatsPixels(uvStats, size[0], size[1]);
+        if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+            VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
+                "[MapDecor] Normalized UVs using atlas size "
+                    + size[0] + "x" + size[1]
+                    + " atlas=" + texture);
+        }
+        return normalized != null ? normalized : uvStats;
+    }
+
+    private static int[] getMapDecorAtlasSize(ResourceLocation atlasLoc) {
+        if (MAP_DECOR_ATLAS_W > 0 && MAP_DECOR_ATLAS_H > 0) {
+            return new int[] { MAP_DECOR_ATLAS_W, MAP_DECOR_ATLAS_H };
+        }
+        synchronized (MAP_DECOR_ATLAS_LOCK) {
+            if (MAP_DECOR_ATLAS_W > 0 && MAP_DECOR_ATLAS_H > 0) {
+                return new int[] { MAP_DECOR_ATLAS_W, MAP_DECOR_ATLAS_H };
+            }
+            try {
+                var tex = ClientAccessHolder.get().getTextureManager().getTexture(atlasLoc);
+                if (!(tex instanceof net.minecraft.client.renderer.texture.TextureAtlas atlas)) {
+                    if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                        VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
+                            "[MapDecor] Atlas texture not available in TextureManager for " + atlasLoc
+                                + " (got " + (tex != null ? tex.getClass().getName() : "null") + ")");
+                    }
+                    return null;
+                }
+                int widthSum = 0;
+                int heightSum = 0;
+                int count = 0;
+                for (TextureAtlasSprite sprite : AtlasCompat.getAllSprites(atlas)) {
+                    if (sprite == null || sprite.contents() == null) {
+                        continue;
+                    }
+                    int sw = sprite.contents().width();
+                    int sh = sprite.contents().height();
+                    float du = sprite.getU1() - sprite.getU0();
+                    float dv = sprite.getV1() - sprite.getV0();
+                    if (sw <= 0 || sh <= 0 || du <= 1e-6f || dv <= 1e-6f) {
+                        continue;
+                    }
+                    int aw = Math.round(sw / du);
+                    int ah = Math.round(sh / dv);
+                    if (aw <= 0 || ah <= 0) {
+                        continue;
+                    }
+                    widthSum += aw;
+                    heightSum += ah;
+                    count++;
+                    if (count >= 8) {
+                        break;
+                    }
+                }
+                if (count == 0) {
+                    return null;
+                }
+                MAP_DECOR_ATLAS_W = Math.round(widthSum / (float) count);
+                MAP_DECOR_ATLAS_H = Math.round(heightSum / (float) count);
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
+                        "[MapDecor] Estimated atlas size from sprites: "
+                            + MAP_DECOR_ATLAS_W + "x" + MAP_DECOR_ATLAS_H
+                            + " atlas=" + atlasLoc);
+                }
+                return new int[] { MAP_DECOR_ATLAS_W, MAP_DECOR_ATLAS_H };
+            } catch (Throwable t) {
+                return null;
+            }
+        }
     }
 
     private static EntityTextureManager.TextureHandle tryRegisterPlayerAttachmentTexture(

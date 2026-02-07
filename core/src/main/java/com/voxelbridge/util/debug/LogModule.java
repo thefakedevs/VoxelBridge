@@ -17,6 +17,7 @@ public enum LogModule {
     TEXTURE_RESOLVE("texture.resolve", "texture_resolve.log"),
     TEXTURE_REGISTER("texture.register", "texture_register.log"),
     TEXTURE_ATLAS("texture.atlas", "texture_atlas.log"),
+    DYNAMIC_MAP("dynamicmap", "dynamicmap.log"),
 
     ANIMATION("animation", "animation.log"),
     UV_REMAP("uv.remap", "uv_remap.log"),

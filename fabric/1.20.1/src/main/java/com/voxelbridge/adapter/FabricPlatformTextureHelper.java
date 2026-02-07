@@ -63,6 +63,9 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         ResourceLocation normalized = normalizeDynamicLocation(location);
         NativeImage cached = DynamicTextureCache.get(normalized);
         if (cached != null) {
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.20.1] Cache hit: " + normalized);
+            }
             return Optional.of(copyNativeImage(cached));
         }
 
@@ -70,6 +73,9 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
             Optional<NativeImage> loaded = DynamicTextureCache.loadOnRenderThread(normalized);
             if (loaded.isPresent()) {
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.20.1] Loaded on render thread: " + normalized);
+                }
                 return Optional.of(copyNativeImage(loaded.get()));
             }
         } else {
@@ -204,13 +210,22 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
             return null;
         }
         if (!isMapRenderType(type)) {
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.20.1] Not a map RenderType: " + type);
+            }
             return null;
         }
         int mapId = getMapIdFromStack(stack);
         if (mapId < 0) {
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.20.1] Map id not found in ItemStack.");
+            }
             return null;
         }
         ResourceLocation mapLoc = new ResourceLocation("minecraft", "map/" + mapId);
+        if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+            VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.20.1] Resolved map location: " + mapLoc);
+        }
         return new ResolvedTexture(mapLoc, 0f, 1f, 0f, 1f, false, null, null);
     }
 

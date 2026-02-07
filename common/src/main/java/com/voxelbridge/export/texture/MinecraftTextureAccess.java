@@ -41,6 +41,10 @@ public final class MinecraftTextureAccess implements TextureAccess<TextureAtlasS
         }
         try {
             ResourceLocation loc = ResourceLocation.parse(resourceKey);
+            ResourceLocation normalized = MapTextureUtil.normalizeDynamicMapLocation(loc);
+            if (normalized != null) {
+                loc = normalized;
+            }
             return TextureLoader.readTexture(loc, preserveAnimationStrip);
         } catch (Exception ignored) {
             return null;

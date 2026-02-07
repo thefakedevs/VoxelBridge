@@ -2,6 +2,8 @@ package com.voxelbridge.adapter;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.compat.FabricTextureAccess;
+import com.voxelbridge.util.debug.LogModule;
+import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.MapRenderer;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -52,6 +54,9 @@ public final class DynamicTextureCache {
         if (!IN_FLIGHT.add(location)) {
             return;
         }
+        if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+            VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] Preheat scheduled: " + location);
+        }
         Minecraft.getInstance().execute(() -> {
             try {
                 loadOnRenderThread(location);
@@ -70,11 +75,17 @@ public final class DynamicTextureCache {
         }
         NativeImage cached = CACHE.get(location);
         if (cached != null) {
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] Cache hit: " + location);
+            }
             return Optional.of(cached);
         }
 
         Optional<NativeImage> mapImage = loadMapTexture(location);
         if (mapImage.isPresent()) {
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] Map texture loaded: " + location);
+            }
             return mapImage;
         }
 
@@ -83,6 +94,9 @@ public final class DynamicTextureCache {
         if (pixels != null) {
             NativeImage copy = copyNativeImage(pixels);
             CACHE.put(location, copy);
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] DynamicTexture pixels loaded: " + location);
+            }
             return Optional.of(copy);
         }
 
@@ -91,11 +105,17 @@ public final class DynamicTextureCache {
             try {
                 NativeImage img = NativeImage.read(new FileInputStream(file));
                 CACHE.put(location, img);
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] HttpTexture file loaded: " + location);
+                }
                 return Optional.of(img);
             } catch (Exception ignored) {
             }
         }
 
+        if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+            VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] Dynamic texture not found: " + location);
+        }
         return Optional.empty();
     }
 
@@ -118,6 +138,9 @@ public final class DynamicTextureCache {
         try {
             MapItemSavedData data = MapItem.getSavedData(mapId, mc.level);
             if (data != null) {
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] MapRenderer.update: id=" + mapId);
+                }
                 mapRenderer.update(mapId, data);
             }
         } catch (Exception ignored) {
@@ -148,6 +171,10 @@ public final class DynamicTextureCache {
             }
             NativeImage copy = copyNativeImage(pixels);
             CACHE.put(location, copy);
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] Map pixels captured: id=" + mapId
+                    + " size=" + copy.getWidth() + "x" + copy.getHeight());
+            }
             return Optional.of(copy);
         } catch (Exception ignored) {
             return Optional.empty();
