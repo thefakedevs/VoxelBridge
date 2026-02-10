@@ -166,12 +166,8 @@ public final class BlockEntityRenderer {
             CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, blockEntity, chunkX, chunkZ);
 
             com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderer][renderDirect] Calling renderer.render()...");
-            Vec3 camera = Vec3.ZERO;
-            try {
-                camera = ctx.getMc().gameRenderer.getMainCamera().getPosition();
-            } catch (Throwable ignored) {
-                // Fallback to zero if camera is unavailable.
-            }
+            // Export-only camera spoof: keep BER distance checks at zero.
+            Vec3 camera = Vec3.atCenterOf(blockEntity.getBlockPos());
             Adapters.getBlockEntityRender().render(renderer, blockEntity, 0.0f, poseStack, captureBuffer, 0xF000F0, OverlayTexture.NO_OVERLAY, camera);
 
             com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderer][renderDirect] renderer.render() returned, flushing buffer...");

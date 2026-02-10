@@ -20,21 +20,25 @@ public class KeyInputHandler {
         if (KeyBindings.KEY_SET_POS1.consumeClick()) {
             BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
             if (hit == null) {
-                mc.player.displayClientMessage(Component.literal("[VoxelBridge] No block targeted."), false);
-            } else {
-                ExportControl.setPos1(hit);
-                mc.player.displayClientMessage(Component.literal("[VoxelBridge] pos1 set to " + hit.toShortString()), false);
+                hit = mc.player.blockPosition();
+                mc.player.displayClientMessage(
+                        Component.literal("[VoxelBridge] No block targeted, use current position: " + hit.toShortString()),
+                        false);
             }
+            ExportControl.setPos1(hit);
+            mc.player.displayClientMessage(Component.literal("[VoxelBridge] pos1 set to " + hit.toShortString()), false);
         }
 
         if (KeyBindings.KEY_SET_POS2.consumeClick()) {
             BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
             if (hit == null) {
-                mc.player.displayClientMessage(Component.literal("[VoxelBridge] No block targeted."), false);
-            } else {
-                ExportControl.setPos2(hit);
-                mc.player.displayClientMessage(Component.literal("[VoxelBridge] pos2 set to " + hit.toShortString()), false);
+                hit = mc.player.blockPosition();
+                mc.player.displayClientMessage(
+                        Component.literal("[VoxelBridge] No block targeted, use current position: " + hit.toShortString()),
+                        false);
             }
+            ExportControl.setPos2(hit);
+            mc.player.displayClientMessage(Component.literal("[VoxelBridge] pos2 set to " + hit.toShortString()), false);
         }
 
         if (KeyBindings.KEY_CLEAR.consumeClick()) {

@@ -51,8 +51,12 @@ public final class VoxelBridgeCommands {
                 var mc = ClientAccessHolder.get().getMinecraft();
                 BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
                 if (hit == null) {
-                    ctx.getSource().sendSystemMessage(Component.literal("§c[VoxelBridge] No block targeted."));
-                    return 0;
+                    if (mc.player == null) {
+                        ctx.getSource().sendSystemMessage(Component.literal("[VoxelBridge] No block targeted."));
+                        return 0;
+                    }
+                    hit = mc.player.blockPosition();
+                    ctx.getSource().sendSystemMessage(Component.literal("[VoxelBridge] No block targeted, use current position: " + hit.toShortString()));
                 }
                 setPos1(hit);
                 ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] pos1 set to " + getPos1().toShortString()));
@@ -71,8 +75,12 @@ public final class VoxelBridgeCommands {
                 var mc = ClientAccessHolder.get().getMinecraft();
                 BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
                 if (hit == null) {
-                    ctx.getSource().sendSystemMessage(Component.literal("§c[VoxelBridge] No block targeted."));
-                    return 0;
+                    if (mc.player == null) {
+                        ctx.getSource().sendSystemMessage(Component.literal("[VoxelBridge] No block targeted."));
+                        return 0;
+                    }
+                    hit = mc.player.blockPosition();
+                    ctx.getSource().sendSystemMessage(Component.literal("[VoxelBridge] No block targeted, use current position: " + hit.toShortString()));
                 }
                 setPos2(hit);
                 ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] pos2 set to " + getPos2().toShortString()));
@@ -344,10 +352,10 @@ public final class VoxelBridgeCommands {
                     int threads = ExportRuntimeConfig.getExportThreadCount();
                     int cpuCores = Runtime.getRuntime().availableProcessors();
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Export thread count: §f" + threads + "§7 (CPU cores: " + cpuCores + ")"));
-                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge threads <count> (1-32)"));
+                    ctx.getSource().sendSystemMessage(Component.literal("§7   Usage: /voxelbridge threads <count> (1-128)"));
                     return 1;
                 })
-                .then(Commands.argument("count", IntegerArgumentType.integer(1, 32)).executes(ctx -> {
+                .then(Commands.argument("count", IntegerArgumentType.integer(1, 128)).executes(ctx -> {
                     int count = IntegerArgumentType.getInteger(ctx, "count");
                     ExportRuntimeConfig.setExportThreadCount(count);
                     ctx.getSource().sendSystemMessage(Component.literal("§b[VoxelBridge] Export threads -> " + count));

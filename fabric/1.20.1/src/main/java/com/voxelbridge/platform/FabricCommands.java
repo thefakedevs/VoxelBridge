@@ -31,8 +31,12 @@ public final class FabricCommands {
                     var mc = ClientAccessHolder.get().getMinecraft();
                     BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
                     if (hit == null) {
-                        ctx.getSource().sendFeedback(Component.literal("§c[VoxelBridge] No block targeted."));
-                        return 0;
+                        if (mc.player == null) {
+                            ctx.getSource().sendFeedback(Component.literal("[VoxelBridge] No block targeted."));
+                            return 0;
+                        }
+                        hit = mc.player.blockPosition();
+                        ctx.getSource().sendFeedback(Component.literal("[VoxelBridge] No block targeted, use current position: " + hit.toShortString()));
                     }
                     ExportControl.setPos1(hit);
                     ctx.getSource()
@@ -67,8 +71,12 @@ public final class FabricCommands {
                     var mc = ClientAccessHolder.get().getMinecraft();
                     BlockPos hit = RayCastUtil.getLookingAt(mc, 20.0);
                     if (hit == null) {
-                        ctx.getSource().sendFeedback(Component.literal("§c[VoxelBridge] No block targeted."));
-                        return 0;
+                        if (mc.player == null) {
+                            ctx.getSource().sendFeedback(Component.literal("[VoxelBridge] No block targeted."));
+                            return 0;
+                        }
+                        hit = mc.player.blockPosition();
+                        ctx.getSource().sendFeedback(Component.literal("[VoxelBridge] No block targeted, use current position: " + hit.toShortString()));
                     }
                     ExportControl.setPos2(hit);
                     ctx.getSource()
@@ -376,10 +384,10 @@ public final class FabricCommands {
                     int cpuCores = Runtime.getRuntime().availableProcessors();
                     ctx.getSource().sendFeedback(Component.literal(
                             "§b[VoxelBridge] Export thread count: §f" + threads + "§7 (CPU cores: " + cpuCores + ")"));
-                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge threads <count> (1-32)"));
+                    ctx.getSource().sendFeedback(Component.literal("§7   Usage: /voxelbridge threads <count> (1-128)"));
                     return 1;
                 })
-                .then(ClientCommandManager.argument("count", IntegerArgumentType.integer(1, 32))
+                .then(ClientCommandManager.argument("count", IntegerArgumentType.integer(1, 128))
                         .executes(ctx -> {
                             int count = IntegerArgumentType.getInteger(ctx, "count");
                             ExportRuntimeConfig.setExportThreadCount(count);
