@@ -23,6 +23,7 @@ import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -244,6 +245,8 @@ public final class BlockEntityRenderer {
      */
     private static class CaptureBuffer extends CaptureBufferBase {
         private static final Set<String> LOGGED_TEXT_TYPES = ConcurrentHashMap.newKeySet();
+        private static final Set<String> LOGGED_TEXT_MISSING_TEXTURE = ConcurrentHashMap.newKeySet();
+        private static final ConcurrentHashMap<String, BufferedImage> TEXTURE_IMAGE_CACHE = new ConcurrentHashMap<>();
         private final BlockEntity blockEntity;
         private final TextureOverrideMap overrides;
         private final PlaneOffsetTracker planeOffset;
@@ -273,10 +276,6 @@ public final class BlockEntityRenderer {
         @Override
         public void onQuad(RenderType renderType, List<RenderCapture.Vertex> verts) {
             if (verts.size() < 3) return;
-
-            if (shouldSkipTextQuad(renderType)) {
-                return;
-            }
 
             boolean logQuads = VoxelBridgeLogger.isDebugEnabled(LogModule.BLOCKENTITY);
             if (logQuads) {
@@ -349,7 +348,15 @@ public final class BlockEntityRenderer {
             RenderCaptureUtil.UvStats uvStats,
             float[] positions
         ) {
+            ResourceLocation rtTexture = renderType != null ? RENDER_TYPE_RESOLVER.resolve(renderType) : null;
+            if (rtTexture == null) {
+                logTextRenderTypeMissingTexture(renderType);
+            }
             ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(source, renderType);
+            if (textureRes == null && isTextRenderType(renderType) && rtTexture != null) {
+                textureRes = new ResolvedTexture(rtTexture, 0f, 1f, 0f, 1f, false, null, null);
+            }
+            textureRes = resolveTextFallbackTexture(ctx, renderType, uvStats, textureRes);
             if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
                 textureRes = RenderCaptureUtil.resolveAtlasSprite(
                     textureRes,
@@ -399,7 +406,60 @@ public final class BlockEntityRenderer {
             );
         }
 
-        private boolean shouldSkipTextQuad(RenderType renderType) {
+        private ResolvedTexture resolveTextFallbackTexture(ExportContext ctx,
+                                                           RenderType renderType,
+                                                           RenderCaptureUtil.UvStats uvStats,
+                                                           ResolvedTexture textureRes) {
+            if (!isTextRenderType(renderType)) {
+                return textureRes;
+            }
+            ResourceLocation current = textureRes != null ? textureRes.texture() : null;
+            if (!isDefaultOrMissingLike(current)) {
+                return textureRes;
+            }
+            ResourceLocation selected = extractFontTextureFromRenderType(renderType);
+            if (selected == null) {
+                selected = pickBestFontPage(ctx, uvStats);
+            }
+            if (selected == null) {
+                return textureRes;
+            }
+            VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP,
+                "[BlockEntityRenderer] Text fallback texture mapped " + current + " -> " + selected);
+            return new ResolvedTexture(selected, 0f, 1f, 0f, 1f, false, null, null);
+        }
+
+        private ResourceLocation pickBestFontPage(ExportContext ctx, RenderCaptureUtil.UvStats uvStats) {
+            return null;
+        }
+
+        private BufferedImage loadTextureImage(ExportContext ctx, ResolvedTexture textureRes) {
+            if (textureRes == null || textureRes.texture() == null) {
+                return null;
+            }
+            String key = textureRes.texture().toString();
+            BufferedImage cached = TEXTURE_IMAGE_CACHE.get(key);
+            if (cached != null) {
+                return cached;
+            }
+            BufferedImage loaded = ctx.getTextureAccess().readTexture(key, true);
+            if (loaded != null) {
+                TEXTURE_IMAGE_CACHE.put(key, loaded);
+            }
+            return loaded;
+        }
+
+        private boolean isDefaultOrMissingLike(ResourceLocation loc) {
+            if (loc == null || loc.getPath() == null) {
+                return true;
+            }
+            String p = loc.getPath().toLowerCase(java.util.Locale.ROOT);
+            return p.startsWith("default/")
+                || p.startsWith("textures/default/")
+                || p.contains("missing");
+        }
+
+        private boolean isTextRenderType(RenderType renderType) {
             if (renderType == null) {
                 return false;
             }
@@ -408,6 +468,27 @@ public final class BlockEntityRenderer {
                 || name.contains("neoforge_text")
                 || name.contains("font")
                 || name.contains("glyph");
+        }
+
+        private ResourceLocation extractFontTextureFromRenderType(RenderType renderType) {
+            if (renderType == null) {
+                return null;
+            }
+            String raw = renderType.toString();
+            if (raw == null || raw.isEmpty()) {
+                return null;
+            }
+            String s = raw.toLowerCase(java.util.Locale.ROOT);
+            java.util.regex.Matcher dyn = java.util.regex.Pattern
+                .compile("([a-z0-9_.-]+:font/[a-z0-9_./-]+)")
+                .matcher(s);
+            if (dyn.find()) {
+                try {
+                    return ResourceLocation.parse(dyn.group(1));
+                } catch (Exception ignored) {
+                }
+            }
+            return null;
         }
 
         private void writeUvs(ExportContext ctx,
@@ -427,8 +508,11 @@ public final class BlockEntityRenderer {
                 RenderCaptureUtil.fillUvsClamp(verts, uv0);
             }
 
-            if (!useAtlasUv && textureRes != null && (uvStats.maxU() > 1f || uvStats.maxV() > 1f)) {
+            if (!useAtlasUv && uvStats != null && textureRes != null && (uvStats.maxU() > 1f || uvStats.maxV() > 1f)) {
                 BufferedImage img = ctx.getCachedSpriteImage(spriteKey);
+                if (img == null) {
+                    img = loadTextureImage(ctx, textureRes);
+                }
                 if (img != null) {
                     RenderCaptureUtil.fillUvsPixels(verts, uv0, img.getWidth(), img.getHeight());
                 }
@@ -451,13 +535,25 @@ public final class BlockEntityRenderer {
             if (!LOGGED_TEXT_TYPES.add(name)) {
                 return;
             }
-            VoxelBridgeLogger.info(LogModule.TEXTURE_RESOLVE, String.format(
+            VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP, String.format(
                 "[BlockEntityRenderer] text UV rawU=%s rawV=%s wrappedU=%s wrappedV=%s",
                 java.util.Arrays.toString(uvStats.rawU()),
                 java.util.Arrays.toString(uvStats.rawV()),
                 java.util.Arrays.toString(uvStats.wrappedU()),
                 java.util.Arrays.toString(uvStats.wrappedV())
             ));
+        }
+
+        private void logTextRenderTypeMissingTexture(RenderType renderType) {
+            if (!isTextRenderType(renderType)) {
+                return;
+            }
+            String key = String.valueOf(renderType);
+            if (!LOGGED_TEXT_MISSING_TEXTURE.add(key)) {
+                return;
+            }
+            VoxelBridgeLogger.warn(LogModule.DYNAMIC_MAP,
+                "[BlockEntityRenderer] text RenderType texture unresolved: " + key);
         }
 
     }

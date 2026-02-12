@@ -24,12 +24,14 @@ public class FabricPlatformRenderHelper implements PlatformRenderHelper {
                         end = name.indexOf("]", start);
                     }
                     if (end > start) {
-                        String texStr = name.substring(start, end).trim();
-                        return new ResourceLocation(texStr);
+                        String texStr = normalizeTextureToken(name.substring(start, end).trim());
+                        if (texStr != null) {
+                            return new ResourceLocation(texStr);
+                        }
                     }
                 }
             }
-            String optional = parseOptionalTexture(name);
+            String optional = normalizeTextureToken(parseOptionalTexture(name));
             return optional != null ? new ResourceLocation(optional) : null;
         } catch (Exception ignored) {
             return null;
@@ -74,6 +76,37 @@ public class FabricPlatformRenderHelper implements PlatformRenderHelper {
             return null;
         }
         return tex;
+    }
+
+    private static String normalizeTextureToken(String token) {
+        if (token == null) {
+            return null;
+        }
+        String tex = token.trim();
+        if (tex.isEmpty() || "empty".equalsIgnoreCase(tex)) {
+            return null;
+        }
+        if (tex.startsWith("Optional[")) {
+            int start = "Optional[".length();
+            int end = tex.lastIndexOf(']');
+            if (end > start) {
+                tex = tex.substring(start, end).trim();
+            }
+        }
+        if (tex.startsWith("texture[Optional[")) {
+            int start = "texture[Optional[".length();
+            int end = tex.lastIndexOf(']');
+            if (end > start) {
+                tex = tex.substring(start, end).trim();
+            }
+        }
+        if (tex.endsWith("]")) {
+            int bracket = tex.indexOf('[');
+            if (bracket >= 0 && bracket < tex.length() - 1) {
+                tex = tex.substring(bracket + 1, tex.length() - 1).trim();
+            }
+        }
+        return tex.isEmpty() ? null : tex;
     }
 
     @Override

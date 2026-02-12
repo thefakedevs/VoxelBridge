@@ -37,6 +37,7 @@ public final class BlockEntityTextureResolver implements TextureResolver<BlockEn
         ResourceLocation base = RenderTypeTextureResolver.INSTANCE.resolve(renderType);
 
         if (isTextRenderType(renderType)) {
+            base = normalizeTextTexture(base, renderType);
             return base != null ? resolveTextureWithAtlasDetection(base) : null;
         }
 
@@ -113,6 +114,45 @@ public final class BlockEntityTextureResolver implements TextureResolver<BlockEn
             || name.contains("neoforge_text")
             || name.contains("font")
             || name.contains("glyph");
+    }
+
+    private static ResourceLocation normalizeTextTexture(ResourceLocation base, RenderType renderType) {
+        // Try extracting concrete font page from RenderType string first.
+        ResourceLocation fromRenderType = extractFontTextureFromRenderType(renderType);
+        if (fromRenderType != null) {
+            return fromRenderType;
+        }
+        if (base == null) {
+            return null;
+        }
+        String path = base.getPath().toLowerCase(java.util.Locale.ROOT);
+        if (path.startsWith("font/")) {
+            return base;
+        }
+        return base;
+    }
+
+    private static ResourceLocation extractFontTextureFromRenderType(RenderType renderType) {
+        if (renderType == null) {
+            return null;
+        }
+        String raw = renderType.toString();
+        if (raw == null || raw.isEmpty()) {
+            return null;
+        }
+        String s = raw.toLowerCase(java.util.Locale.ROOT);
+
+        java.util.regex.Matcher dyn = java.util.regex.Pattern
+            .compile("([a-z0-9_.-]+:font/[a-z0-9_./-]+)")
+            .matcher(s);
+        if (dyn.find()) {
+            try {
+                return ResourceLocation.parse(dyn.group(1));
+            } catch (Exception ignored) {
+            }
+        }
+
+        return null;
     }
 
     /**

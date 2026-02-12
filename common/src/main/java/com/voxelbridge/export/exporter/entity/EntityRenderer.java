@@ -36,6 +36,7 @@ import net.minecraft.world.phys.AABB;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -245,6 +246,9 @@ public final class EntityRenderer {
      * Capture buffer for entity renders.
      */
     private static class CaptureBuffer extends CaptureBufferBase {
+        private static final Set<String> LOGGED_TEXT_TYPES = ConcurrentHashMap.newKeySet();
+        private static final Set<String> LOGGED_TEXT_MISSING_TEXTURE = ConcurrentHashMap.newKeySet();
+        private static final ConcurrentHashMap<String, BufferedImage> TEXTURE_IMAGE_CACHE = new ConcurrentHashMap<>();
         private final double offsetX, offsetY, offsetZ;
         private final Entity entity;
         private final PlaneOffsetTracker planeOffset;
@@ -329,6 +333,7 @@ public final class EntityRenderer {
                     renderType != null ? renderType.toString() : "null"));
             }
             RenderCaptureUtil.UvStats uvStats = RenderCaptureUtil.computeUvStats(verts);
+            logTextUvOnce(renderType, uvStats);
             uvStats = normalizeMapDecorUvStats(uvStats, renderType);
             String materialGroupKey = MaterialGroupKey.entity(entity);
             updateBucketKey();
@@ -386,6 +391,9 @@ public final class EntityRenderer {
             float[] positions
         ) {
             ResourceLocation rtTexture = renderType != null ? RENDER_TYPE_RESOLVER.resolve(renderType) : null;
+            if (rtTexture == null) {
+                logTextRenderTypeMissingTexture(renderType);
+            }
             if (rtTexture != null && rtTexture.getPath() != null && rtTexture.getPath().contains("map_decorations")) {
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
                     VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
@@ -396,6 +404,10 @@ public final class EntityRenderer {
             }
             TextureResolver<Entity> resolver = resolveTextureResolver();
             ResolvedTexture textureRes = resolver != null ? resolver.resolve(source, renderType) : null;
+            if (textureRes == null && isTextRenderType(renderType) && rtTexture != null) {
+                textureRes = new ResolvedTexture(rtTexture, 0f, 1f, 0f, 1f, false, null, null);
+            }
+            textureRes = resolveTextFallbackTexture(ctx, renderType, uvStats, textureRes);
 
             RenderCaptureUtil.UvStats atlasUvStats = uvStats;
             if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
@@ -461,6 +473,138 @@ public final class EntityRenderer {
             );
         }
 
+        private ResolvedTexture resolveTextFallbackTexture(ExportContext ctx,
+                                                           RenderType renderType,
+                                                           RenderCaptureUtil.UvStats uvStats,
+                                                           ResolvedTexture textureRes) {
+            if (!isTextRenderType(renderType)) {
+                return textureRes;
+            }
+            ResourceLocation current = textureRes != null ? textureRes.texture() : null;
+            if (!isDefaultOrMissingLike(current)) {
+                return textureRes;
+            }
+            ResourceLocation selected = extractFontTextureFromRenderType(renderType);
+            if (selected == null) {
+                selected = pickBestFontPage(ctx, uvStats);
+            }
+            if (selected == null) {
+                return textureRes;
+            }
+            VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP,
+                "[EntityRenderer] Text fallback texture mapped " + current + " -> " + selected);
+            return new ResolvedTexture(selected, 0f, 1f, 0f, 1f, false, null, null);
+        }
+
+        private ResourceLocation pickBestFontPage(ExportContext ctx, RenderCaptureUtil.UvStats uvStats) {
+            return null;
+        }
+
+        private BufferedImage loadTextureImage(ExportContext ctx, ResolvedTexture textureRes) {
+            if (textureRes == null || textureRes.texture() == null) {
+                return null;
+            }
+            String key = textureRes.texture().toString();
+            BufferedImage cached = TEXTURE_IMAGE_CACHE.get(key);
+            if (cached != null) {
+                return cached;
+            }
+            BufferedImage loaded = ctx.getTextureAccess().readTexture(key, true);
+            if (loaded != null) {
+                TEXTURE_IMAGE_CACHE.put(key, loaded);
+            }
+            return loaded;
+        }
+
+        private boolean isDefaultOrMissingLike(ResourceLocation loc) {
+            if (loc == null || loc.getPath() == null) {
+                return true;
+            }
+            String p = loc.getPath().toLowerCase(Locale.ROOT);
+            return p.startsWith("default/")
+                || p.startsWith("textures/default/")
+                || p.contains("missing")
+                || p.endsWith("/white")
+                || p.endsWith("white.png");
+        }
+
+        private boolean isTextRenderType(RenderType renderType) {
+            if (renderType == null) {
+                return false;
+            }
+            String name = renderType.toString().toLowerCase(Locale.ROOT);
+            return name.contains("text_")
+                || name.contains("neoforge_text")
+                || name.contains("font")
+                || name.contains("glyph");
+        }
+
+        private ResourceLocation extractFontTextureFromRenderType(RenderType renderType) {
+            if (renderType == null) {
+                return null;
+            }
+            String raw = renderType.toString();
+            if (raw == null || raw.isEmpty()) {
+                return null;
+            }
+            String s = raw.toLowerCase(Locale.ROOT);
+            java.util.regex.Matcher dyn = java.util.regex.Pattern
+                .compile("([a-z0-9_.-]+:font/[a-z0-9_./-]+)")
+                .matcher(s);
+            if (dyn.find()) {
+                try {
+                    return ResourceLocation.parse(dyn.group(1));
+                } catch (Exception ignored) {
+                }
+            }
+            return null;
+        }
+
+        private boolean isFontTexture(ResourceLocation loc) {
+            if (loc == null || loc.getPath() == null) {
+                return false;
+            }
+            String path = loc.getPath().toLowerCase(Locale.ROOT);
+            return path.contains("/font/") || path.startsWith("font/");
+        }
+
+        private void logTextUvOnce(RenderType renderType, RenderCaptureUtil.UvStats uvStats) {
+            if (renderType == null || uvStats == null) {
+                return;
+            }
+            String name = renderType.toString();
+            String lower = name.toLowerCase(Locale.ROOT);
+            boolean isText = lower.contains("text_")
+                || lower.contains("neoforge_text")
+                || lower.contains("font")
+                || lower.contains("glyph");
+            if (!isText) {
+                return;
+            }
+            if (!LOGGED_TEXT_TYPES.add(name)) {
+                return;
+            }
+            VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP, String.format(
+                "[EntityRenderer] text UV rawU=%s rawV=%s wrappedU=%s wrappedV=%s",
+                java.util.Arrays.toString(uvStats.rawU()),
+                java.util.Arrays.toString(uvStats.rawV()),
+                java.util.Arrays.toString(uvStats.wrappedU()),
+                java.util.Arrays.toString(uvStats.wrappedV())
+            ));
+        }
+
+        private void logTextRenderTypeMissingTexture(RenderType renderType) {
+            if (!isTextRenderType(renderType)) {
+                return;
+            }
+            String key = String.valueOf(renderType);
+            if (!LOGGED_TEXT_MISSING_TEXTURE.add(key)) {
+                return;
+            }
+            VoxelBridgeLogger.warn(LogModule.DYNAMIC_MAP,
+                "[EntityRenderer] text RenderType texture unresolved: " + key);
+        }
+
         private TextureResolver<Entity> resolveTextureResolver() {
             TextureResolver<Entity> override = OVERRIDE_RESOLVER;
             if (override != null) {
@@ -501,6 +645,14 @@ public final class EntityRenderer {
                     RenderCaptureUtil.fillUvsAtlas(verts, uv0, u0, u1, v0, v1);
                 }
             } else {
+                boolean isFontTex = isFontTexture(textureRes != null ? textureRes.texture() : null);
+                if (isFontTex && uvStats != null && (uvStats.maxU() > 1f || uvStats.maxV() > 1f)) {
+                    BufferedImage img = loadTextureImage(ctx, textureRes);
+                    if (img != null && img.getWidth() > 0 && img.getHeight() > 0) {
+                        RenderCaptureUtil.fillUvsPixels(verts, uv0, img.getWidth(), img.getHeight());
+                        return;
+                    }
+                }
                 // Non-atlas texture: find actual UV bounds and normalize
                 // This is important for entities like paintings where UV may not be in [0,1]
                 RenderCaptureUtil.UvFillResult result = RenderCaptureUtil.fillUvsNormalize(verts, uv0, uvStats);

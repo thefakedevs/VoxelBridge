@@ -868,6 +868,16 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
 
         // material
         String sampleSprite = pickPrimarySprite(matKey, matChunk.usedSprites());
+        if (sampleSprite == null || !state.getMaterialPaths().containsKey(sampleSprite)) {
+            if (state.getMaterialPaths().containsKey("voxelbridge:transparent")) {
+                VoxelBridgeLogger.warn(LogModule.TEXTURE, String.format(
+                    "[TextureRegistry][MaterialSprites][WARN] matKey=%s picked invalid sprite=%s, fallback to voxelbridge:transparent",
+                    matKey, sampleSprite));
+                sampleSprite = "voxelbridge:transparent";
+            } else {
+                throw new IOException("No valid texture path for material " + matKey + " (picked=" + sampleSprite + ")");
+            }
+        }
         VoxelBridgeLogger.info(LogModule.TEXTURE, String.format(
             "[TextureRegistry][MaterialSprites] matKey=%s sprites=%s picked=%s",
             matKey, matChunk.usedSprites(), sampleSprite));
@@ -926,17 +936,27 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         if (usedSprites == null || usedSprites.isEmpty()) {
             return null;
         }
+        List<String> withMaterialPath = new ArrayList<>();
+        for (String s : usedSprites) {
+            if (s != null && state.getMaterialPaths().containsKey(s)) {
+                withMaterialPath.add(s);
+            }
+        }
+        List<String> candidates = withMaterialPath.isEmpty()
+            ? new ArrayList<>(usedSprites)
+            : withMaterialPath;
+
         if (matKey != null && matKey.endsWith("_animated")) {
-            for (String s : usedSprites) {
+            for (String s : candidates) {
                 if (matKey.equals(com.voxelbridge.export.texture.TexturePathResolver.animationBaseName(s))) {
                     return s;
                 }
             }
         }
-        List<String> list = new ArrayList<>(usedSprites);
+        List<String> list = new ArrayList<>(candidates);
         list.remove("voxelbridge:transparent");
         if (list.isEmpty()) {
-            list = new ArrayList<>(usedSprites);
+            list = new ArrayList<>(candidates);
         }
         Collections.sort(list);
         //  item_frame/glow_item_frame ?sprite
@@ -1050,6 +1070,13 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
     }
 
     private String resolveBucketKey(String materialKey, String spriteKey) {
+        // Keep font-like quads in separate buckets so they don't get merged with
+        // block/entity base textures under the same material group.
+        if (spriteKey != null && isFontLikeSprite(spriteKey)) {
+            String base = materialKey != null ? materialKey : "material";
+            return base + "__font__" + com.voxelbridge.export.texture.TexturePathResolver.safe(spriteKey);
+        }
+
         String animName = resolveAnimationName(spriteKey);
         if (animName == null) {
             return materialKey;
@@ -1093,6 +1120,19 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         java.util.Collections.reverse(suffixes);
         String mergedSuffix = String.join("_", suffixes);
         return animBase + "_" + mergedSuffix + animSuffix;
+    }
+
+    private boolean isFontLikeSprite(String spriteKey) {
+        if (spriteKey == null) {
+            return false;
+        }
+        String s = spriteKey.toLowerCase(java.util.Locale.ROOT);
+        return s.contains("/font/")
+            || s.contains(":font/")
+            || s.contains("textures/font/")
+            || s.contains(":default/")
+            || s.endsWith("/default/0")
+            || s.contains("/glyph");
     }
 
     private static final class PhaseProgress {
