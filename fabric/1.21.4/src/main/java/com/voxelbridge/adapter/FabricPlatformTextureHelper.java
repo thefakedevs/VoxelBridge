@@ -12,6 +12,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.Dumpable;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
@@ -24,9 +25,13 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Fabric implementation of PlatformTextureHelper.
@@ -70,6 +75,14 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
                 VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.21.4] Normalized map location: " + location);
             }
         }
+        ResourceLocation glyphNormalized = normalizeDynamicGlyphLocation(location);
+        if (glyphNormalized != null) {
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
+                    "[FabricTextureHelper/1.21.4] Normalized glyph location: " + location + " -> " + glyphNormalized);
+            }
+            location = glyphNormalized;
+        }
 
         // 1) Dynamic / HTTP textures (render thread)
         if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
@@ -83,6 +96,17 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
                     VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.21.4] DynamicTexture pixels loaded: " + location);
                 }
                 return Optional.of(copyNativeImage(pixels));
+            }
+            Optional<NativeImage> dumpableImage = loadDumpableTexture(texture, location);
+            if (dumpableImage.isPresent()) {
+                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                    NativeImage ni = dumpableImage.get();
+                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
+                        "[FabricTextureHelper/1.21.4] Dumpable texture loaded: " + location
+                            + " size=" + ni.getWidth() + "x" + ni.getHeight()
+                            + " type=" + texture.getClass().getSimpleName());
+                }
+                return Optional.of(copyNativeImage(dumpableImage.get()));
             }
 
             File file = FabricTextureAccess.getHttpTextureFile(texture);
@@ -106,6 +130,62 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         }
 
         return Optional.empty();
+    }
+
+    private static ResourceLocation normalizeDynamicGlyphLocation(ResourceLocation location) {
+        if (location == null || location.getPath() == null) {
+            return null;
+        }
+        String path = location.getPath();
+        if (!path.startsWith("textures/default/")) {
+            return null;
+        }
+        String p = path.substring("textures/".length());
+        if (p.endsWith(".png")) {
+            p = p.substring(0, p.length() - ".png".length());
+        }
+        if (p.isEmpty()) {
+            return null;
+        }
+        return ResourceLocation.fromNamespaceAndPath(location.getNamespace(), p);
+    }
+
+    private static Optional<NativeImage> loadDumpableTexture(net.minecraft.client.renderer.texture.AbstractTexture texture,
+                                                             ResourceLocation location) {
+        if (!(texture instanceof Dumpable dumpable) || location == null) {
+            return Optional.empty();
+        }
+        Path tempDir = null;
+        try {
+            tempDir = Files.createTempDirectory("voxelbridge-fontdump-");
+            dumpable.dumpContents(location, tempDir);
+            try (Stream<Path> stream = Files.walk(tempDir)) {
+                Optional<Path> png = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".png"))
+                    .findFirst();
+                if (png.isEmpty()) {
+                    return Optional.empty();
+                }
+                try (InputStream in = Files.newInputStream(png.get())) {
+                    return Optional.of(NativeImage.read(in));
+                }
+            }
+        } catch (Exception ignored) {
+            return Optional.empty();
+        } finally {
+            if (tempDir != null) {
+                try (Stream<Path> walk = Files.walk(tempDir)) {
+                    walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (Exception ignored) {
+                        }
+                    });
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 
     @Override

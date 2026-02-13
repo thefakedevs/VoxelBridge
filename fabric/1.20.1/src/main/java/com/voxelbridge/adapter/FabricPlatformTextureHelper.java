@@ -261,6 +261,15 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
             return null;
         }
         String path = location.getPath();
+        if (path != null && path.startsWith("textures/default/")) {
+            String p = path.substring("textures/".length());
+            if (p.endsWith(".png")) {
+                p = p.substring(0, p.length() - ".png".length());
+            }
+            if (!p.isEmpty()) {
+                return new ResourceLocation(location.getNamespace(), p);
+            }
+        }
         // Some render types expose dynamic map textures as textures/dynamic/map/<id>_<frame>.png
         if (path != null && path.startsWith("textures/dynamic/map/")) {
             String file = path.substring("textures/dynamic/map/".length());

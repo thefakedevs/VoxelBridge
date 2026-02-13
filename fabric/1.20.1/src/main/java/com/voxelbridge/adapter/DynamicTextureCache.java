@@ -8,15 +8,20 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.MapRenderer;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.texture.Dumpable;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.MapItem;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
  * Fabric 1.20.1 dynamic texture cache for HttpTexture/DynamicTexture.
@@ -100,6 +105,18 @@ public final class DynamicTextureCache {
             return Optional.of(copy);
         }
 
+        Optional<NativeImage> dumpable = loadDumpableTexture(texture, location);
+        if (dumpable.isPresent()) {
+            NativeImage copy = copyNativeImage(dumpable.get());
+            CACHE.put(location, copy);
+            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
+                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] Dumpable texture loaded: " + location
+                    + " size=" + copy.getWidth() + "x" + copy.getHeight()
+                    + " type=" + texture.getClass().getSimpleName());
+            }
+            return Optional.of(copy);
+        }
+
         File file = FabricTextureAccess.getHttpTextureFile(texture);
         if (file != null && file.exists()) {
             try {
@@ -117,6 +134,43 @@ public final class DynamicTextureCache {
             VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[DynamicTextureCache] Dynamic texture not found: " + location);
         }
         return Optional.empty();
+    }
+
+    private static Optional<NativeImage> loadDumpableTexture(AbstractTexture texture, ResourceLocation location) {
+        if (!(texture instanceof Dumpable dumpable) || location == null) {
+            return Optional.empty();
+        }
+        Path tempDir = null;
+        try {
+            tempDir = Files.createTempDirectory("voxelbridge-fontdump-");
+            dumpable.dumpContents(location, tempDir);
+            try (Stream<Path> stream = Files.walk(tempDir)) {
+                Optional<Path> png = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".png"))
+                    .findFirst();
+                if (png.isEmpty()) {
+                    return Optional.empty();
+                }
+                try (InputStream in = Files.newInputStream(png.get())) {
+                    return Optional.of(NativeImage.read(in));
+                }
+            }
+        } catch (Exception ignored) {
+            return Optional.empty();
+        } finally {
+            if (tempDir != null) {
+                try (Stream<Path> walk = Files.walk(tempDir)) {
+                    walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (Exception ignored) {
+                        }
+                    });
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 
     private static Optional<NativeImage> loadMapTexture(ResourceLocation location) {
