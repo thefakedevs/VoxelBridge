@@ -8,6 +8,7 @@ import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
@@ -246,5 +247,22 @@ public final class RenderCaptureUtil {
         float wrapped = v % 1f;
         if (wrapped < 0f) wrapped += 1f;
         return wrapped;
+    }
+
+    /**
+     * Converts a face normal to the closest Minecraft {@link Direction},
+     * or {@code null} if the normal is zero/degenerate.
+     */
+    public static Direction approximateDirection(float[] normal) {
+        int axis = GeometryUtil.dominantAxisSigned(normal);
+        return switch (axis) {
+            case  1 -> Direction.EAST;
+            case -1 -> Direction.WEST;
+            case  2 -> Direction.UP;
+            case -2 -> Direction.DOWN;
+            case  3 -> Direction.SOUTH;
+            case -3 -> Direction.NORTH;
+            default -> null;
+        };
     }
 }

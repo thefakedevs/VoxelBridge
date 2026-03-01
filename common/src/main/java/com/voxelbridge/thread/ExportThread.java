@@ -67,6 +67,8 @@ public class ExportThread extends Thread {
                     mc.player.displayClientMessage(Component.literal("[VoxelBridge] Export failed: " + e.getMessage()), false);
             });
         } finally {
+            com.voxelbridge.export.exporter.entity.EntityRenderer.clearSessionCaches();
+            com.voxelbridge.export.exporter.blockentity.BlockEntityRenderer.clearSessionCaches();
             com.voxelbridge.export.ExportControl.clearActiveExport(this);
         }
     }

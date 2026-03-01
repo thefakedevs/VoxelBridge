@@ -71,6 +71,11 @@ public final class EntityRenderer {
         CHUNK_PLANE_OFFSETS.remove(chunkKey(chunkX, chunkZ));
     }
 
+    /** Clears all per-session caches. Call at export end to release memory. */
+    public static void clearSessionCaches() {
+        CHUNK_PLANE_OFFSETS.clear();
+    }
+
     public static boolean render(
         ExportContext ctx,
         Entity entity,

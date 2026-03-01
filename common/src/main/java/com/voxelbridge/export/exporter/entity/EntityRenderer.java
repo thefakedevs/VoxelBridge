@@ -3,7 +3,6 @@ package com.voxelbridge.export.exporter.entity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.voxelbridge.adapter.Adapters;
 import com.voxelbridge.core.ir.IrSink;
-import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.config.ExportRuntimeConfig;
 import com.voxelbridge.export.ExportContext;
 import com.voxelbridge.export.exporter.MaterialGroupKey;
@@ -13,6 +12,7 @@ import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.DefaultAtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
+import com.voxelbridge.export.exporter.resolve.TextRenderTypeUtil;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.compat.AtlasCompat;
 import com.voxelbridge.export.texture.EntityTextureManager;
@@ -49,8 +49,7 @@ public final class EntityRenderer {
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
     private static final ConcurrentHashMap<Long, PlaneOffsetTracker> CHUNK_PLANE_OFFSETS = new ConcurrentHashMap<>();
     private static final Object MAP_DECOR_ATLAS_LOCK = new Object();
-    private static volatile int MAP_DECOR_ATLAS_W;
-    private static volatile int MAP_DECOR_ATLAS_H;
+    private static volatile int[] MAP_DECOR_ATLAS_SIZE; // [width, height], cached after first resolve
 
     private EntityRenderer() {}
 
@@ -72,6 +71,15 @@ public final class EntityRenderer {
 
     public static void clearChunkTracker(int chunkX, int chunkZ) {
         CHUNK_PLANE_OFFSETS.remove(chunkKey(chunkX, chunkZ));
+    }
+
+    /** Clears all per-session caches. Call at export end to release memory. */
+    public static void clearSessionCaches() {
+        CHUNK_PLANE_OFFSETS.clear();
+        MAP_DECOR_ATLAS_SIZE = null;
+        CaptureBuffer.TEXTURE_IMAGE_CACHE.clear();
+        CaptureBuffer.LOGGED_TEXT_TYPES.clear();
+        CaptureBuffer.LOGGED_TEXT_MISSING_TEXTURE.clear();
     }
 
     public static boolean render(
@@ -517,47 +525,15 @@ public final class EntityRenderer {
         }
 
         private boolean isDefaultOrMissingLike(ResourceLocation loc) {
-            if (loc == null || loc.getPath() == null) {
-                return true;
-            }
-            String p = loc.getPath().toLowerCase(Locale.ROOT);
-            return p.startsWith("default/")
-                || p.startsWith("textures/default/")
-                || p.contains("missing")
-                || p.endsWith("/white")
-                || p.endsWith("white.png");
+            return TextRenderTypeUtil.isDefaultOrMissingLike(loc);
         }
 
         private boolean isTextRenderType(RenderType renderType) {
-            if (renderType == null) {
-                return false;
-            }
-            String name = renderType.toString().toLowerCase(Locale.ROOT);
-            return name.contains("text_")
-                || name.contains("neoforge_text")
-                || name.contains("font")
-                || name.contains("glyph");
+            return TextRenderTypeUtil.isTextRenderType(renderType);
         }
 
         private ResourceLocation extractFontTextureFromRenderType(RenderType renderType) {
-            if (renderType == null) {
-                return null;
-            }
-            String raw = renderType.toString();
-            if (raw == null || raw.isEmpty()) {
-                return null;
-            }
-            String s = raw.toLowerCase(Locale.ROOT);
-            java.util.regex.Matcher dyn = java.util.regex.Pattern
-                .compile("([a-z0-9_.-]+:font/[a-z0-9_./-]+)")
-                .matcher(s);
-            if (dyn.find()) {
-                try {
-                    return ResourceLocation.parse(dyn.group(1));
-                } catch (Exception ignored) {
-                }
-            }
-            return null;
+            return TextRenderTypeUtil.extractFontTexture(renderType);
         }
 
         private boolean isFontTexture(ResourceLocation loc) {
@@ -615,16 +591,7 @@ public final class EntityRenderer {
         }
 
         private Direction approximateDirection(float[] normal) {
-            int axis = GeometryUtil.dominantAxisSigned(normal);
-            return switch (axis) {
-                case 1 -> Direction.EAST;
-                case -1 -> Direction.WEST;
-                case 2 -> Direction.UP;
-                case -2 -> Direction.DOWN;
-                case 3 -> Direction.SOUTH;
-                case -3 -> Direction.NORTH;
-                default -> null;
-            };
+            return RenderCaptureUtil.approximateDirection(normal);
         }
 
         private void writeUvs(ExportContext ctx,
@@ -785,12 +752,14 @@ public final class EntityRenderer {
     }
 
     private static int[] getMapDecorAtlasSize(ResourceLocation atlasLoc) {
-        if (MAP_DECOR_ATLAS_W > 0 && MAP_DECOR_ATLAS_H > 0) {
-            return new int[] { MAP_DECOR_ATLAS_W, MAP_DECOR_ATLAS_H };
+        int[] cached = MAP_DECOR_ATLAS_SIZE;
+        if (cached != null) {
+            return cached;
         }
         synchronized (MAP_DECOR_ATLAS_LOCK) {
-            if (MAP_DECOR_ATLAS_W > 0 && MAP_DECOR_ATLAS_H > 0) {
-                return new int[] { MAP_DECOR_ATLAS_W, MAP_DECOR_ATLAS_H };
+            cached = MAP_DECOR_ATLAS_SIZE;
+            if (cached != null) {
+                return cached;
             }
             try {
                 var tex = ClientAccessHolder.get().getTextureManager().getTexture(atlasLoc);
@@ -831,15 +800,15 @@ public final class EntityRenderer {
                 if (count == 0) {
                     return null;
                 }
-                MAP_DECOR_ATLAS_W = Math.round(widthSum / (float) count);
-                MAP_DECOR_ATLAS_H = Math.round(heightSum / (float) count);
+                int w = Math.round(widthSum / (float) count);
+                int h = Math.round(heightSum / (float) count);
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
                     VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
                         "[MapDecor] Estimated atlas size from sprites: "
-                            + MAP_DECOR_ATLAS_W + "x" + MAP_DECOR_ATLAS_H
-                            + " atlas=" + atlasLoc);
+                            + w + "x" + h + " atlas=" + atlasLoc);
                 }
-                return new int[] { MAP_DECOR_ATLAS_W, MAP_DECOR_ATLAS_H };
+                MAP_DECOR_ATLAS_SIZE = new int[] { w, h };
+                return MAP_DECOR_ATLAS_SIZE;
             } catch (Throwable t) {
                 return null;
             }

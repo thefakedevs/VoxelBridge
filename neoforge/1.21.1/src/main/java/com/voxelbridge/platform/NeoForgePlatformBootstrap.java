@@ -51,6 +51,7 @@ public final class NeoForgePlatformBootstrap implements PlatformBootstrap {
         Adapters.getSelectionRender().register(gameBus);
         NeoForgeEventBusBridge.addListener(gameBus, (RenderGuiEvent.Post event) -> HudOverlayRenderer.render(event.getGuiGraphics()));
 
+        com.voxelbridge.export.exporter.resolve.TextRenderTypeUtil.registerHint("neoforge_text");
         ExportConfigStore.init();
         ConfigScreenBridge.setOpener(mc -> mc.setScreen(NeoForgeConfigScreen.create(mc.screen)));
         container.registerExtensionPoint(IConfigScreenFactory.class,

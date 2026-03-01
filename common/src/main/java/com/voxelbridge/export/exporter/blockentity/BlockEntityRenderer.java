@@ -10,6 +10,7 @@ import com.voxelbridge.export.exporter.resolve.AtlasLocator;
 import com.voxelbridge.export.exporter.resolve.DefaultAtlasLocator;
 import com.voxelbridge.export.exporter.resolve.RenderTypeResolver;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
+import com.voxelbridge.export.exporter.resolve.TextRenderTypeUtil;
 import com.voxelbridge.export.exporter.resolve.TextureResolver;
 import com.voxelbridge.export.exporter.PlaneOffsetTracker;
 import com.voxelbridge.export.exporter.capture.CapturedQuadProcessor;
@@ -68,6 +69,14 @@ public final class BlockEntityRenderer {
 
     public static void clearChunkTracker(int chunkX, int chunkZ) {
         CHUNK_PLANE_OFFSETS.remove(chunkKey(chunkX, chunkZ));
+    }
+
+    /** Clears all per-session caches. Call at export end to release memory. */
+    public static void clearSessionCaches() {
+        CHUNK_PLANE_OFFSETS.clear();
+        CaptureBuffer.TEXTURE_IMAGE_CACHE.clear();
+        CaptureBuffer.LOGGED_TEXT_TYPES.clear();
+        CaptureBuffer.LOGGED_TEXT_MISSING_TEXTURE.clear();
     }
 
     /**
@@ -329,16 +338,7 @@ public final class BlockEntityRenderer {
         }
 
         private Direction approximateDirection(float[] normal) {
-            int axis = GeometryUtil.dominantAxisSigned(normal);
-            return switch (axis) {
-                case 1 -> Direction.EAST;
-                case -1 -> Direction.WEST;
-                case 2 -> Direction.UP;
-                case -2 -> Direction.DOWN;
-                case 3 -> Direction.SOUTH;
-                case -3 -> Direction.NORTH;
-                default -> null;
-            };
+            return RenderCaptureUtil.approximateDirection(normal);
         }
 
         private CapturedQuadProcessor.TextureResult resolveTexture(
@@ -450,45 +450,15 @@ public final class BlockEntityRenderer {
         }
 
         private boolean isDefaultOrMissingLike(ResourceLocation loc) {
-            if (loc == null || loc.getPath() == null) {
-                return true;
-            }
-            String p = loc.getPath().toLowerCase(java.util.Locale.ROOT);
-            return p.startsWith("default/")
-                || p.startsWith("textures/default/")
-                || p.contains("missing");
+            return TextRenderTypeUtil.isDefaultOrMissingLike(loc);
         }
 
         private boolean isTextRenderType(RenderType renderType) {
-            if (renderType == null) {
-                return false;
-            }
-            String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
-            return name.contains("text_")
-                || name.contains("neoforge_text")
-                || name.contains("font")
-                || name.contains("glyph");
+            return TextRenderTypeUtil.isTextRenderType(renderType);
         }
 
         private ResourceLocation extractFontTextureFromRenderType(RenderType renderType) {
-            if (renderType == null) {
-                return null;
-            }
-            String raw = renderType.toString();
-            if (raw == null || raw.isEmpty()) {
-                return null;
-            }
-            String s = raw.toLowerCase(java.util.Locale.ROOT);
-            java.util.regex.Matcher dyn = java.util.regex.Pattern
-                .compile("([a-z0-9_.-]+:font/[a-z0-9_./-]+)")
-                .matcher(s);
-            if (dyn.find()) {
-                try {
-                    return ResourceLocation.parse(dyn.group(1));
-                } catch (Exception ignored) {
-                }
-            }
-            return null;
+            return TextRenderTypeUtil.extractFontTexture(renderType);
         }
 
         private void writeUvs(ExportContext ctx,

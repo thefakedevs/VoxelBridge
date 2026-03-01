@@ -14,6 +14,9 @@ import net.minecraft.client.renderer.RenderType;
 import java.util.List;
 
 public final class CapturedQuadProcessor {
+    /** Canonical sprite key for the always-transparent material slot. */
+    public static final String TRANSPARENT_SPRITE_KEY = "voxelbridge:transparent";
+
     private static final float[] EMPTY_UV = new float[8];
     private static final float[] NORMAL_UP = new float[] {
         0f, 1f, 0f,
@@ -126,7 +129,7 @@ public final class CapturedQuadProcessor {
             RenderCaptureUtil.applyColorMode(ctx, colors, EMPTY_UV);
         float[] faceNormal = GeometryUtil.computeFaceNormal(positions);
         planeOffsetStrategy.apply(planeOffset, positions, faceNormal);
-        sceneSink.addQuad(resolvedMaterialKey, spriteKey, "voxelbridge:transparent",
+        sceneSink.addQuad(resolvedMaterialKey, spriteKey, TRANSPARENT_SPRITE_KEY,
             RenderLayer.UNKNOWN, colorResult.tintMode(),
             renderTypeResolver.isDoubleSided(renderType),
             false,

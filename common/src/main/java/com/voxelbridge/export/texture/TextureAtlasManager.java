@@ -5,6 +5,7 @@ import com.voxelbridge.config.ExportRuntimeConfig.AtlasMode;
 import com.voxelbridge.core.export.ExportState;
 import com.voxelbridge.core.texture.TextureRepository;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.exporter.capture.CapturedQuadProcessor;
 import com.voxelbridge.export.texture.ExportOptions;
 import com.voxelbridge.export.texture.AtlasBuilder;
 import com.voxelbridge.util.debug.LogModule;
@@ -38,7 +39,7 @@ public final class TextureAtlasManager {
      * Reserves slot 0 for the transparent texture (16x16 fully transparent).
      */
     public static void initializeReservedSlots(ExportContext ctx) {
-        String transparentKey = "voxelbridge:transparent";
+        String transparentKey = CapturedQuadProcessor.TRANSPARENT_SPRITE_KEY;
 
         // Create 16x16 fully transparent image
         BufferedImage transparentImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
@@ -102,8 +103,8 @@ public final class TextureAtlasManager {
      */
     public static void registerTransparentTexture(ExportContext ctx, String spriteKey) {
         // Verify the transparent texture was initialized
-        if (!spriteKey.equals("voxelbridge:transparent")) {
-            throw new IllegalArgumentException("Only 'voxelbridge:transparent' is supported as transparent texture key");
+        if (!spriteKey.equals(CapturedQuadProcessor.TRANSPARENT_SPRITE_KEY)) {
+            throw new IllegalArgumentException("Only '" + CapturedQuadProcessor.TRANSPARENT_SPRITE_KEY + "' is supported as transparent texture key");
         }
 
         if (!ctx.getAtlasBook().containsKey(spriteKey)) {

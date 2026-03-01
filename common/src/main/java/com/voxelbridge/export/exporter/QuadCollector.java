@@ -8,6 +8,7 @@ import com.voxelbridge.core.util.color.ColorMode;
 import com.voxelbridge.core.util.color.ColorModeHandler;
 import com.voxelbridge.core.util.geometry.GeometryUtil;
 import com.voxelbridge.export.ExportContext;
+import com.voxelbridge.export.exporter.capture.CapturedQuadProcessor;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 
@@ -156,7 +157,7 @@ final class QuadCollector implements VertexConsumer {
             ? TintMode.COLORMAP
             : TintMode.VERTEX_COLOR;
         String materialKey = ctx.resolveMaterialKey(spriteKey, materialGroupKey);
-        sink.addQuad(materialKey, spriteKey, "voxelbridge:transparent",
+        sink.addQuad(materialKey, spriteKey, CapturedQuadProcessor.TRANSPARENT_SPRITE_KEY,
             RenderLayer.UNKNOWN, tintMode, true, false,
             positions.clone(), normalizedUVs, colorData.uv1(), normal, colorData.colors());
 

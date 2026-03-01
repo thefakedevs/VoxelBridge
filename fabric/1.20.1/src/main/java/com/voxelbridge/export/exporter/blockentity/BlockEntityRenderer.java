@@ -73,6 +73,11 @@ public final class BlockEntityRenderer {
         CHUNK_PLANE_OFFSETS.remove(chunkKey(chunkX, chunkZ));
     }
 
+    /** Clears all per-session caches. Call at export end to release memory. */
+    public static void clearSessionCaches() {
+        CHUNK_PLANE_OFFSETS.clear();
+    }
+
     /**
      * Renders a BlockEntity and outputs geometry to the scene sink.
      *
