@@ -2,38 +2,24 @@ package com.voxelbridge.adapter;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.compat.FabricAtlasAccess;
-import com.voxelbridge.compat.FabricPaintingAccess;
 import com.voxelbridge.compat.FabricSpriteAccess;
-import com.voxelbridge.compat.FabricTextureAccess;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
-import com.voxelbridge.export.texture.MapTextureUtil;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.client.renderer.texture.Dumpable;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.decoration.Painting;
 import net.minecraft.world.entity.decoration.PaintingVariant;
-import net.minecraft.world.item.MapItem;
-import net.minecraft.world.level.saveddata.maps.MapId;
-import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * Fabric implementation of PlatformTextureHelper.
@@ -66,137 +52,7 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
 
     @Override
     public Optional<NativeImage> readTexture(ResourceLocation location) {
-        if (location == null) {
-            return Optional.empty();
-        }
-        ResourceLocation normalized = MapTextureUtil.normalizeDynamicMapLocation(location);
-        if (normalized != null) {
-            location = normalized;
-            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.21.1] Normalized map location: " + location);
-            }
-        }
-        ResourceLocation glyphNormalized = normalizeDynamicGlyphLocation(location);
-        if (glyphNormalized != null) {
-            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
-                    "[FabricTextureHelper/1.21.1] Normalized glyph location: " + location + " -> " + glyphNormalized);
-            }
-            location = glyphNormalized;
-        }
-
-        // 1) Dynamic / HTTP textures (render thread)
-        if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
-            preheatMapTexture(location);
-
-            Optional<NativeImage> mapImage = loadMapTexture(location);
-            if (mapImage.isPresent()) {
-                return Optional.of(copyNativeImage(mapImage.get()));
-            }
-
-            var tm = Minecraft.getInstance().getTextureManager();
-            var texture = tm.getTexture(location);
-
-            NativeImage pixels = FabricTextureAccess.getDynamicTexturePixels(texture);
-            if (pixels != null) {
-                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.21.1] DynamicTexture pixels loaded: " + location);
-                }
-                return Optional.of(copyNativeImage(pixels));
-            }
-
-            Optional<NativeImage> dumpableImage = loadDumpableTexture(texture, location);
-            if (dumpableImage.isPresent()) {
-                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                    NativeImage ni = dumpableImage.get();
-                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
-                        "[FabricTextureHelper/1.21.1] Dumpable texture loaded: " + location
-                            + " size=" + ni.getWidth() + "x" + ni.getHeight()
-                            + " type=" + texture.getClass().getSimpleName());
-                }
-                return Optional.of(copyNativeImage(dumpableImage.get()));
-            }
-
-            File file = FabricTextureAccess.getHttpTextureFile(texture);
-            if (file != null && file.exists()) {
-                try {
-                    return Optional.of(NativeImage.read(new FileInputStream(file)));
-                } catch (Exception ignored) {
-                }
-            }
-        }
-
-        // 2) Resource manager fallback
-        try {
-            var resource = Minecraft.getInstance().getResourceManager().getResource(location);
-            if (resource.isPresent()) {
-                try (var is = resource.get().open()) {
-                    return Optional.of(NativeImage.read(is));
-                }
-            }
-        } catch (Exception ignored) {
-        }
-
-        return Optional.empty();
-    }
-
-    private static ResourceLocation normalizeDynamicGlyphLocation(ResourceLocation location) {
-        if (location == null || location.getPath() == null) {
-            return null;
-        }
-        String path = location.getPath();
-        // Glyph atlas pages are runtime textures in TextureManager (e.g. minecraft:default/0),
-        // but RenderType may expose them as resource-like paths (textures/default/0.png).
-        if (!path.startsWith("textures/default/")) {
-            return null;
-        }
-        String p = path.substring("textures/".length());
-        if (p.endsWith(".png")) {
-            p = p.substring(0, p.length() - ".png".length());
-        }
-        if (p.isEmpty()) {
-            return null;
-        }
-        return ResourceLocation.fromNamespaceAndPath(location.getNamespace(), p);
-    }
-
-    private static Optional<NativeImage> loadDumpableTexture(net.minecraft.client.renderer.texture.AbstractTexture texture,
-                                                             ResourceLocation location) {
-        if (!(texture instanceof Dumpable dumpable) || location == null) {
-            return Optional.empty();
-        }
-        Path tempDir = null;
-        try {
-            tempDir = Files.createTempDirectory("voxelbridge-fontdump-");
-            dumpable.dumpContents(location, tempDir);
-
-            try (Stream<Path> stream = Files.walk(tempDir)) {
-                Optional<Path> png = stream
-                    .filter(Files::isRegularFile)
-                    .filter(p -> p.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".png"))
-                    .findFirst();
-                if (png.isEmpty()) {
-                    return Optional.empty();
-                }
-                try (InputStream in = Files.newInputStream(png.get())) {
-                    return Optional.of(NativeImage.read(in));
-                }
-            }
-        } catch (Exception ignored) {
-            return Optional.empty();
-        } finally {
-            if (tempDir != null) {
-                try (Stream<Path> walk = Files.walk(tempDir)) {
-                    walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
-                        try {
-                            Files.deleteIfExists(p);
-                        } catch (Exception ignored) {
-                        }
-                    });
-                } catch (Exception ignored) {
-                }
-            }
-        }
+        return FabricDynamicTextureReader.INSTANCE.readTexture(location);
     }
 
     @Override
@@ -204,12 +60,6 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         if (src != null && dst != null) {
             dst.copyFrom(src);
         }
-    }
-
-    private NativeImage copyNativeImage(NativeImage src) {
-        NativeImage dst = new NativeImage(src.format(), src.getWidth(), src.getHeight(), false);
-        dst.copyFrom(src);
-        return dst;
     }
 
     @Override
@@ -296,79 +146,5 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
             return spriteName;
         }
         return ResourceLocation.fromNamespaceAndPath(spriteName.getNamespace(), "painting/" + path);
-    }
-
-    private static void preheatMapTexture(ResourceLocation location) {
-        int mapId = MapTextureUtil.parseMapId(location);
-        if (mapId < 0) {
-            return;
-        }
-        MapId id = new MapId(mapId);
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null) {
-            return;
-        }
-        var mapRenderer = mc.gameRenderer.getMapRenderer();
-        if (mapRenderer == null) {
-            return;
-        }
-        try {
-            MapItemSavedData data = MapItem.getSavedData(id, mc.level);
-            if (data != null) {
-                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.21.1] MapRenderer.update: " + id);
-                }
-                mapRenderer.update(id, data);
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    private static Optional<NativeImage> loadMapTexture(ResourceLocation location) {
-        int mapId = MapTextureUtil.parseMapId(location);
-        if (mapId < 0) {
-            return Optional.empty();
-        }
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null) {
-            return Optional.empty();
-        }
-        var mapRenderer = mc.gameRenderer.getMapRenderer();
-        if (mapRenderer == null) {
-            return Optional.empty();
-        }
-        try {
-            it.unimi.dsi.fastutil.ints.Int2ObjectMap<?> maps =
-                ((com.voxelbridge.mixin.MapRendererAccessor) (Object) mapRenderer).voxelbridge$getMaps();
-            if (maps == null) {
-                return Optional.empty();
-            }
-            Object instance = maps.get(mapId);
-            if (instance == null) {
-                return Optional.empty();
-            }
-
-            try {
-                ((com.voxelbridge.mixin.MapInstanceInvoker) (Object) instance).voxelbridge$forceUpload();
-            } catch (Exception ignored) {
-            }
-
-            DynamicTexture tex = ((com.voxelbridge.mixin.MapInstanceAccessor) (Object) instance).voxelbridge$getTexture();
-            if (tex == null) {
-                return Optional.empty();
-            }
-            NativeImage pixels = tex.getPixels();
-            if (pixels == null) {
-                return Optional.empty();
-            }
-            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP,
-                    "[FabricTextureHelper/1.21.1] Map pixels captured: id=" + mapId
-                        + " size=" + pixels.getWidth() + "x" + pixels.getHeight());
-            }
-            return Optional.of(pixels);
-        } catch (Exception ignored) {
-            return Optional.empty();
-        }
     }
 }

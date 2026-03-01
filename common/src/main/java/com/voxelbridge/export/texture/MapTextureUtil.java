@@ -74,59 +74,15 @@ public final class MapTextureUtil {
     }
 
     public static ResourceLocation normalizeDynamicMapLocation(ResourceLocation location) {
-        if (location == null) {
-            return null;
+        ResourceLocation normalized = DynamicTextureUtil.normalizeDynamicMapLocation(location);
+        if (normalized != null) {
+            debug("Normalize dynamic map location: " + location + " -> " + normalized);
         }
-        int id = parseMapId(location);
-        if (id < 0) {
-            return null;
-        }
-        ResourceLocation normalized = ResourceLocation.fromNamespaceAndPath(location.getNamespace(), "map/" + id);
-        debug("Normalize dynamic map location: " + location + " -> " + normalized);
         return normalized;
     }
 
     public static int parseMapId(ResourceLocation location) {
-        if (location == null) {
-            return -1;
-        }
-        String path = location.getPath();
-        if (path == null) {
-            return -1;
-        }
-        if (path.startsWith("map/")) {
-            return parseInt(path.substring("map/".length()));
-        }
-        if (path.startsWith("maps/")) {
-            return parseInt(path.substring("maps/".length()));
-        }
-        if (path.startsWith("textures/dynamic/map/")) {
-            String file = path.substring("textures/dynamic/map/".length());
-            int dot = file.indexOf('.');
-            if (dot > 0) {
-                file = file.substring(0, dot);
-            }
-            int underscore = file.indexOf('_');
-            String idStr = underscore > 0 ? file.substring(0, underscore) : file;
-            return parseInt(idStr);
-        }
-        if (path.startsWith("textures/map/")) {
-            String file = path.substring("textures/map/".length());
-            int dot = file.indexOf('.');
-            if (dot > 0) {
-                file = file.substring(0, dot);
-            }
-            return parseInt(file);
-        }
-        if (path.startsWith("textures/maps/")) {
-            String file = path.substring("textures/maps/".length());
-            int dot = file.indexOf('.');
-            if (dot > 0) {
-                file = file.substring(0, dot);
-            }
-            return parseInt(file);
-        }
-        return -1;
+        return DynamicTextureUtil.parseMapId(location);
     }
 
     private static boolean isMapPath(String path) {
@@ -144,17 +100,6 @@ public final class MapTextureUtil {
     private static void debug(String message) {
         if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
             VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[MapTextureUtil] " + message);
-        }
-    }
-
-    private static int parseInt(String value) {
-        if (value == null || value.isEmpty()) {
-            return -1;
-        }
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException ignored) {
-            return -1;
         }
     }
 }

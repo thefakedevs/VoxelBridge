@@ -1070,17 +1070,30 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
     }
 
     private String resolveBucketKey(String materialKey, String spriteKey) {
-        // Keep font-like quads in separate buckets so they don't get merged with
-        // block/entity base textures under the same material group.
-        if (spriteKey != null && isFontLikeSprite(spriteKey)) {
-            String base = materialKey != null ? materialKey : "material";
-            return base + "__font__" + com.voxelbridge.export.texture.TexturePathResolver.safe(spriteKey);
+        if (spriteKey == null) {
+            return materialKey;
         }
 
         String animName = resolveAnimationName(spriteKey);
-        if (animName == null) {
-            return materialKey;
+        if (animName != null) {
+            return resolveAnimatedBucketKey(materialKey, animName);
         }
+
+        // In INDIVIDUAL mode each sprite is a separate image file, so each unique
+        // sprite must land in its own bucket — otherwise pickPrimarySprite selects
+        // one texture and every other sprite's quads render with the wrong image.
+        // In ATLAS mode all sprites share one packed atlas, so merging is fine.
+        if (options.atlasMode() == com.voxelbridge.export.texture.ExportOptions.AtlasMode.INDIVIDUAL) {
+            if (!"voxelbridge:transparent".equals(spriteKey)) {
+                String base = materialKey != null ? materialKey : "material";
+                return base + "__" + com.voxelbridge.export.texture.TexturePathResolver.safe(spriteKey);
+            }
+        }
+
+        return materialKey;
+    }
+
+    private String resolveAnimatedBucketKey(String materialKey, String animName) {
         if (materialKey == null) {
             return animName;
         }
@@ -1120,19 +1133,6 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         java.util.Collections.reverse(suffixes);
         String mergedSuffix = String.join("_", suffixes);
         return animBase + "_" + mergedSuffix + animSuffix;
-    }
-
-    private boolean isFontLikeSprite(String spriteKey) {
-        if (spriteKey == null) {
-            return false;
-        }
-        String s = spriteKey.toLowerCase(java.util.Locale.ROOT);
-        return s.contains("/font/")
-            || s.contains(":font/")
-            || s.contains("textures/font/")
-            || s.contains(":default/")
-            || s.endsWith("/default/0")
-            || s.contains("/glyph");
     }
 
     private static final class PhaseProgress {

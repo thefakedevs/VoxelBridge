@@ -2,9 +2,7 @@ package com.voxelbridge.adapter;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.voxelbridge.compat.FabricAtlasAccess;
-import com.voxelbridge.compat.FabricPaintingAccess;
 import com.voxelbridge.compat.FabricSpriteAccess;
-import com.voxelbridge.compat.FabricTextureAccess;
 import com.voxelbridge.export.exporter.resolve.ResolvedTexture;
 import com.voxelbridge.util.debug.LogModule;
 import com.voxelbridge.util.debug.VoxelBridgeLogger;
@@ -56,45 +54,7 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
 
     @Override
     public Optional<NativeImage> readTexture(ResourceLocation location) {
-        if (location == null) {
-            return Optional.empty();
-        }
-
-        ResourceLocation normalized = normalizeDynamicLocation(location);
-        NativeImage cached = DynamicTextureCache.get(normalized);
-        if (cached != null) {
-            if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.20.1] Cache hit: " + normalized);
-            }
-            return Optional.of(copyNativeImage(cached));
-        }
-
-        // 1) Dynamic / HTTP textures (render thread)
-        if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
-            Optional<NativeImage> loaded = DynamicTextureCache.loadOnRenderThread(normalized);
-            if (loaded.isPresent()) {
-                if (VoxelBridgeLogger.isDebugEnabled(LogModule.DYNAMIC_MAP)) {
-                    VoxelBridgeLogger.debug(LogModule.DYNAMIC_MAP, "[FabricTextureHelper/1.20.1] Loaded on render thread: " + normalized);
-                }
-                return Optional.of(copyNativeImage(loaded.get()));
-            }
-        } else {
-            // Non-blocking preheat for dynamic/HTTP textures.
-            DynamicTextureCache.preheat(normalized);
-        }
-
-        // 2) Resource manager fallback
-        try {
-            var resource = Minecraft.getInstance().getResourceManager().getResource(location);
-            if (resource.isPresent()) {
-                try (var is = resource.get().open()) {
-                    return Optional.of(NativeImage.read(is));
-                }
-            }
-        } catch (Exception ignored) {
-        }
-
-        return Optional.empty();
+        return FabricDynamicTextureReader.INSTANCE.readTexture(location);
     }
 
     @Override
@@ -102,12 +62,6 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         if (src != null && dst != null) {
             dst.copyFrom(src);
         }
-    }
-
-    private NativeImage copyNativeImage(NativeImage src) {
-        NativeImage dst = new NativeImage(src.format(), src.getWidth(), src.getHeight(), false);
-        dst.copyFrom(src);
-        return dst;
     }
 
     @Override
@@ -254,46 +208,6 @@ public class FabricPlatformTextureHelper implements PlatformTextureHelper {
         } catch (Exception ignored) {
         }
         return -1;
-    }
-
-    private static ResourceLocation normalizeDynamicLocation(ResourceLocation location) {
-        if (location == null) {
-            return null;
-        }
-        String path = location.getPath();
-        if (path != null && path.startsWith("textures/default/")) {
-            String p = path.substring("textures/".length());
-            if (p.endsWith(".png")) {
-                p = p.substring(0, p.length() - ".png".length());
-            }
-            if (!p.isEmpty()) {
-                return new ResourceLocation(location.getNamespace(), p);
-            }
-        }
-        // Some render types expose dynamic map textures as textures/dynamic/map/<id>_<frame>.png
-        if (path != null && path.startsWith("textures/dynamic/map/")) {
-            String file = path.substring("textures/dynamic/map/".length());
-            int dot = file.indexOf('.');
-            if (dot > 0) {
-                file = file.substring(0, dot);
-            }
-            int underscore = file.indexOf('_');
-            String idStr = underscore > 0 ? file.substring(0, underscore) : file;
-            try {
-                int id = Integer.parseInt(idStr);
-                return new ResourceLocation(location.getNamespace(), "map/" + id);
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        if (path != null && path.startsWith("maps/")) {
-            String idStr = path.substring("maps/".length());
-            try {
-                int id = Integer.parseInt(idStr);
-                return new ResourceLocation(location.getNamespace(), "map/" + id);
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        return location;
     }
 
     private static ResourceLocation normalizePaintingSpriteName(ResourceLocation spriteName) {

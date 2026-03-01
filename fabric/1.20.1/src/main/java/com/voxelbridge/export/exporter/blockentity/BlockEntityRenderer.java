@@ -28,6 +28,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 
@@ -277,9 +278,7 @@ public final class BlockEntityRenderer {
         public void onQuad(RenderType renderType, List<RenderCapture.Vertex> verts) {
             if (verts.size() < 3) return;
 
-            if (shouldSkipTextQuad(renderType)) {
-                return;
-            }
+            // Text quads are now handled by resolveTexture via font texture fallback
 
             boolean logQuads = VoxelBridgeLogger.isDebugEnabled(LogModule.BLOCKENTITY);
             if (logQuads) {
@@ -352,7 +351,13 @@ public final class BlockEntityRenderer {
             RenderCaptureUtil.UvStats uvStats,
             float[] positions
         ) {
+            ResourceLocation rtTexture = renderType != null ? RENDER_TYPE_RESOLVER.resolve(renderType) : null;
             ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(source, renderType);
+            if (textureRes == null && isTextRenderType(renderType) && rtTexture != null) {
+                textureRes = new ResolvedTexture(rtTexture, 0f, 1f, 0f, 1f, false, null, null);
+            }
+            textureRes = resolveTextFallbackTexture(renderType, textureRes);
+
             if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
                 textureRes = RenderCaptureUtil.resolveAtlasSprite(
                     textureRes,
@@ -402,15 +407,73 @@ public final class BlockEntityRenderer {
             );
         }
 
-        private boolean shouldSkipTextQuad(RenderType renderType) {
+        private boolean isTextRenderType(RenderType renderType) {
             if (renderType == null) {
                 return false;
             }
             String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
             return name.contains("text_")
-                || name.contains("neoforge_text")
                 || name.contains("font")
                 || name.contains("glyph");
+        }
+
+        private ResolvedTexture resolveTextFallbackTexture(RenderType renderType, ResolvedTexture textureRes) {
+            if (!isTextRenderType(renderType)) {
+                return textureRes;
+            }
+            ResourceLocation current = textureRes != null ? textureRes.texture() : null;
+            if (!isDefaultOrMissingLike(current)) {
+                return textureRes;
+            }
+            ResourceLocation selected = extractFontTextureFromRenderType(renderType);
+            if (selected == null) {
+                return textureRes;
+            }
+            VoxelBridgeLogger.info(LogModule.DYNAMIC_MAP,
+                "[BlockEntityRenderer/1.20.1] Text fallback texture mapped " + current + " -> " + selected);
+            return new ResolvedTexture(selected, 0f, 1f, 0f, 1f, false, null, null);
+        }
+
+        private boolean isDefaultOrMissingLike(ResourceLocation loc) {
+            if (loc == null || loc.getPath() == null) {
+                return true;
+            }
+            String p = loc.getPath().toLowerCase(java.util.Locale.ROOT);
+            return p.startsWith("default/")
+                || p.startsWith("textures/default/")
+                || p.contains("missing")
+                || p.endsWith("/white")
+                || p.endsWith("white.png");
+        }
+
+        private ResourceLocation extractFontTextureFromRenderType(RenderType renderType) {
+            if (renderType == null) {
+                return null;
+            }
+            String raw = renderType.toString();
+            if (raw == null || raw.isEmpty()) {
+                return null;
+            }
+            String s = raw.toLowerCase(java.util.Locale.ROOT);
+            java.util.regex.Matcher dyn = java.util.regex.Pattern
+                .compile("([a-z0-9_.-]+:font/[a-z0-9_./-]+)")
+                .matcher(s);
+            if (dyn.find()) {
+                return ResourceLocation.tryParse(dyn.group(1));
+            }
+            java.util.regex.Matcher tex = java.util.regex.Pattern
+                .compile("([a-z0-9_.-]+:textures/[a-z0-9_./-]+\\.png)")
+                .matcher(s);
+            if (tex.find()) {
+                return ResourceLocation.tryParse(tex.group(1));
+            }
+            java.util.regex.Matcher ns = java.util.regex.Pattern
+                .compile("([a-z0-9_.-]+:[a-z0-9_./-]+)")
+                .matcher(s);
+            if (ns.find()) {
+                return ResourceLocation.tryParse(ns.group(1));
+            }
+            return null;
         }
 
         private void writeUvs(ExportContext ctx,

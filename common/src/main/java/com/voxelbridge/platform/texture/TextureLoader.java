@@ -49,12 +49,15 @@ public final class TextureLoader {
                     NativeImage nativeDynamic = dynamicOpt.get();
                     try {
                         BufferedImage dynamic = nativeImageToBufferedImage(nativeDynamic);
+                        if (com.voxelbridge.export.texture.DynamicTextureUtil.normalizeAll(png).kind()
+                                == com.voxelbridge.export.texture.DynamicTextureUtil.DynamicTextureKind.GLYPH) {
+                            com.voxelbridge.export.texture.DynamicTextureUtil.cleanGlyphPixels(dynamic);
+                        }
                         if (logResolve) {
                             VoxelBridgeLogger.info(LogModule.TEXTURE_RESOLVE, String.format("[TextureLoader] Loaded dynamic texture %s (%dx%d)", png, dynamic.getWidth(), dynamic.getHeight()));
                         }
                         return preserveAnimationStrip ? dynamic : extractFirstFrame(dynamic);
                     } finally {
-                        // NativeImage from helper is a copy, we should close it after conversion
                         nativeDynamic.close();
                     }
                 }
