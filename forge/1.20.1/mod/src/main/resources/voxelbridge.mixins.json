@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "package": "com.voxelbridge.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "minVersion": "0.8",
+  "refmap": "voxelbridge.refmap.json",
+  "client": [
+    "BakedQuadAccessor",
+    "HttpTextureAccessor",
+    "MapInstanceAccessor",
+    "MapInstanceInvoker",
+    "MapRendererAccessor",
+    "SpriteContentsAccessor",
+    "TextureAtlasAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

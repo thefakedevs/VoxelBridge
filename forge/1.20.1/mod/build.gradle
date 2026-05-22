@@ -1,0 +1,290 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
+    id 'com.gradleup.shadow' version '9.2.2'
+}
+
+ext {
+    active_forge_mc = "1.20.1"
+    forge_minecraft_version = "1.20.1"
+    forge_version = "47.3.0"
+    forge_minecraft_version_range = "[1.20.1]"
+    forge_loader_version_range = "[47,)"
+}
+
+def activeForgeMc = (project.findProperty('active_forge_mc') ?: '1.20.1').toString()
+def platform = "forge"
+def mcVersionDir = rootProject.file("forge/${activeForgeMc}")
+def mcProjectDir = project.projectDir
+
+buildDir = rootProject.file("build/${platform}/${activeForgeMc}")
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = "VoxelBridge-forge-${activeForgeMc}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+repositories {
+    maven { url = 'https://maven.minecraftforge.net/' }
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+    mavenCentral()
+}
+
+def jgltfVersion = '2.0.4'
+def pngjVersion = '2.1.0'
+def troveVersion = '3.0.3'
+def jacksonDatabindVersion = '2.13.4.2'
+def jacksonCoreVersion = '2.13.4'
+def jacksonAnnotationsVersion = '2.13.4'
+
+configurations {
+    shaded
+    implementation.extendsFrom shaded
+}
+
+def runtimeLibs = [
+    "de.javagl:jgltf-model:${jgltfVersion}",
+    "de.javagl:jgltf-impl-v1:${jgltfVersion}",
+    "de.javagl:jgltf-impl-v2:${jgltfVersion}",
+    "ar.com.hjg:pngj:${pngjVersion}",
+    "net.sf.trove4j:trove4j:${troveVersion}",
+    "com.fasterxml.jackson.core:jackson-annotations:${jacksonAnnotationsVersion}",
+    "com.fasterxml.jackson.core:jackson-core:${jacksonCoreVersion}",
+    "com.fasterxml.jackson.core:jackson-databind:${jacksonDatabindVersion}"
+]
+
+minecraft {
+    mappings channel: 'official', version: forge_minecraft_version
+    copyIdeResources = true
+
+    runs {
+        client {
+            workingDirectory rootProject.file("run/${platform}/${activeForgeMc}")
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                voxelbridge {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory rootProject.file("run/${platform}/${activeForgeMc}-server")
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            args '--nogui'
+            mods {
+                voxelbridge {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory rootProject.file("run/${platform}/${activeForgeMc}-data")
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            args '--mod', mod_id, '--all',
+                    '--output', file("${mcVersionDir}/src/generated/resources/"),
+                    '--existing', file("${mcProjectDir}/src/main/resources/")
+            mods {
+                voxelbridge {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        configureEach {
+            lazyToken('minecraft_classpath') {
+                configurations.minecraftLibrary.copyRecursive().resolve()
+                    .collect { it.absolutePath }
+                    .join(File.pathSeparator)
+            }
+        }
+    }
+}
+
+mixin {
+    add sourceSets.main, "voxelbridge.refmap.json"
+    config "voxelbridge.mixins.json"
+}
+
+sourceSets {
+    main {
+        def filteredCommonDir = file("$buildDir/filtered-common")
+        def forgeBackportsDir = file("$buildDir/forge-backports")
+        tasks.register("syncCommonForForge1201", Sync) {
+            from("${rootProject.projectDir}/common/src/main/java") {
+                exclude(
+                    "com/voxelbridge/export/exporter/blockentity/BannerTextureBaker.java",
+                    "com/voxelbridge/export/exporter/blockentity/BannerBlockEntityHandler.java",
+                    "com/voxelbridge/export/exporter/blockentity/BlockEntityExporter.java",
+                    "com/voxelbridge/export/exporter/blockentity/BlockEntityTextureResolver.java",
+                    "com/voxelbridge/export/exporter/blockentity/SignBlockEntityHandler.java",
+                    "com/voxelbridge/export/exporter/blockentity/BlockEntityRenderer.java",
+                    "com/voxelbridge/export/exporter/entity/EntityRenderer.java",
+                    "com/voxelbridge/export/exporter/entity/EntityTextureResolver.java",
+                    "com/voxelbridge/export/exporter/FluidExporter.java",
+                    "com/voxelbridge/export/exporter/QuadCollector.java",
+                    "com/voxelbridge/export/texture/AnimatedTextureHelper.java",
+                    "com/voxelbridge/export/texture/MapTextureUtil.java",
+                    "com/voxelbridge/export/texture/MinecraftTextureAccess.java",
+                    "com/voxelbridge/export/texture/PbrTextureHelper.java",
+                    "com/voxelbridge/export/texture/SpriteKeyResolver.java",
+                    "com/voxelbridge/export/StreamingRegionSampler.java",
+                    "com/voxelbridge/export/scene/gltf/GltfExportService.java",
+                    "com/voxelbridge/platform/render/capture/RenderCapture.java",
+                    "com/voxelbridge/platform/texture/TextureLoader.java",
+                    "com/voxelbridge/util/ResourceLocationUtil.java"
+                )
+            }
+            into(filteredCommonDir)
+        }
+        tasks.register("syncForge1201Backports", Sync) {
+            from("${rootProject.projectDir}/fabric/1.20.1/src/main/java") {
+                include(
+                    "com/voxelbridge/export/exporter/blockentity/BannerTextureBaker.java",
+                    "com/voxelbridge/export/exporter/blockentity/BannerBlockEntityHandler.java",
+                    "com/voxelbridge/export/exporter/blockentity/BlockEntityExporter.java",
+                    "com/voxelbridge/export/exporter/blockentity/BlockEntityTextureResolver.java",
+                    "com/voxelbridge/export/exporter/blockentity/SignBlockEntityHandler.java",
+                    "com/voxelbridge/export/exporter/blockentity/BlockEntityRenderer.java",
+                    "com/voxelbridge/export/exporter/entity/EntityRenderer.java",
+                    "com/voxelbridge/export/exporter/entity/EntityTextureResolver.java",
+                    "com/voxelbridge/export/exporter/FluidExporter.java",
+                    "com/voxelbridge/export/exporter/QuadCollector.java",
+                    "com/voxelbridge/export/texture/AnimatedTextureHelper.java",
+                    "com/voxelbridge/export/texture/MinecraftTextureAccess.java",
+                    "com/voxelbridge/export/texture/PbrTextureHelper.java",
+                    "com/voxelbridge/export/texture/SpriteKeyResolver.java",
+                    "com/voxelbridge/export/StreamingRegionSampler.java",
+                    "com/voxelbridge/export/scene/gltf/GltfExportService.java",
+                    "com/voxelbridge/platform/render/capture/RenderCapture.java",
+                    "com/voxelbridge/platform/texture/TextureLoader.java",
+                    "com/voxelbridge/util/ResourceLocationUtil.java"
+                )
+            }
+            into(forgeBackportsDir)
+        }
+        java.srcDirs = [
+            "${mcProjectDir}/src/main/java",
+            "${rootProject.projectDir}/core/src/main/java",
+            filteredCommonDir,
+            forgeBackportsDir
+        ]
+        resources.srcDirs = [
+            "${mcProjectDir}/src/main/resources",
+            "${mcVersionDir}/src/generated/resources"
+        ]
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${forge_minecraft_version}-${forge_version}"
+
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+
+    compileOnly "org.apache.logging.log4j:log4j-api:2.20.0"
+    compileOnly "org.apache.logging.log4j:log4j-core:2.20.0"
+
+    runtimeLibs.each { dependencyNotation ->
+        shaded dependencyNotation
+        minecraftLibrary dependencyNotation
+    }
+}
+
+tasks.named("compileJava").configure {
+    dependsOn "syncCommonForForge1201"
+    dependsOn "syncForge1201Backports"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+processResources {
+    inputs.property 'mod_id', mod_id
+    inputs.property 'mod_name', mod_name
+    inputs.property 'mod_version', mod_version
+    inputs.property 'mod_description', mod_description
+    inputs.property 'mod_authors', mod_authors
+    inputs.property 'mod_license', mod_license
+    inputs.property 'forge_minecraft_version', forge_minecraft_version
+    inputs.property 'forge_minecraft_version_range', forge_minecraft_version_range
+    inputs.property 'forge_loader_version_range', forge_loader_version_range
+    filesMatching('META-INF/mods.toml') {
+        expand(
+            mod_id: mod_id,
+            mod_name: mod_name,
+            mod_version: mod_version,
+            mod_description: mod_description,
+            mod_authors: mod_authors,
+            mod_license: mod_license,
+            forge_minecraft_version: forge_minecraft_version,
+            forge_minecraft_version_range: forge_minecraft_version_range,
+            forge_loader_version_range: forge_loader_version_range
+        )
+    }
+}
+
+jar {
+    manifest {
+        attributes([
+            "Specification-Title": mod_id,
+            "Specification-Vendor": mod_authors,
+            "Specification-Version": "1",
+            "Implementation-Title": mod_name,
+            "Implementation-Version": mod_version,
+            "Implementation-Vendor": mod_authors,
+            "MixinConfigs": "voxelbridge.mixins.json"
+        ])
+    }
+}
+
+tasks.named('shadowJar') {
+    archiveClassifier.set('all')
+    configurations = [project.configurations.shaded]
+    relocate 'de.javagl.jgltf', 'com.voxelbridge.shadow.jgltf'
+    relocate 'ar.com.hjg.pngj', 'com.voxelbridge.shadow.pngj'
+    relocate 'gnu.trove', 'com.voxelbridge.shadow.trove'
+    relocate 'com.fasterxml.jackson', 'com.voxelbridge.shadow.jackson'
+    mergeServiceFiles()
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    destinationDirectory = layout.buildDirectory.dir("libs")
+}
+
+reobf {
+    shadowJar {}
+}
+
+tasks.named('shadowJar') { finalizedBy 'reobfShadowJar' }
+tasks.named('assemble') { dependsOn tasks.shadowJar }
+
+def taskGroupRoot = "voxelbridge/forge/mod/${activeForgeMc}"
+def groupForTask = { Task task ->
+    def name = task.name
+    def category
+    if (name ==~ /^(run|prepare).*/ || name.endsWith("Run")) {
+        category = "moddev"
+    } else if (name.startsWith("publish") || name == "publishToMavenLocal") {
+        category = "publish"
+    } else if (task instanceof org.gradle.api.tasks.VerificationTask || name == "check" || name.endsWith("Test")) {
+        category = "verification"
+    } else if (name == "build" || name == "assemble" || name == "clean" || name.endsWith("Jar") || name.startsWith("reobf")) {
+        category = "build"
+    } else {
+        category = "misc"
+    }
+    return "${taskGroupRoot}/${category}"
+}
+
+tasks.configureEach { task ->
+    task.group = groupForTask(task)
+}

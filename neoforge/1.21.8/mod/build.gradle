@@ -89,7 +89,7 @@ neoForge {
         }
 
         data {
-            data()
+            clientData()
             programArguments.addAll '--mod', project.mod_id, '--all',
                 '--output', file("${mcProjectDir}/src/generated/resources/").getAbsolutePath(),
                 '--existing', file("${mcProjectDir}/src/main/resources/").getAbsolutePath()
