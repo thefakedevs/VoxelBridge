@@ -6,7 +6,6 @@
   "refmap": "voxelbridge.refmap.json",
   "client": [
     "BakedQuadAccessor",
-    "HttpTextureAccessor",
     "MapInstanceAccessor",
     "MapInstanceInvoker",
     "MapRendererAccessor",

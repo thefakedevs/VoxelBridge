@@ -251,6 +251,9 @@ jar {
 tasks.named('shadowJar') {
     archiveClassifier.set('all')
     configurations = [project.configurations.shaded]
+    manifest {
+        attributes 'Multi-Release': 'false'
+    }
     relocate 'de.javagl.jgltf', 'com.voxelbridge.shadow.jgltf'
     relocate 'ar.com.hjg.pngj', 'com.voxelbridge.shadow.pngj'
     relocate 'gnu.trove', 'com.voxelbridge.shadow.trove'
@@ -260,11 +263,59 @@ tasks.named('shadowJar') {
     destinationDirectory = layout.buildDirectory.dir("libs")
 }
 
+tasks.register('fixShadowJarManifest') {
+    dependsOn tasks.named('reobfShadowJar')
+    doLast {
+        File jarFile = tasks.named('shadowJar').get().archiveFile.get().asFile
+        File fixedFile = new File(jarFile.parentFile, "${jarFile.name}.fixed")
+        def input = new java.util.jar.JarFile(jarFile)
+        try {
+            def manifest = input.manifest ?: new java.util.jar.Manifest()
+            def attrs = manifest.mainAttributes
+            attrs.put(java.util.jar.Attributes.Name.MANIFEST_VERSION, attrs.getValue(java.util.jar.Attributes.Name.MANIFEST_VERSION) ?: '1.0')
+            attrs.putValue('Multi-Release', 'false')
+            def output = new java.util.jar.JarOutputStream(new FileOutputStream(fixedFile), manifest)
+            try {
+                input.entries().each { entry ->
+                    if (entry.name.equalsIgnoreCase('META-INF/MANIFEST.MF')) {
+                        return
+                    }
+                    def newEntry = new java.util.jar.JarEntry(entry.name)
+                    newEntry.time = entry.time
+                    if (entry.method == java.util.zip.ZipEntry.STORED) {
+                        newEntry.method = entry.method
+                        newEntry.size = entry.size
+                        newEntry.compressedSize = entry.compressedSize
+                        newEntry.crc = entry.crc
+                    }
+                    output.putNextEntry(newEntry)
+                    if (!entry.directory) {
+                        input.getInputStream(entry).withCloseable { stream ->
+                            stream.transferTo(output)
+                        }
+                    }
+                    output.closeEntry()
+                }
+            } finally {
+                output.close()
+            }
+        } finally {
+            input.close()
+        }
+        java.nio.file.Files.move(
+            fixedFile.toPath(),
+            jarFile.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+    }
+}
+
 reobf {
     shadowJar {}
 }
 
 tasks.named('shadowJar') { finalizedBy 'reobfShadowJar' }
+tasks.named('reobfShadowJar') { finalizedBy 'fixShadowJarManifest' }
 tasks.named('assemble') { dependsOn tasks.shadowJar }
 
 def taskGroupRoot = "voxelbridge/forge/mod/${activeForgeMc}"
