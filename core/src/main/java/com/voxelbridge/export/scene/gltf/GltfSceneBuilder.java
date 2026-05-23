@@ -14,6 +14,7 @@ import de.javagl.jgltf.model.io.GltfAsset;
 import de.javagl.jgltf.model.io.GltfAssetWriter;
 import de.javagl.jgltf.model.io.v2.GltfAssetV2;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -892,6 +893,13 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
         pbr.setMetallicFactor(0.0f);
         pbr.setRoughnessFactor(1.0f);
         material.setPbrMetallicRoughness(pbr);
+        String alphaMode = detectAlphaMode(sampleSprite);
+        if (alphaMode != null) {
+            material.setAlphaMode(alphaMode);
+            if ("MASK".equals(alphaMode)) {
+                material.setAlphaCutoff(0.5f);
+            }
+        }
         boolean forceDoubleSided = com.voxelbridge.config.ExportRuntimeConfig.isExportDoubleSidedEnabled();
         material.setDoubleSided(forceDoubleSided || doubleSided);
 
@@ -971,6 +979,43 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
             }
         }
         return list.get(0);
+    }
+
+    private String detectAlphaMode(String spriteKey) {
+        BufferedImage image = state.getTextureRepository().getBySpriteKey(spriteKey);
+        if (image == null && options.animationEnabled()) {
+            var frames = state.getTextureRepository().getAnimation(spriteKey);
+            if (frames != null && !frames.isEmpty()) {
+                image = frames.frames().get(0);
+            }
+        }
+        if (image == null) {
+            return null;
+        }
+
+        boolean hasTransparent = false;
+        boolean hasPartial = false;
+        int width = image.getWidth();
+        int height = image.getHeight();
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int alpha = (image.getRGB(x, y) >>> 24) & 0xFF;
+                if (alpha < 255) {
+                    hasTransparent = true;
+                    if (alpha > 0) {
+                        hasPartial = true;
+                        break;
+                    }
+                }
+            }
+            if (hasPartial) {
+                break;
+            }
+        }
+        if (hasPartial) {
+            return "BLEND";
+        }
+        return hasTransparent ? "MASK" : null;
     }
 
     private int addView(GlTF gltf, int bufferIndex, int byteOffset, int byteLength, int target) {
@@ -1079,15 +1124,12 @@ public final class GltfSceneBuilder implements IrSink, IrBulkQuadSink {
             return resolveAnimatedBucketKey(materialKey, animName);
         }
 
-        // In INDIVIDUAL mode each sprite is a separate image file, so each unique
-        // sprite must land in its own bucket — otherwise pickPrimarySprite selects
-        // one texture and every other sprite's quads render with the wrong image.
-        // In ATLAS mode all sprites share one packed atlas, so merging is fine.
-        if (options.atlasMode() == com.voxelbridge.export.texture.ExportOptions.AtlasMode.INDIVIDUAL) {
-            if (!"voxelbridge:transparent".equals(spriteKey)) {
-                String base = materialKey != null ? materialKey : "material";
-                return base + "__" + com.voxelbridge.export.texture.TexturePathResolver.safe(spriteKey);
-            }
+        // A glTF primitive has exactly one material texture. Even in ATLAS mode,
+        // different sprites can land on different atlas pages, so keep sprite
+        // buckets separate and let UV remap place each sprite inside its image.
+        if (!"voxelbridge:transparent".equals(spriteKey)) {
+            String base = materialKey != null ? materialKey : "material";
+            return base + "__" + com.voxelbridge.export.texture.TexturePathResolver.safe(spriteKey);
         }
 
         return materialKey;

@@ -14,9 +14,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public final class BlockEntityRenderBatch {
 
     // Concurrent queue so worker threads can enqueue safely
-    private final ConcurrentLinkedQueue<BlockEntityRenderer.RenderTask> tasks = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<Runnable> tasks = new ConcurrentLinkedQueue<>();
 
-    public void enqueue(BlockEntityRenderer.RenderTask task) {
+    public void enqueue(Runnable task) {
         if (task != null) {
             tasks.add(task);
             com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderBatch] Enqueued task, total queued: " + tasks.size());
@@ -39,7 +39,7 @@ public final class BlockEntityRenderBatch {
         com.voxelbridge.util.debug.VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[BlockEntityRenderBatch] flush() called with " + taskCount + " tasks");
         mc.executeBlocking(() -> {
             int executed = 0;
-            BlockEntityRenderer.RenderTask task;
+            Runnable task;
             while ((task = tasks.poll()) != null) {
                 try {
                     task.run();

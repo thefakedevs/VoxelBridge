@@ -19,6 +19,7 @@ public final class BlockEntityExporter {
     private static final List<BlockEntityHandler> HANDLERS = List.of(
         new BannerBlockEntityHandler(),
         new SignBlockEntityHandler(),
+        new CreateTrackBlockEntityHandler(),
         new GenericBlockEntityHandler()
     );
 

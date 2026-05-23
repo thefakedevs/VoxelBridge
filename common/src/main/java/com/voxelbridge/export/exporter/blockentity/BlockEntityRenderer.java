@@ -31,7 +31,11 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
 
 import java.awt.image.BufferedImage;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -46,6 +50,8 @@ public final class BlockEntityRenderer {
     private static TextureResolver<BlockEntity> TEXTURE_RESOLVER = BlockEntityTextureResolver.INSTANCE;
     private static RenderTypeResolver RENDER_TYPE_RESOLVER = RenderTypeTextureResolver.INSTANCE;
     private static final ConcurrentHashMap<Long, PlaneOffsetTracker> CHUNK_PLANE_OFFSETS = new ConcurrentHashMap<>();
+    private static final ResourceLocation BLOCK_ATLAS_TEXTURE =
+        ResourceLocation.tryParse("minecraft:textures/atlas/blocks.png");
 
     private BlockEntityRenderer() {}
 
@@ -145,6 +151,82 @@ public final class BlockEntityRenderer {
         int chunkX = pos.getX() >> 4;
         int chunkZ = pos.getZ() >> 4;
         return new RenderTask(ctx, blockEntity, sceneSink, offsetX, offsetY, offsetZ, overrides, renderer, chunkX, chunkZ);
+    }
+
+    public static CreateTrackConnectionsRenderTask createCreateTrackConnectionsTask(
+        ExportContext ctx,
+        BlockEntity blockEntity,
+        IrSink sceneSink,
+        double offsetX,
+        double offsetY,
+        double offsetZ
+    ) {
+        try {
+            Map<?, ?> connections = getCreateTrackConnections(blockEntity);
+            if (connections == null || connections.isEmpty()) {
+                return null;
+            }
+
+            Class<?> rendererClass = Class.forName(
+                "com.simibubi.create.content.trains.track.TrackRenderer",
+                false,
+                blockEntity.getClass().getClassLoader()
+            );
+            Method renderBezierTurn = findCreateTrackRenderMethod(rendererClass);
+            if (renderBezierTurn == null) {
+                VoxelBridgeLogger.warn(LogModule.BLOCKENTITY,
+                    "[BlockEntityRenderer] Create TrackRenderer.renderBezierTurn not found");
+                return null;
+            }
+            renderBezierTurn.setAccessible(true);
+
+            BlockPos pos = blockEntity.getBlockPos();
+            return new CreateTrackConnectionsRenderTask(
+                ctx,
+                blockEntity,
+                sceneSink,
+                offsetX,
+                offsetY,
+                offsetZ,
+                renderBezierTurn,
+                pos.getX() >> 4,
+                pos.getZ() >> 4
+            );
+        } catch (Throwable t) {
+            VoxelBridgeLogger.warn(LogModule.BLOCKENTITY,
+                "[BlockEntityRenderer] Create track task creation failed: " + t.getMessage());
+            return null;
+        }
+    }
+
+    private static Method findCreateTrackRenderMethod(Class<?> rendererClass) {
+        for (Method method : rendererClass.getDeclaredMethods()) {
+            if ("renderBezierTurn".equals(method.getName()) && method.getParameterCount() == 4) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    private static Map<?, ?> getCreateTrackConnections(BlockEntity blockEntity) throws ReflectiveOperationException {
+        try {
+            Method getConnections = blockEntity.getClass().getMethod("getConnections");
+            Object result = getConnections.invoke(blockEntity);
+            return result instanceof Map<?, ?> map ? map : null;
+        } catch (NoSuchMethodException ignored) {
+            Class<?> type = blockEntity.getClass();
+            while (type != null) {
+                try {
+                    Field connections = type.getDeclaredField("connections");
+                    connections.setAccessible(true);
+                    Object result = connections.get(blockEntity);
+                    return result instanceof Map<?, ?> map ? map : null;
+                } catch (NoSuchFieldException e) {
+                    type = type.getSuperclass();
+                }
+            }
+            return null;
+        }
     }
 
     /**
@@ -249,6 +331,89 @@ public final class BlockEntityRenderer {
         }
     }
 
+    public static final class CreateTrackConnectionsRenderTask implements Runnable {
+        private final ExportContext ctx;
+        private final BlockEntity blockEntity;
+        private final IrSink sceneSink;
+        private final double offsetX;
+        private final double offsetY;
+        private final double offsetZ;
+        private final Method renderBezierTurn;
+        private final int chunkX;
+        private final int chunkZ;
+        private boolean success;
+
+        CreateTrackConnectionsRenderTask(
+            ExportContext ctx,
+            BlockEntity blockEntity,
+            IrSink sceneSink,
+            double offsetX,
+            double offsetY,
+            double offsetZ,
+            Method renderBezierTurn,
+            int chunkX,
+            int chunkZ
+        ) {
+            this.ctx = ctx;
+            this.blockEntity = blockEntity;
+            this.sceneSink = sceneSink;
+            this.offsetX = offsetX;
+            this.offsetY = offsetY;
+            this.offsetZ = offsetZ;
+            this.renderBezierTurn = renderBezierTurn;
+            this.chunkX = chunkX;
+            this.chunkZ = chunkZ;
+        }
+
+        @Override
+        public void run() {
+            sceneSink.onChunkStart(chunkX, chunkZ);
+            try {
+                this.success = renderCreateTrackConnectionsDirect();
+            } finally {
+                sceneSink.onChunkEnd(chunkX, chunkZ, this.success);
+            }
+        }
+
+        public boolean wasSuccessful() {
+            return success;
+        }
+
+        private boolean renderCreateTrackConnectionsDirect() {
+            try {
+                Map<?, ?> connections = getCreateTrackConnections(blockEntity);
+                if (connections == null || connections.isEmpty()) {
+                    return false;
+                }
+
+                PoseStack poseStack = new PoseStack();
+                poseStack.translate(offsetX, offsetY, offsetZ);
+
+                BlockPos pos = blockEntity.getBlockPos();
+                CaptureBuffer captureBuffer = new CaptureBuffer(ctx, sceneSink, blockEntity,
+                    pos.getX() >> 4, pos.getZ() >> 4, BLOCK_ATLAS_TEXTURE);
+                var vertexConsumer = captureBuffer.getBuffer(RenderType.solid());
+                Object level = blockEntity.getLevel();
+
+                Collection<?> values = connections.values();
+                for (Object connection : values) {
+                    renderBezierTurn.invoke(null, level, connection, poseStack, vertexConsumer);
+                }
+                captureBuffer.flush();
+
+                boolean hadGeometry = captureBuffer.hadGeometry();
+                VoxelBridgeLogger.debug(LogModule.BLOCKENTITY,
+                    "[BlockEntityRenderer] Create track connections rendered, hadGeometry=" + hadGeometry);
+                return hadGeometry;
+            } catch (Throwable t) {
+                VoxelBridgeLogger.warn(LogModule.BLOCKENTITY,
+                    "[BlockEntityRenderer] Create track render failed: " + t.getMessage());
+                t.printStackTrace();
+                return false;
+            }
+        }
+    }
+
     /**
      * Captures rendered geometry from BlockEntity renderers.
      */
@@ -259,8 +424,14 @@ public final class BlockEntityRenderer {
         private final BlockEntity blockEntity;
         private final TextureOverrideMap overrides;
         private final PlaneOffsetTracker planeOffset;
+        private final ResourceLocation fallbackAtlasTexture;
 
         CaptureBuffer(ExportContext ctx, IrSink sceneSink, BlockEntity blockEntity, int chunkX, int chunkZ) {
+            this(ctx, sceneSink, blockEntity, chunkX, chunkZ, null);
+        }
+
+        CaptureBuffer(ExportContext ctx, IrSink sceneSink, BlockEntity blockEntity, int chunkX, int chunkZ,
+                      ResourceLocation fallbackAtlasTexture) {
             super(ctx, sceneSink, (renderType, queuedVertices) -> {
                 if (VoxelBridgeLogger.isDebugEnabled(LogModule.BLOCKENTITY)) {
                     VoxelBridgeLogger.debug(LogModule.BLOCKENTITY, "[VertexCollector] setNormal called, vertices.size=" + queuedVertices);
@@ -268,6 +439,7 @@ public final class BlockEntityRenderer {
             });
             this.blockEntity = blockEntity;
             this.overrides = OVERRIDES.get();
+            this.fallbackAtlasTexture = fallbackAtlasTexture;
             this.planeOffset = CHUNK_PLANE_OFFSETS.computeIfAbsent(
                 chunkKey(chunkX, chunkZ),
                 key -> new PlaneOffsetTracker(3.0f, 1e-3f, 1e-3f, 1000f, 1000f, 1000f)
@@ -355,6 +527,9 @@ public final class BlockEntityRenderer {
             ResolvedTexture textureRes = TEXTURE_RESOLVER.resolve(source, renderType);
             if (textureRes == null && isTextRenderType(renderType) && rtTexture != null) {
                 textureRes = new ResolvedTexture(rtTexture, 0f, 1f, 0f, 1f, false, null, null);
+            }
+            if (textureRes == null && fallbackAtlasTexture != null) {
+                textureRes = new ResolvedTexture(fallbackAtlasTexture, 0f, 1f, 0f, 1f, true, null, fallbackAtlasTexture);
             }
             textureRes = resolveTextFallbackTexture(ctx, renderType, uvStats, textureRes);
             if (textureRes != null && textureRes.isAtlasTexture() && textureRes.sprite() == null) {
